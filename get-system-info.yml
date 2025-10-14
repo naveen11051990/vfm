@@ -1,7 +1,9 @@
 ---
 - name: Gather system info
-  hosts: "firewall"
+  hosts: "PRODUCTIONFIREWALL"
   connection: local
+  collections:
+    - paloaltonetworks.panos
 
   vars:
     device:
@@ -9,8 +11,6 @@
       username: "{{ username }}"
       password: "{{ password }}"
 
-  collections:
-    - paloaltonetworks.panos
 
   tasks:
     - name: Gather facts for device
