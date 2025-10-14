@@ -7,9 +7,9 @@
 
   vars:
     device:
-      ip_address: "{{ 192.168.29.221 }}"
-      username: "{{ naveen }}"
-      password: "{{ Naveen@vfm2025! }}"
+      ip_address: "192.168.29.221"
+      username: "naveen"
+      password: "Naveen@vfm2025!"
 
 
   tasks:
