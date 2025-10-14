@@ -1,13 +1,13 @@
 ---
 - name: Gather security rules
-  hosts: "firewall"
+  hosts: "PRODUCTIONFIREWALL"
   connection: local
 
   vars:
     device:
-      ip_address: "{{ ip_address }}"
-      username: "{{ username }}"
-      password: "{{ password }}"
+      ip_address: "192.168.29.221"
+      username: "naveen"
+      password: "Naveen@vfm2025!"
 
   collections:
     - paloaltonetworks.panos
