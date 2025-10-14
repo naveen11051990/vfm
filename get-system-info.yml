@@ -1,6 +1,6 @@
 ---
 - name: Gather system info
-  hosts: "PRODUCTIONFIREWALL"
+  hosts: "firewall"
   connection: local
   collections:
     - paloaltonetworks.panos
