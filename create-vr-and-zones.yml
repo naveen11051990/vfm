@@ -20,6 +20,9 @@
          username: "{{ username }}"
          password: "{{ password }}"
         name: "new-vrouter"
+        vsys: "vsys1"
+        state: present
+        commit: true
 
     - name: Create zone for Internet
       paloaltonetworks.panos.panos_zone:
