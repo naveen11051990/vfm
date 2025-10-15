@@ -1,6 +1,6 @@
 ---
-- name: Create VR and Zones
-  hosts: "PRODUCTIONFIREWALL"
+- name: Create VR and Zones, then commit once
+  hosts: PRODUCTIONFIREWALL
   connection: local
 
   vars:
@@ -15,35 +15,39 @@
   tasks:
     - name: Create new Virtual Router
       paloaltonetworks.panos.panos_virtual_router:
-        provider:
-         ip_address: "{{ ip_address }}"
-         username: "{{ username }}"
-         password: "{{ password }}"
-        name: "new-vrouter"
+        provider: "{{ device }}"
         vsys: "vsys1"
+        name: "new-vrouter"
         state: present
-        commit: true
 
     - name: Create zone for Internet
       paloaltonetworks.panos.panos_zone:
-        provider:
-         ip_address: "{{ ip_address }}"
-         username: "{{ username }}"
-         password: "{{ password }}"
+        provider: "{{ device }}"
+        vsys: "vsys1"
         zone: "internet"
         mode: "layer3"
         enable_userid: false
+        state: present
 
     - name: Create zone for DMZ
       paloaltonetworks.panos.panos_zone:
         provider: "{{ device }}"
+        vsys: "vsys1"
         zone: "dmz"
         mode: "layer3"
         enable_userid: false
+        state: present
 
     - name: Create zone for Users
       paloaltonetworks.panos.panos_zone:
         provider: "{{ device }}"
+        vsys: "vsys1"
         zone: "users"
         mode: "layer3"
         enable_userid: true
+        state: present
+
+    - name: Commit candidate configuration
+      paloaltonetworks.panos.panos_commit:
+        provider: "{{ device }}"
+ 
