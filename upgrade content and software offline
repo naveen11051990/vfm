@@ -1,6 +1,6 @@
 ---
 - name: Upgrade firewall and content offline
-  hosts: "firewall"
+  hosts: "PRODUCTIONFIREWALL"
   connection: local
 
   vars:
