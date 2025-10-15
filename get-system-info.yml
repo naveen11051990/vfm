@@ -1,24 +1,21 @@
 ---
 - name: Gather system info
-  hosts: "PRODUCTIONFIREWALL"
+  hosts: "firewall"
   connection: local
-  collections:
-    - paloaltonetworks.panos
 
   vars:
     device:
-      ip_address: "192.168.29.221"
-      username: "naveen"
-      password: "P@ssw0rd@@vfm2025!"
+      ip_address: "{{ ip_address }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
 
+  collections:
+    - paloaltonetworks.panos
 
   tasks:
     - name: Gather facts for device
       paloaltonetworks.panos.panos_facts:
-        provider:
-         ip_address: "192.168.29.221"
-         username: "naveen"
-         password: "P@ssw0rd@@vfm2025!"
+        provider: "{{ device }}"
 
     - name: Display information
       ansible.builtin.debug:
