@@ -15,7 +15,11 @@
   tasks:
     - name: Create new Virtual Router
       paloaltonetworks.panos.panos_virtual_router:
-        provider: "{{ device }}"
+        provider:
+         ip_address: "{{ ip_address }}"
+         username: "{{ username }}"
+         password: "{{ password }}"
+        
         name: "new-vrouter"
 
     - name: Create zone for Internet
