@@ -19,12 +19,14 @@
          ip_address: "{{ ip_address }}"
          username: "{{ username }}"
          password: "{{ password }}"
-        
-        name: "new-vrouter"
+         name: "new-vrouter"
 
     - name: Create zone for Internet
       paloaltonetworks.panos.panos_zone:
-        provider: "{{ device }}"
+        provider:
+         ip_address: "{{ ip_address }}"
+         username: "{{ username }}"
+         password: "{{ password }}"
         zone: "internet"
         mode: "layer3"
         enable_userid: false
