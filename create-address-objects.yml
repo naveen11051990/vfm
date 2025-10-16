@@ -29,7 +29,7 @@
         description: "Address object 2 from Ansible"
 
 
-      name: Commit candidate configuration
+    - name: Commit candidate configuration
       paloaltonetworks.panos.panos_commit:
-        provider: "{{ device }}"
+      provider: "{{ device }}"
       
