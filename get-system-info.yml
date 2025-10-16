@@ -30,3 +30,16 @@
           - "HA Status: {{ ansible_facts['net_ha_localstate'] }}"
           - "Multi-VSYS: {{ ansible_facts['net_multivsys'] }}"
           - "{{ ansible_facts['net_session_usage'] }} out of {{ ansible_facts['net_session_max'] }} sessions in use"
+
+     - name: Filter invalid OS versions
+      ansible.builtin.set_fact:
+        msgq: >-
+          {{
+            (msg | default([]))
+            | selectattr(Version, 'equalto', ['10.2.7-h3'])
+            | list
+          }}
+
+     - name: Show invalid OS
+      ansible.builtin.debug:
+        var: msgq
