@@ -24,7 +24,7 @@
       ansible.builtin.debug:
         msg: "{{ sec_rules }}"
 
-   - name: Filter rules with source=any, dest=any, port=any
+    - name: Filter any any rules
       ansible.builtin.set_fact:
         insecure_rules: >-
           {{
