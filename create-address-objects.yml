@@ -19,7 +19,7 @@
         name: "source-server"
         value: "192.168.120.8/32"
         description: "Address object 1 from Ansible"
-      commit: true 
+      
 
     - name: Create destination address object
       paloaltonetworks.panos.panos_address_object:
@@ -27,4 +27,9 @@
         name: "destination-server"
         value: "192.168.80.5/32"
         description: "Address object 2 from Ansible"
-      commit: true
+
+
+      name: Commit candidate configuration
+      paloaltonetworks.panos.panos_commit:
+        provider: "{{ device }}"
+      
