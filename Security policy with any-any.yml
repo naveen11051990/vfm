@@ -29,8 +29,8 @@
         insecure_rules: >-
           {{
             (sec_rules.gathered | default([]))
-            | selectattr('source', 'equalto', ['any'])
-            | selectattr('destination', 'equalto', ['any'])
+            | selectattr('source_ip', 'equalto', ['any'])
+            | selectattr('destination_ip', 'equalto', ['any'])
             | selectattr('service', 'equalto', ['any'])
             | list
           }}
