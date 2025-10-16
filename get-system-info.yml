@@ -18,18 +18,9 @@
         provider: "{{ device }}"
 
     - name: Display information
+      # Changed to output only the device serial number per request
       ansible.builtin.debug:
-        msg:
-          - "Hostname: {{ ansible_facts['net_hostname'] }}"
-          - "Serial: {{ ansible_facts['net_serial'] }}"
-          - "Model: {{ ansible_facts['net_model'] }}"
-          - "Version: {{ ansible_facts['net_version'] }}"
-          - "Uptime: {{ ansible_facts['net_uptime'] }}"
-          - "HA Enabled: {{ ansible_facts['net_ha_enabled'] }}"
-          - "HA Type: {{ ansible_facts['net_ha_localmode'] }}"
-          - "HA Status: {{ ansible_facts['net_ha_localstate'] }}"
-          - "Multi-VSYS: {{ ansible_facts['net_multivsys'] }}"
-          - "{{ ansible_facts['net_session_usage'] }} out of {{ ansible_facts['net_session_max'] }} sessions in use"
+        msg: "{{ ansible_facts['net_serial'] }}"
 
     - name: Filter invalid OS versions
       ansible.builtin.set_fact:
