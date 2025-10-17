@@ -119,11 +119,11 @@ graph TB
         WIG["Web<br/>Interface<br/>Gateway"]
     end
 
-    subgraph "Gateway: 192.168.29.136"
+    subgraph "Hub: 192.168.29.136"
         HUB["Automation<br/>Hub"]
     end
 
-    subgraph "Gateway: 192.168.29.137"
+    subgraph "EDA Controller: 192.168.29.137"
         EDA["Automation<br/>EDA<br/>Controller"]
     end
 

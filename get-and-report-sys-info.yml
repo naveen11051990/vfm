@@ -1,0 +1,81 @@
+---
+- name: Gather and report system info
+  hosts: "PRODUCTIONFIREWALL"
+  connection: local
+
+  vars:
+    device:
+      ip_address: "{{ ip_address }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+    report_output_dir: "{{ playbook_dir }}/reports"
+    report_filename: "{{ inventory_hostname }}-system-info.pdf"
+    report_output_path: "{{ report_output_dir }}/{{ report_filename }}"
+
+  collections:
+    - paloaltonetworks.panos
+
+  tasks:
+    - name: Gather facts for device
+      # Collect device information including the serial number
+      paloaltonetworks.panos.panos_facts:
+        provider: "{{ device }}"
+
+    - name: Capture serial number for reporting
+      ansible.builtin.set_fact:
+        device_serial_number: "{{ ansible_facts['net_serial'] | default('') }}"
+
+    - name: Ensure serial number was collected
+      ansible.builtin.fail:
+        msg: "Serial number was not found in gathered facts."
+      when: device_serial_number | length == 0
+
+    - name: Ensure report output directory exists
+      ansible.builtin.file:
+        path: "{{ report_output_dir }}"
+        state: directory
+        mode: "0755"
+      delegate_to: localhost
+
+    - name: Generate PDF report for device
+      ansible.builtin.command:
+        argv:
+          - python3
+          - reporting/sys_info_report.py
+          - "--serial"
+          - "{{ device_serial_number }}"
+          - "--host"
+          - "{{ inventory_hostname }}"
+          - "--output"
+          - "{{ report_output_path }}"
+        chdir: "{{ playbook_dir }}"
+      delegate_to: localhost
+      register: report_generation
+      changed_when: report_generation.rc == 0
+
+    - name: Gather report file details
+      ansible.builtin.stat:
+        path: "{{ report_output_path }}"
+      delegate_to: localhost
+      register: sys_info_pdf_stat
+
+    - name: Read generated PDF for artifact publishing
+      ansible.builtin.slurp:
+        src: "{{ report_output_path }}"
+      delegate_to: localhost
+      register: sys_info_pdf
+
+    - name: Publish report metadata as job artifact
+      ansible.builtin.set_stats:
+        data:
+          sys_info_report:
+            filename: "{{ report_filename }}"
+            saved_path: "{{ report_output_path }}"
+            size_bytes: "{{ sys_info_pdf_stat.stat.size }}"
+            content_base64: "{{ sys_info_pdf.content }}"
+        per_host: false
+
+    - name: Report PDF location
+      ansible.builtin.debug:
+        msg: "System info report saved to {{ report_output_path }}"
+      delegate_to: localhost
