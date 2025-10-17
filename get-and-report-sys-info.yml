@@ -11,6 +11,7 @@
     report_output_dir: "{{ playbook_dir }}/reports"
     report_filename: "{{ inventory_hostname }}-system-info.pdf"
     report_output_path: "{{ report_output_dir }}/{{ report_filename }}"
+    artifacts_dir: "{{ lookup('env', 'ANSIBLE_ARTIFACTS_DIR') | default('/runner/artifacts', true) }}"
 
   collections:
     - paloaltonetworks.panos
@@ -53,6 +54,21 @@
       register: report_generation
       changed_when: report_generation.rc == 0
 
+    - name: Ensure job artifact directory exists
+      ansible.builtin.file:
+        path: "{{ artifacts_dir }}"
+        state: directory
+        mode: "0755"
+      delegate_to: localhost
+
+    - name: Copy PDF report into job artifacts
+      ansible.builtin.copy:
+        src: "{{ report_output_path }}"
+        dest: "{{ artifacts_dir }}/{{ report_filename }}"
+        remote_src: true
+        mode: "0644"
+      delegate_to: localhost
+
     - name: Gather report file details
       ansible.builtin.stat:
         path: "{{ report_output_path }}"
@@ -77,5 +93,7 @@
 
     - name: Report PDF location
       ansible.builtin.debug:
-        msg: "System info report saved to {{ report_output_path }}"
+        msg:
+          - "System info report saved to {{ report_output_path }}"
+          - "Download it from the job's Artifacts tab (file: {{ report_filename }})"
       delegate_to: localhost
