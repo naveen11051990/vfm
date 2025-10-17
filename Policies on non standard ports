@@ -1,0 +1,38 @@
+---
+- name: Gather security rules
+  hosts: "PRODUCTIONFIREWALL"
+  connection: local
+
+  vars:
+    device:
+      ip_address: "{{ ip_address }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+
+  collections:
+    - paloaltonetworks.panos
+
+  tasks:
+    - name: Get all security rules
+      paloaltonetworks.panos.panos_security_rule:
+        provider: "{{ device }}"
+        gathered_filter: "*"
+        state: gathered
+      register: sec_rules
+
+    - name: Output
+      ansible.builtin.debug:
+        msg: "{{ sec_rules }}"
+
+    - name: Filter any any rules
+      ansible.builtin.set_fact:
+        insecure_rules: >-
+          {{
+            (sec_rules.gathered | default([]))
+            | selectattr('service', 'equalto', ['135'])
+            | list
+          }}
+
+    - name: Show insecure rules (if any)
+      ansible.builtin.debug:
+        msg: "{{ insecure_rules | map(attribute='rule_name') | list }}"
