@@ -1,0 +1,44 @@
+---
+- name: Create a security policy rule on Palo Alto firewall
+  hosts: "PRODUCTIONFIREWALL"
+  connection: local
+  gather_facts: false
+
+  vars:
+    device:
+      ip_address: "{{ ip_address }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+
+  collections:
+    - paloaltonetworks.panos
+
+  tasks:
+    - name: Create / add security rule
+      paloaltonetworks.panos.panos_security_rule:
+        provider: "{{ device }}"
+        rule_name: "Rule_from_AAP_Allow_HTTP_Example"
+        description: "Allow HTTP traffic from internal to external"
+        source_zone:
+          - "Inside"
+        destination_zone:
+          - "Outside"
+        source_ip:
+          - "10.0.1.0/24"
+        destination_ip:
+          - "any"
+        source_user:
+          - "any"
+        application:
+          - "web-browsing"
+        service:
+          - "service-http"
+        action: "allow"
+        log_start: false
+        log_end: true
+        commit: true    # commit immediately after creating rule
+      register: rule_create
+
+    - name: Debug result
+      ansible.builtin.debug:
+        var: rule_create
