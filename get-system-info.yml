@@ -17,10 +17,7 @@
       paloaltonetworks.panos.panos_facts:
         provider: "{{ device }}"
 
-    - name: Display information
-      # Changed to output only the device serial number per request
-      ansible.builtin.debug:
-        msg: "{{ ansible_facts['net_serial'] }}"
+    
 
     - name: Filter invalid OS versions
       ansible.builtin.set_fact:
@@ -34,3 +31,7 @@
     - name: Show invalid OS
       ansible.builtin.debug:
         var: msgq
+    - name: Display information
+      # Changed to output only the device serial number per request
+      ansible.builtin.debug:
+        msg: "{{ ansible_facts['net_serial'] }}"
