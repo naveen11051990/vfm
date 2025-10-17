@@ -37,4 +37,4 @@
 
     - name: Show insecure rules (if any)
       ansible.builtin.debug:
-        var: insecure_rules
+        msg: "{{ insecure_rules | map(attribute='rule_name') | list }}"
