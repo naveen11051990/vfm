@@ -106,7 +106,7 @@ Configure the pg_hba.conf file and change auth method to md5 in `/var/lib/pgsql/
   `ALTER USER automationgateway WITH PASSWORD 'newpassword';`
   `ALTER USER automationedacontroller WITH PASSWORD 'newpassword';`
 
-## Architecture Diagram
+## Server Setup
 
 ```mermaid
 graph TB

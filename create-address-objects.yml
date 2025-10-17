@@ -27,3 +27,7 @@
         name: "destination-server"
         value: "192.168.80.5/32"
         description: "Address object 2 from Ansible"
+
+    - name: Commit candidate configuration
+      paloaltonetworks.panos.panos_commit_firewall:
+        provider: "{{ device }}"
