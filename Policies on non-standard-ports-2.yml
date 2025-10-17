@@ -29,7 +29,8 @@
         insecure_rules: >-
           {{
             (sec_rules.gathered | default([]))
-            | rejectattr('service', 'equalto', ['135'])
+            | rejectattr('service', 'equalto', ['443']
+            | selectattr('application', 'equalto', ['ssl'])
             | list
           }}
 
