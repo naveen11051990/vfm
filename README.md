@@ -101,4 +101,49 @@ Configure the pg_hba.conf file and change auth method to md5 in `/var/lib/pgsql/
 
   `sudo -u postgres psql`
 
-  `ALTER USER `
+  `ALTER USER awx WITH PASSWORD 'newpassword';`
+  `ALTER USER automationhub WITH PASSWORD 'newpassword';`
+  `ALTER USER automationgateway WITH PASSWORD 'newpassword';`
+  `ALTER USER automationedacontroller WITH PASSWORD 'newpassword';`
+
+## Architecture Diagram
+
+```mermaid
+graph TB
+    subgraph "Controller: 192.168.29.134"
+        PGSQL["PostgreSQL 15<br/>━━━━━━━━━━━━━━━━━━━━<br/>ROLE: awx DB: awx<br/>━━━━━━━━━━━━━━━━━━━━<br/>ROLE: automationgateway<br/>DB: automationgateway<br/>━━━━━━━━━━━━━━━━━━━━<br/>ROLE: automationhub<br/>DB: automationhub<br/>━━━━━━━━━━━━━━━━━━━━<br/>ROLE: automationedacontroller<br/>DB: automationedacontroller"]
+        CTRL["Controller"]
+    end
+
+    subgraph "Gateway: 192.168.29.135"
+        WIG["Web<br/>Interface<br/>Gateway"]
+    end
+
+    subgraph "Gateway: 192.168.29.136"
+        HUB["Automation<br/>Hub"]
+    end
+
+    subgraph "Gateway: 192.168.29.137"
+        EDA["Automation<br/>EDA<br/>Controller"]
+    end
+
+    PGSQL -.-> CTRL
+    PGSQL -.-> WIG
+    PGSQL -.-> HUB
+    PGSQL -.-> EDA
+
+    CTRL --> WIG
+    CTRL --> HUB
+    CTRL --> EDA
+
+    classDef controllerBox fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef gatewayBox fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef hubBox fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef edaBox fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef dbBox fill:#e3f2fd,stroke:#0d47a1,stroke-width:2px
+
+    class CTRL,PGSQL controllerBox
+    class WIG gatewayBox
+    class HUB hubBox
+    class EDA edaBox
+```
