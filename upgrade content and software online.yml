@@ -1,0 +1,172 @@
+---
+- name: Upgrade firewall and content online
+  hosts: "PRODUCTIONFIREWALL"
+  connection: local
+
+  vars:
+    device:
+      ip_address: "{{ ip_address }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+
+    # Content and software versions to download and install
+    content_version: "9030-9720" # Update this to your desired content version
+    software_version: "10.1.14-h13"
+    reboot_firewall: false
+
+    # Temporary directory for downloads
+    temp_dir: "/tmp/panos_upgrades"
+
+  collections:
+    - paloaltonetworks.panos
+    - community.general
+
+  tasks:
+    - name: Create temporary directory for downloads
+      file:
+        path: "{{ temp_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Check current PAN-OS version
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "show system info"
+      register: system_info
+
+    - name: Display current system information
+      debug:
+        msg: "Current system info retrieved"
+
+    - name: Download latest content updates
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "request content upgrade download latest"
+      register: content_download
+
+    - name: Get job ID for content download
+      xml:
+        xmlstring: "{{ content_download.stdout_xml }}"
+        xpath: /response[@status='success']/result/job
+        content: text
+      register: content_download_jobid
+      when: content_download.stdout_xml is defined
+
+    - name: Check content download job until completion
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<show><jobs><id>{{ content_download_jobid.matches[0].job }}</id></jobs></show>"
+        cmd_is_xml: true
+      register: content_download_result
+      until: (content_download_result.stdout | from_json).response.result.job.status == "FIN"
+      retries: 300 # Increased retries for download
+      delay: 10
+      failed_when: (content_download_result.stdout | from_json).response.result.job.result == "FAIL"
+      when: content_download_jobid.matches is defined and content_download_jobid.matches | length > 0
+
+    - name: Install downloaded content
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "request content upgrade install latest"
+      register: content_install
+
+    - name: Get job ID for content install
+      xml:
+        xmlstring: "{{ content_install.stdout_xml }}"
+        xpath: /response[@status='success']/result/job
+        content: text
+      register: content_install_jobid
+      when: content_install.stdout_xml is defined
+
+    - name: Check content install job until completion
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<show><jobs><id>{{ content_install_jobid.matches[0].job }}</id></jobs></show>"
+        cmd_is_xml: true
+      register: content_install_result
+      until: (content_install_result.stdout | from_json).response.result.job.status == "FIN"
+      retries: 100
+      delay: 5
+      failed_when: (content_install_result.stdout | from_json).response.result.job.result == "FAIL"
+      when: content_install_jobid.matches is defined and content_install_jobid.matches | length > 0
+
+    - name: Check available software versions
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "request system software check"
+      register: software_check
+
+    - name: Download software version
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "request system software download version {{ software_version }}"
+      register: software_download
+
+    - name: Get job ID for software download
+      xml:
+        xmlstring: "{{ software_download.stdout_xml }}"
+        xpath: /response[@status='success']/result/job
+        content: text
+      register: software_download_jobid
+      when: software_download.stdout_xml is defined
+
+    - name: Check software download job until completion
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<show><jobs><id>{{ software_download_jobid.matches[0].job }}</id></jobs></show>"
+        cmd_is_xml: true
+      register: software_download_result
+      until: (software_download_result.stdout | from_json).response.result.job.status == "FIN"
+      retries: 300 # Increased retries for download
+      delay: 10
+      failed_when: (software_download_result.stdout | from_json).response.result.job.result == "FAIL"
+      when: software_download_jobid.matches is defined and software_download_jobid.matches | length > 0
+
+    - name: Install software
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "request system software install version {{ software_version }}"
+      register: software_install
+
+    - name: Get job ID for software install
+      xml:
+        xmlstring: "{{ software_install.stdout_xml }}"
+        xpath: /response[@status='success']/result/job
+        content: text
+      register: software_install_jobid
+      when: software_install.stdout_xml is defined
+
+    - name: Check software install job until completion
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<show><jobs><id>{{ software_install_jobid.matches[0].job }}</id></jobs></show>"
+        cmd_is_xml: true
+      register: software_install_result
+      until: (software_install_result.stdout | from_json).response.result.job.status == "FIN"
+      retries: 100
+      delay: 5
+      failed_when: (software_install_result.stdout | from_json).response.result.job.result != "OK"
+      when: software_install_jobid.matches is defined and software_install_jobid.matches | length > 0
+
+    - name: Display upgrade completion status
+      debug:
+        msg:
+          - "Content upgrade completed successfully"
+          - "Software upgrade completed successfully"
+          - "Firewall is ready for reboot if required"
+
+    - name: Reboot if requested
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<request><restart><system></system></restart></request>"
+        cmd_is_xml: true
+      when:
+        - reboot_firewall
+        - software_install_result is defined
+        - (software_install_result.stdout | from_json).response.result.job.result == "OK"
+
+    - name: Clean up temporary directory
+      file:
+        path: "{{ temp_dir }}"
+        state: absent
+      delegate_to: localhost
