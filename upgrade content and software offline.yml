@@ -9,9 +9,9 @@
       username: "{{ username }}"
       password: "{{ password }}"
 
-    content_file: "panupv2-all-contents-8644-7712"
-    software_file: "PanOS_vm-10.1.8"
-    software_version: "10.1.8"
+    content_file: "panupv2-all-contents-9030-9720"
+    software_file: "PanOS_vm-10.1.14-h13"
+    software_version: "10.1.14-h13"
     reboot_firewall: false
 
   collections:
