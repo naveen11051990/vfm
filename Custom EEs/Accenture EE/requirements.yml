@@ -1,4 +1,5 @@
 ---
 collections:
   - name: paloaltonetworks.panos
-  - name: awx.awx
+  - name: community.general
+  # - name: awx.awx
