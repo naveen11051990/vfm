@@ -45,7 +45,7 @@
       register: content_download
 
     - name: Get job ID for content download
-      xml:
+      community.general.xml:
         xmlstring: "{{ content_download.stdout_xml }}"
         xpath: /response[@status='success']/result/job
         content: text
@@ -58,20 +58,20 @@
         cmd: "<show><jobs><id>{{ content_download_jobid.matches[0].job }}</id></jobs></show>"
         cmd_is_xml: true
       register: content_download_result
-      until: (content_download_result.stdout | from_json).response.result.job.status == "FIN"
+      until: content_download_result.stdout_xml is search('<status>FIN</status>')
       retries: 300 # Increased retries for download
       delay: 10
-      failed_when: (content_download_result.stdout | from_json).response.result.job.result == "FAIL"
+      failed_when: content_download_result.stdout_xml is search('<result>FAIL</result>')
       when: content_download_jobid.matches is defined and content_download_jobid.matches | length > 0
 
-    - name: Install downloaded content
+    - name: Install downloaded content (latest)
       paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
-        cmd: "request content upgrade install latest"
+        cmd: "request content upgrade install version latest"
       register: content_install
 
     - name: Get job ID for content install
-      xml:
+      community.general.xml:
         xmlstring: "{{ content_install.stdout_xml }}"
         xpath: /response[@status='success']/result/job
         content: text
@@ -84,10 +84,10 @@
         cmd: "<show><jobs><id>{{ content_install_jobid.matches[0].job }}</id></jobs></show>"
         cmd_is_xml: true
       register: content_install_result
-      until: (content_install_result.stdout | from_json).response.result.job.status == "FIN"
+      until: content_install_result.stdout_xml is search('<status>FIN</status>')
       retries: 100
       delay: 5
-      failed_when: (content_install_result.stdout | from_json).response.result.job.result == "FAIL"
+      failed_when: content_install_result.stdout_xml is search('<result>FAIL</result>')
       when: content_install_jobid.matches is defined and content_install_jobid.matches | length > 0
 
     - name: Check available software versions
@@ -103,7 +103,7 @@
       register: software_download
 
     - name: Get job ID for software download
-      xml:
+      community.general.xml:
         xmlstring: "{{ software_download.stdout_xml }}"
         xpath: /response[@status='success']/result/job
         content: text
@@ -116,10 +116,10 @@
         cmd: "<show><jobs><id>{{ software_download_jobid.matches[0].job }}</id></jobs></show>"
         cmd_is_xml: true
       register: software_download_result
-      until: (software_download_result.stdout | from_json).response.result.job.status == "FIN"
+      until: software_download_result.stdout_xml is search('<status>FIN</status>')
       retries: 300 # Increased retries for download
       delay: 10
-      failed_when: (software_download_result.stdout | from_json).response.result.job.result == "FAIL"
+      failed_when: software_download_result.stdout_xml is search('<result>FAIL</result>')
       when: software_download_jobid.matches is defined and software_download_jobid.matches | length > 0
 
     - name: Install software
@@ -129,7 +129,7 @@
       register: software_install
 
     - name: Get job ID for software install
-      xml:
+      community.general.xml:
         xmlstring: "{{ software_install.stdout_xml }}"
         xpath: /response[@status='success']/result/job
         content: text
@@ -142,10 +142,10 @@
         cmd: "<show><jobs><id>{{ software_install_jobid.matches[0].job }}</id></jobs></show>"
         cmd_is_xml: true
       register: software_install_result
-      until: (software_install_result.stdout | from_json).response.result.job.status == "FIN"
+      until: software_install_result.stdout_xml is search('<status>FIN</status>')
       retries: 100
       delay: 5
-      failed_when: (software_install_result.stdout | from_json).response.result.job.result != "OK"
+      failed_when: (software_install_result.stdout_xml is search('<status>FIN</status>')) and not (software_install_result.stdout_xml is search('<result>OK</result>'))
       when: software_install_jobid.matches is defined and software_install_jobid.matches | length > 0
 
     - name: Display upgrade completion status
@@ -163,7 +163,7 @@
       when:
         - reboot_firewall
         - software_install_result is defined
-        - (software_install_result.stdout | from_json).response.result.job.result == "OK"
+        - software_install_result.stdout_xml is search('<result>OK</result>')
 
     - name: Clean up temporary directory
       file:
