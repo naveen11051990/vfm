@@ -43,14 +43,61 @@
              if content_update_needed | bool else
              'Content already at requested version ' ~ content_version ~ ' — skipping download/install' }}
 
-    - name: Apply content update (download+install)
-      paloaltonetworks.panos.panos_dynamic_update:
+    - name: Download content updates
+      paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
-        update_type: "content"
-        version: "{{ content_version }}"
-        download: true
-        install: true
+        cmd: "request content upgrade download version {{ content_version }}"
+      register: content_download
       when: content_update_needed | bool
+
+    - name: Get job ID for content download
+      community.general.xml:
+        xmlstring: "{{ content_download.stdout_xml }}"
+        xpath: /response[@status='success']/result/job
+        content: text
+      register: content_download_jobid
+      when: content_update_needed | bool and content_download.stdout_xml is defined
+
+    - name: Wait for content download to finish
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<show><jobs><id>{{ content_download_jobid.matches[0].job }}</id></jobs></show>"
+        cmd_is_xml: true
+      register: content_download_result
+      until: content_download_result.stdout_xml is search('<status>FIN</status>')
+      retries: 300
+      delay: 10
+      failed_when: content_download_result.stdout_xml is search('<result>FAIL</result>')
+      when: content_update_needed | bool and content_download_jobid.matches is defined and content_download_jobid.matches | length > 0
+      no_log: "{{ quiet_polling }}"
+
+    - name: Install downloaded content
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "request content upgrade install version {{ content_version }}"
+      register: content_install
+      when: content_update_needed | bool
+
+    - name: Get job ID for content install
+      community.general.xml:
+        xmlstring: "{{ content_install.stdout_xml }}"
+        xpath: /response[@status='success']/result/job
+        content: text
+      register: content_install_jobid
+      when: content_update_needed | bool and content_install.stdout_xml is defined
+
+    - name: Wait for content install to finish
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<show><jobs><id>{{ content_install_jobid.matches[0].job }}</id></jobs></show>"
+        cmd_is_xml: true
+      register: content_install_result
+      until: content_install_result.stdout_xml is search('<status>FIN</status>')
+      retries: 100
+      delay: 5
+      failed_when: content_install_result.stdout_xml is search('<result>FAIL</result>')
+      when: content_update_needed | bool and content_install_jobid.matches is defined and content_install_jobid.matches | length > 0
+      no_log: "{{ quiet_polling }}"
 
     - name: Start software update
       debug:
