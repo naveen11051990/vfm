@@ -41,7 +41,7 @@
     - name: Download latest content updates
       paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
-        cmd: "request content upgrade download {{ content_version }}"
+        cmd: "request content upgrade download latest"
       register: content_download
 
     - name: Get job ID for content download
@@ -67,7 +67,7 @@
     - name: Install downloaded content (latest)
       paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
-        cmd: "request content upgrade install version {{ content_version }}"
+        cmd: "request content upgrade install version latest"
       register: content_install
 
     - name: Get job ID for content install
