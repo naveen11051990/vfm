@@ -55,25 +55,22 @@
       register: content_check
       when: content_update_needed | bool
 
-    - name: Get job ID for content index refresh
-      community.general.xml:
-        xmlstring: "{{ content_check.stdout_xml }}"
-        xpath: /response[@status='success']/result/job
-        content: text
-      register: content_check_jobid
+    - name: Extract job ID for content index refresh (if any)
+      set_fact:
+        content_check_jobid: "{{ (content_check.stdout_xml | regex_search('<job>(\\d+)</job>', '\\1')) | default('') }}"
       when: content_update_needed | bool and content_check.stdout_xml is defined
 
     - name: Wait for content index refresh to finish
       paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
-        cmd: "<show><jobs><id>{{ content_check_jobid.matches[0].job }}</id></jobs></show>"
+        cmd: "<show><jobs><id>{{ content_check_jobid }}</id></jobs></show>"
         cmd_is_xml: true
       register: content_check_result
       until: content_check_result.stdout_xml is search('<status>FIN</status>')
       retries: 100
       delay: 5
       failed_when: content_check_result.stdout_xml is search('<result>FAIL</result>')
-      when: content_update_needed | bool and content_check_jobid.matches is defined and content_check_jobid.matches | length > 0
+      when: content_update_needed | bool and (content_check_jobid | length) > 0
       no_log: "{{ quiet_polling }}"
 
     - name: Download content updates
