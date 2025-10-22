@@ -1,5 +1,5 @@
 ---
-- name: Configure VLANs and assign ports on Cisco Catalyst 9300
+- name: Configure VLANs and SSH on Cisco Catalyst 9300
   hosts: 192.168.29.164
   gather_facts: no
   connection: network_cli
@@ -7,26 +7,12 @@
     - cisco.ios
 
   vars:
-    ansible_user: admin
-    ansible_password: "admin@123"
-    ansible_become: yes
-    ansible_become_method: enable
-    # VLAN definitions
-    vlan_definitions:
-      - vlan_id: 10
-        name: USERS
-      - vlan_id: 20
-        name: SERVERS
-
-    # Interfaces to assign VLAN10
     vlan10_interfaces:
       - GigabitEthernet2/0/10
       - GigabitEthernet2/0/11
       - GigabitEthernet2/0/12
       - GigabitEthernet2/0/13
       - GigabitEthernet2/0/14
-
-    # Interfaces to assign VLAN20
     vlan20_interfaces:
       - GigabitEthernet2/0/15
       - GigabitEthernet2/0/16
@@ -36,34 +22,49 @@
       - GigabitEthernet2/0/20
 
   tasks:
-
     - name: Create VLANs 10 and 20
       cisco.ios.ios_vlans:
-        config: "{{ vlan_definitions }}"
-        state: merged
+        config:
+          - name: USERS
+            vlan_id: 30
+          - name: SERVERS
+            vlan_id: 40
 
-    - name: Assign VLAN 10 to interfaces GigabitEthernet2/0/10-14
-      cisco.ios.ios_l2_interfaces:
-        config: |
-          {% for intf in vlan10_interfaces %}
-          - name: {{ intf }}
-            mode: access
-            access:
-              vlan: 10
-          {% endfor %}
-        state: merged
-
-    - name: Assign VLAN 20 to interfaces GigabitEthernet2/0/15-20
-      cisco.ios.ios_l2_interfaces:
-        config: |
-          {% for intf in vlan20_interfaces %}
-          - name: {{ intf }}
-            mode: access
-            access:
-              vlan: 20
-          {% endfor %}
-        state: merged
-
-    - name: Save running-config to startup-config
+    - name: Assign VLAN 30 to interfaces GigabitEthernet2/0/10-14
       cisco.ios.ios_config:
-        save_when: changed
+        lines:
+          - "interface {{ item }}"
+          - "switchport mode access"
+          - "switchport access vlan 30"
+        parents: "interface range {{ item }}"
+      loop: "{{ vlan30_interfaces }}"
+      when: vlan30_interfaces is defined
+
+    - name: Assign VLAN 40 to interfaces GigabitEthernet2/0/15-20
+      cisco.ios.ios_config:
+        lines:
+          - "interface {{ item }}"
+          - "switchport mode access"
+          - "switchport access vlan 40"
+        parents: "interface range {{ item }}"
+      loop: "{{ vlan40_interfaces }}"
+      when: vlan40_interfaces is defined
+
+    - name: Enable SSH and disable Telnet
+      cisco.ios.ios_config:
+        lines:
+          - "ip domain-name example.com"
+          - "crypto key generate rsa usage-keys label ssh-key modulus 2048"
+          - "ip ssh version 2"
+          - "line vty 0 4"
+          - "transport input ssh"
+          - "login local"
+      when: ansible_user is defined and ansible_password is defined
+
+    - name: Create local user for SSH login
+      cisco.ios.ios_user:
+        name: admin
+        password: admin@123
+        privilege: 15
+        update: yes
+      when: ansible_user is defined and ansible_password is defined
