@@ -1,6 +1,6 @@
 ---
 - name: Configure VLANs and assign ports on Cisco Catalyst 9300
-  hosts: cisco9300-1
+  hosts: CISCO9300-1
   gather_facts: no
   connection: network_cli
   collections:
