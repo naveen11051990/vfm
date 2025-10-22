@@ -11,8 +11,8 @@
 
     # Content and software versions to download and install
     content_version: "9030-9720"
-    software_version: "10.1.14-h16"
-    reboot_firewall: false
+    software_version: "10.1.14-h13"
+    reboot_firewall: true
 
     # Suppress noisy retry logs from polling tasks
     quiet_polling: true
