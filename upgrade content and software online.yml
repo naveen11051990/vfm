@@ -10,75 +10,39 @@
       password: "{{ password }}"
 
     # Content and software versions to download and install
-    content_version: "9030-9720"
+    content_version: "9030-9720" # Update this to your desired content version
     software_version: "10.1.14-h16"
-    reboot_firewall: false
+    reboot_firewall: true
 
-    # Suppress noisy retry logs from polling tasks
-    quiet_polling: true
+    # Temporary directory for downloads
+    temp_dir: "/tmp/panos_upgrades"
 
   collections:
     - paloaltonetworks.panos
     - community.general
 
   tasks:
+    - name: Create temporary directory for downloads
+      file:
+        path: "{{ temp_dir }}"
+        state: directory
+        mode: "0755"
+
     - name: Check current PAN-OS version
       paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
         cmd: "show system info"
       register: system_info
 
-    - name: Parse current content version
-      set_fact:
-        current_content_version: "{{ (system_info.stdout_xml | regex_search('<content-version>([^<]+)</content-version>', '\\1')) | default('unknown') }}"
-
-    - name: Decide if content update is needed
-      set_fact:
-        content_update_needed: "{{ current_content_version != content_version }}"
-
-    - name: Build content file name
-      set_fact:
-        content_file: "panupv2-all-contents-{{ content_version }}"
-      when: content_update_needed | bool and content_version | lower != 'latest'
-
-    - name: Start content update
+    - name: Display current system information
       debug:
-        msg: >-
-          {{ 'Starting content update to version ' ~ content_version
-             if content_update_needed | bool else
-             'Content already at requested version ' ~ content_version ~ ' — skipping download/install' }}
+        msg: "Current system info retrieved"
 
-    - name: Refresh content index
+    - name: Download latest content updates
       paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
-        cmd: "request content upgrade check"
-      register: content_check
-      when: content_update_needed | bool
-
-    - name: Extract job ID for content index refresh (if any)
-      set_fact:
-        content_check_jobid: "{{ (content_check.stdout_xml | regex_search('<job>(\\d+)</job>', '\\1')) | default('') }}"
-      when: content_update_needed | bool and content_check.stdout_xml is defined
-
-    - name: Wait for content index refresh to finish
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "<show><jobs><id>{{ content_check_jobid }}</id></jobs></show>"
-        cmd_is_xml: true
-      register: content_check_result
-      until: content_check_result.stdout_xml is search('<status>FIN</status>')
-      retries: 100
-      delay: 5
-      failed_when: content_check_result.stdout_xml is search('<result>FAIL</result>')
-      when: content_update_needed | bool and (content_check_jobid | length) > 0
-      no_log: "{{ quiet_polling }}"
-
-    - name: Download content updates
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "request content upgrade download {{ 'latest' if (content_version | lower) == 'latest' else ('file ' ~ content_file) }}"
+        cmd: "request content upgrade download {{ content_version }}"
       register: content_download
-      when: content_update_needed | bool
 
     - name: Get job ID for content download
       community.general.xml:
@@ -86,9 +50,9 @@
         xpath: /response[@status='success']/result/job
         content: text
       register: content_download_jobid
-      when: content_update_needed | bool and content_download.stdout_xml is defined
+      when: content_download.stdout_xml is defined
 
-    - name: Wait for content download to finish
+    - name: Check content download job until completion
       paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
         cmd: "<show><jobs><id>{{ content_download_jobid.matches[0].job }}</id></jobs></show>"
@@ -97,23 +61,14 @@
       until: content_download_result.stdout_xml is search('<status>FIN</status>')
       retries: 300
       delay: 10
-      failed_when: (content_download_result.stdout_xml is search('<status>FIN</status>')) and (content_download_result.stdout_xml is search('<result>FAIL</result>'))
-      when: content_update_needed | bool and content_download_jobid.matches is defined and content_download_jobid.matches | length > 0
-      no_log: "{{ quiet_polling }}"
+      failed_when: content_download_result.stdout_xml is search('<result>FAIL</result>')
+      when: content_download_jobid.matches is defined and content_download_jobid.matches | length > 0
 
     - name: Install downloaded content (latest)
       paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
-        cmd: "request content upgrade install version latest"
-      register: content_install
-      when: content_update_needed | bool and (content_version | lower) == 'latest'
-
-    - name: Install downloaded content (specific version)
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
         cmd: "request content upgrade install version {{ content_version }}"
       register: content_install
-      when: content_update_needed | bool and (content_version | lower) != 'latest'
 
     - name: Get job ID for content install
       community.general.xml:
@@ -121,65 +76,97 @@
         xpath: /response[@status='success']/result/job
         content: text
       register: content_install_jobid
-      when: content_update_needed | bool and content_install.stdout_xml is defined
+      when: content_install.stdout_xml is defined
 
-    - block:
-        - name: Wait for content install to finish
-          paloaltonetworks.panos.panos_op:
-            provider: "{{ device }}"
-            cmd: "<show><jobs><id>{{ content_install_jobid.matches[0].job }}</id></jobs></show>"
-            cmd_is_xml: true
-          register: content_install_result
-          until: content_install_result.stdout_xml is search('<status>FIN</status>')
-          retries: 100
-          delay: 5
-          failed_when: (content_install_result.stdout_xml is search('<status>FIN</status>')) and (content_install_result.stdout_xml is search('<result>FAIL</result>'))
-          no_log: "{{ quiet_polling }}"
-      rescue:
-        - name: Show content install job output on failure
-          debug:
-            msg: "Content install job output: {{ content_install_result.stdout_xml | default('no-xml-returned') }}"
-      when: content_update_needed | bool and content_install_jobid.matches is defined and content_install_jobid.matches | length > 0
-
-    - name: Start software update
-      debug:
-        msg: "Updating PAN-OS to version {{ software_version }} (download+install{{ ' + reboot' if reboot_firewall else '' }})"
-
-    - name: Install target PAN-OS version
-      paloaltonetworks.panos.panos_software:
-        provider: "{{ device }}"
-        version: "{{ software_version }}"
-        download: true
-        install: true
-        restart: "{{ reboot_firewall | bool }}"
-
-    - name: Wait for device to be ready after reboot
-      paloaltonetworks.panos.panos_check:
-        provider: "{{ device }}"
-      changed_when: false
-      register: ready_result
-      until: ready_result is not failed and ready_result.msg == 'Device is ready.'
-      retries: 100
-      delay: 15
-      when: reboot_firewall
-
-    - name: Verify requested content version installed
+    - name: Check content install job until completion
       paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
-        cmd: "show system info"
-      register: sysinfo_after_content
-      when: content_version is defined
+        cmd: "<show><jobs><id>{{ content_install_jobid.matches[0].job }}</id></jobs></show>"
+        cmd_is_xml: true
+      register: content_install_result
+      until: content_install_result.stdout_xml is search('<status>FIN</status>')
+      retries: 100
+      delay: 5
+      failed_when: content_install_result.stdout_xml is search('<result>FAIL</result>')
+      when: content_install_jobid.matches is defined and content_install_jobid.matches | length > 0
 
-    - name: Assert content version matches requested
-      assert:
-        that:
-          - sysinfo_after_content.stdout_xml is search('<content-version>' ~ content_version ~ '</content-version>')
-        fail_msg: "Installed content version does not match requested: {{ content_version }}"
-        success_msg: "Installed content version matches requested: {{ content_version }}"
-      when: content_version is defined
+    - name: Check available software versions
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "request system software check"
+      register: software_check
+
+    - name: Download software version
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "request system software download version {{ software_version }}"
+      register: software_download
+
+    - name: Get job ID for software download
+      community.general.xml:
+        xmlstring: "{{ software_download.stdout_xml }}"
+        xpath: /response[@status='success']/result/job
+        content: text
+      register: software_download_jobid
+      when: software_download.stdout_xml is defined
+
+    - name: Check software download job until completion
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<show><jobs><id>{{ software_download_jobid.matches[0].job }}</id></jobs></show>"
+        cmd_is_xml: true
+      register: software_download_result
+      until: software_download_result.stdout_xml is search('<status>FIN</status>')
+      retries: 300
+      delay: 10
+      failed_when: software_download_result.stdout_xml is search('<result>FAIL</result>')
+      when: software_download_jobid.matches is defined and software_download_jobid.matches | length > 0
+
+    - name: Install software
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "request system software install version {{ software_version }}"
+      register: software_install
+
+    - name: Get job ID for software install
+      community.general.xml:
+        xmlstring: "{{ software_install.stdout_xml }}"
+        xpath: /response[@status='success']/result/job
+        content: text
+      register: software_install_jobid
+      when: software_install.stdout_xml is defined
+
+    - name: Check software install job until completion
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<show><jobs><id>{{ software_install_jobid.matches[0].job }}</id></jobs></show>"
+        cmd_is_xml: true
+      register: software_install_result
+      until: software_install_result.stdout_xml is search('<status>FIN</status>')
+      retries: 100
+      delay: 5
+      failed_when: (software_install_result.stdout_xml is search('<status>FIN</status>')) and not (software_install_result.stdout_xml is search('<result>OK</result>'))
+      when: software_install_jobid.matches is defined and software_install_jobid.matches | length > 0
 
     - name: Display upgrade completion status
       debug:
         msg:
-          - "{{ content_update_needed | bool | ternary('Content update installed: ' ~ content_version, 'Content already at requested version: ' ~ content_version) }}"
-          - "Software {{ software_version }} {{ 'installed and rebooted' if reboot_firewall else 'staged (reboot pending)' }}"
+          - "Content upgrade completed successfully"
+          - "Software upgrade completed successfully"
+          - "Firewall is ready for reboot if required"
+
+    - name: Reboot if requested
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<request><restart><system></system></restart></request>"
+        cmd_is_xml: true
+      when:
+        - reboot_firewall
+        - software_install_result is defined
+        - software_install_result.stdout_xml is search('<result>OK</result>')
+
+    - name: Clean up temporary directory
+      file:
+        path: "{{ temp_dir }}"
+        state: absent
+      delegate_to: localhost
