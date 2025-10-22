@@ -97,7 +97,7 @@
       until: content_download_result.stdout_xml is search('<status>FIN</status>')
       retries: 300
       delay: 10
-      failed_when: content_download_result.stdout_xml is search('<result>FAIL</result>')
+      failed_when: (content_download_result.stdout_xml is search('<status>FIN</status>')) and (content_download_result.stdout_xml is search('<result>FAIL</result>'))
       when: content_update_needed | bool and content_download_jobid.matches is defined and content_download_jobid.matches | length > 0
       no_log: "{{ quiet_polling }}"
 
@@ -124,18 +124,23 @@
       register: content_install_jobid
       when: content_update_needed | bool and content_install.stdout_xml is defined
 
-    - name: Wait for content install to finish
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "<show><jobs><id>{{ content_install_jobid.matches[0].job }}</id></jobs></show>"
-        cmd_is_xml: true
-      register: content_install_result
-      until: content_install_result.stdout_xml is search('<status>FIN</status>')
-      retries: 100
-      delay: 5
-      failed_when: content_install_result.stdout_xml is search('<result>FAIL</result>')
+    - block:
+        - name: Wait for content install to finish
+          paloaltonetworks.panos.panos_op:
+            provider: "{{ device }}"
+            cmd: "<show><jobs><id>{{ content_install_jobid.matches[0].job }}</id></jobs></show>"
+            cmd_is_xml: true
+          register: content_install_result
+          until: content_install_result.stdout_xml is search('<status>FIN</status>')
+          retries: 100
+          delay: 5
+          failed_when: (content_install_result.stdout_xml is search('<status>FIN</status>')) and (content_install_result.stdout_xml is search('<result>FAIL</result>'))
+          no_log: "{{ quiet_polling }}"
+      rescue:
+        - name: Show content install job output on failure
+          debug:
+            msg: "Content install job output: {{ content_install_result.stdout_xml | default('no-xml-returned') }}"
       when: content_update_needed | bool and content_install_jobid.matches is defined and content_install_jobid.matches | length > 0
-      no_log: "{{ quiet_polling }}"
 
     - name: Start software update
       debug:
