@@ -50,21 +50,4 @@
       loop: "{{ vlan40_interfaces }}"
       when: vlan40_interfaces is defined
 
-    - name: Enable SSH and disable Telnet
-      cisco.ios.ios_config:
-        lines:
-          - "ip domain-name example.com"
-          - "crypto key generate rsa usage-keys label ssh-key modulus 2048"
-          - "ip ssh version 2"
-          - "line vty 0 4"
-          - "transport input ssh"
-          - "login local"
-      when: ansible_user is defined and ansible_password is defined
-
-    - name: Create local user for SSH login
-      cisco.ios.ios_user:
-        name: admin
-        password: admin@123
-        privilege: 15
-        update: yes
-      when: ansible_user is defined and ansible_password is defined
+    
