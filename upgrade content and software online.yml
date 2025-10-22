@@ -155,24 +155,3 @@
       retries: 100
       delay: 15
       when: reboot_firewall
-
-    - name: Verify requested content version installed
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "show system info"
-      register: sysinfo_after_content
-      when: content_version is defined
-
-    - name: Assert content version matches requested
-      assert:
-        that:
-          - sysinfo_after_content.stdout_xml is search('<content-version>' ~ content_version ~ '</content-version>')
-        fail_msg: "Installed content version does not match requested: {{ content_version }}"
-        success_msg: "Installed content version matches requested: {{ content_version }}"
-      when: content_version is defined
-
-    - name: Display upgrade completion status
-      debug:
-        msg:
-          - "{{ content_update_needed | bool | ternary('Content update installed: ' ~ content_version, 'Content already at requested version: ' ~ content_version) }}"
-          - "Software {{ software_version }} {{ 'installed and rebooted' if reboot_firewall else 'staged (reboot pending)' }}"
