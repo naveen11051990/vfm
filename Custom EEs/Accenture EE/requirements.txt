@@ -2,3 +2,4 @@ pan-python==0.17.0
 pan-os-python==1.12.3
 requests>=2.31.0
 xmltodict>=0.13.0
+lxml==6.0.2

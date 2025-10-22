@@ -1,6 +1,6 @@
 ---
 - name: Upgrade firewall and content online
-  hosts: "PRODUCTIONFIREWALL"
+  hosts: "UPGRADEFW"
   connection: local
 
   vars:
