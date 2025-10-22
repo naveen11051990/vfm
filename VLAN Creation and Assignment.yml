@@ -1,0 +1,69 @@
+---
+- name: Configure VLANs and assign ports on Cisco Catalyst 9300
+  hosts: switches
+  gather_facts: no
+  connection: network_cli
+  collections:
+    - cisco.ios
+
+  vars:
+    ansible_user: admin
+    ansible_password: "admin@123"
+    ansible_become: yes
+    ansible_become_method: enable
+    # VLAN definitions
+    vlan_definitions:
+      - vlan_id: 10
+        name: USERS
+      - vlan_id: 20
+        name: SERVERS
+
+    # Interfaces to assign VLAN10
+    vlan10_interfaces:
+      - GigabitEthernet2/0/10
+      - GigabitEthernet2/0/11
+      - GigabitEthernet2/0/12
+      - GigabitEthernet2/0/13
+      - GigabitEthernet2/0/14
+
+    # Interfaces to assign VLAN20
+    vlan20_interfaces:
+      - GigabitEthernet2/0/15
+      - GigabitEthernet2/0/16
+      - GigabitEthernet2/0/17
+      - GigabitEthernet2/0/18
+      - GigabitEthernet2/0/19
+      - GigabitEthernet2/0/20
+
+  tasks:
+
+    - name: Create VLANs 10 and 20
+      cisco.ios.ios_vlans:
+        config: "{{ vlan_definitions }}"
+        state: merged
+
+    - name: Assign VLAN 10 to interfaces GigabitEthernet2/0/10-14
+      cisco.ios.ios_l2_interfaces:
+        config: |
+          {% for intf in vlan10_interfaces %}
+          - name: {{ intf }}
+            mode: access
+            access:
+              vlan: 10
+          {% endfor %}
+        state: merged
+
+    - name: Assign VLAN 20 to interfaces GigabitEthernet2/0/15-20
+      cisco.ios.ios_l2_interfaces:
+        config: |
+          {% for intf in vlan20_interfaces %}
+          - name: {{ intf }}
+            mode: access
+            access:
+              vlan: 20
+          {% endfor %}
+        state: merged
+
+    - name: Save running-config to startup-config
+      cisco.ios.ios_config:
+        save_when: changed
