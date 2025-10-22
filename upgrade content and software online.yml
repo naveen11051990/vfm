@@ -108,11 +108,10 @@
       register: content_install
       when: content_update_needed | bool and (content_version | lower) == 'latest'
 
-    - name: Install downloaded content (specific file, skip validity check)
+    - name: Install downloaded content (specific version)
       paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
-        cmd: "<request><content><upgrade><install><skip-content-validity-check>yes</skip-content-validity-check><file>{{ content_file }}</file></install></upgrade></content></request>"
-        cmd_is_xml: true
+        cmd: "request content upgrade install version {{ content_version }}"
       register: content_install
       when: content_update_needed | bool and (content_version | lower) != 'latest'
 
