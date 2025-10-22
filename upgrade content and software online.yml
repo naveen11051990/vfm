@@ -101,12 +101,20 @@
       when: content_update_needed | bool and content_download_jobid.matches is defined and content_download_jobid.matches | length > 0
       no_log: "{{ quiet_polling }}"
 
-    - name: Install downloaded content
+    - name: Install downloaded content (latest)
       paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
-        cmd: "request content upgrade install {{ 'version latest' if (content_version | lower) == 'latest' else ('file ' ~ content_file) }}"
+        cmd: "request content upgrade install version latest"
       register: content_install
-      when: content_update_needed | bool
+      when: content_update_needed | bool and (content_version | lower) == 'latest'
+
+    - name: Install downloaded content (specific file, skip validity check)
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<request><content><upgrade><install><skip-content-validity-check>yes</skip-content-validity-check><file>{{ content_file }}</file></install></upgrade></content></request>"
+        cmd_is_xml: true
+      register: content_install
+      when: content_update_needed | bool and (content_version | lower) != 'latest'
 
     - name: Get job ID for content install
       community.general.xml:
