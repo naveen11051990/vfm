@@ -26,9 +26,13 @@
         provider: "{{ device }}"
       register: panos_facts
 
+    - name: Debug panos_facts
+      ansible.builtin.debug:
+        var: panos_facts
+
     - name: Set current version fact
       ansible.builtin.set_fact:
-        current_version: "{{ panos_facts.ansible_facts.panos_version }}"
+        current_version: "{{ panos_facts.panos_version }}"
 
     - name: "Check if upgrade is needed (current: {{ current_version }}, target: {{ target_version }})"
       ansible.builtin.fail:
