@@ -152,8 +152,4 @@
           - snmp-server user netops NETOPS v3 auth sha admin priv aes 128 admin@123
         save_when: modified
 
-    - name: Save running configuration to startup
-      cisco.ios.ios_config:
-        lines:
-          - write memory
-        save_when: modified
+   
