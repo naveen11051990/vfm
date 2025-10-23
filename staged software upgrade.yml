@@ -63,7 +63,10 @@
     - name: Sort and normalize available versions
       set_fact:
         available_versions: "{{ available_versions_raw | unique | community.general.version_sort }}"
-        available_series: "{{ available_versions | map('regex_search','^(\\d+\\.\\d+)') | list | unique | community.general.version_sort }}"
+
+    - name: Derive available series from versions
+      set_fact:
+        available_series: "{{ available_versions | map('regex_search','^(\\d+\\.\\d+)') | list | select('string') | unique | community.general.version_sort }}"
 
     - name: Initialize planned upgrade list
       set_fact:
