@@ -102,8 +102,8 @@
         cs_bases: "{{ cs_versions | select('search', '^' ~ cs_esc ~ '\\.\\d+$') | list | community.general.version_sort }}"
         cs_base_latest: "{{ (cs_bases | last) | default('') }}"
         cs_hotfix_nums: "{{ cs_versions | select('search', '^' ~ (cs_base_latest | replace('.', '\\.')) ~ '-h\\d+$') | map('regex_search','-h(\\d+)$','\\1') | map('int') | list }}"
-        cs_hotfix_max: "{{ (cs_hotfix_nums | max) | default(0, true) }}"
-        cs_latest: "{{ (cs_hotfix_max > 0) | ternary(cs_base_latest ~ '-h' ~ cs_hotfix_max, cs_base_latest) }}"
+        cs_hotfix_max: "{{ ((cs_hotfix_nums | max) | default(0, true)) | int }}"
+        cs_latest: "{{ ((cs_hotfix_max | int) > 0) | ternary(cs_base_latest ~ '-h' ~ (cs_hotfix_max | string), cs_base_latest) }}"
       set_fact:
         planned_versions: "{{ planned_versions + ([cs_latest] if (target_series != current_series and cs_latest|length > 0 and cs_latest != current_version) else []) }}"
       when:
@@ -120,8 +120,8 @@
         s_bases: "{{ s_versions | select('search', '^' ~ s_esc ~ '\\.\\d+$') | list | community.general.version_sort }}"
         s_base_latest: "{{ (s_bases | last) | default('') }}"
         s_hotfix_nums: "{{ s_versions | select('search', '^' ~ (s_base_latest | replace('.', '\\.')) ~ '-h\\d+$') | map('regex_search','-h(\\d+)$','\\1') | map('int') | list }}"
-        s_hotfix_max: "{{ (s_hotfix_nums | max) | default(0, true) }}"
-        s_latest: "{{ (s_hotfix_max > 0) | ternary(s_base_latest ~ '-h' ~ s_hotfix_max, s_base_latest) }}"
+        s_hotfix_max: "{{ ((s_hotfix_nums | max) | default(0, true)) | int }}"
+        s_latest: "{{ ((s_hotfix_max | int) > 0) | ternary(s_base_latest ~ '-h' ~ (s_hotfix_max | string), s_base_latest) }}"
       set_fact:
         planned_versions: "{{ planned_versions + ([s_base] if s_base|length > 0 else []) + ([s_latest] if s_latest|length > 0 and s_latest != s_base else []) }}"
       when:
