@@ -7,6 +7,11 @@
     - cisco.ios
 
   vars:
+    ansible_user: admin
+    ansible_password: "admin@123"
+    ansible_become: yes
+    ansible_become_method: enable
+
     # VLAN definitions
     vlan_defs:
       - vlan_id: 30
@@ -14,7 +19,7 @@
       - vlan_id: 40
         name: SERVERS
 
-    # Interface lists
+    # List of ports for VLAN 30
     vlan30_interfaces:
       - GigabitEthernet2/0/10
       - GigabitEthernet2/0/11
@@ -22,6 +27,7 @@
       - GigabitEthernet2/0/13
       - GigabitEthernet2/0/14
 
+    # List of ports for VLAN 40
     vlan40_interfaces:
       - GigabitEthernet2/0/15
       - GigabitEthernet2/0/16
@@ -39,27 +45,23 @@
     - name: Assign VLAN 30 to interfaces Gi2/0/10-14
       cisco.ios.ios_l2_interfaces:
         config:
-          {% for intf in vlan30_interfaces %}
-          - name: "{{ intf }}"
+          - name: "{{ item }}"
             mode: access
             access:
               vlan: 30
-          {% endfor %}
         state: merged
-      when: vlan30_interfaces is defined
+      loop: "{{ vlan30_interfaces }}"
 
     - name: Assign VLAN 40 to interfaces Gi2/0/15-20
       cisco.ios.ios_l2_interfaces:
         config:
-          {% for intf in vlan40_interfaces %}
-          - name: "{{ intf }}"
+          - name: "{{ item }}"
             mode: access
             access:
               vlan: 40
-          {% endfor %}
         state: merged
-      when: vlan40_interfaces is defined
+      loop: "{{ vlan40_interfaces }}"
 
-    - name: Save running-config to startup-config
+    - name: Save running config to startup config
       cisco.ios.ios_config:
         save_when: changed
