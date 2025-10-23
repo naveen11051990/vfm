@@ -53,11 +53,16 @@
 
     - name: Parse available versions from software output
       ansible.builtin.set_fact:
-        available_versions: "{{ software_info.stdout | regex_findall('Version: ([0-9]+\\.[0-9]+\\.[0-9]+(?:-h[0-9]+)?)') | unique | list }}"
+        available_versions: '{{ software_info.stdout | regex_findall("version=\"([0-9]+\.[0-9]+\.[0-9]+(?:-h[0-9]+)?)\"") | unique | list }}'
 
     - name: Debug available versions
       ansible.builtin.debug:
         msg: "Available versions: {{ available_versions }}"
+
+    - name: Debug raw software info when no versions parsed
+      ansible.builtin.debug:
+        var: software_info.stdout
+      when: available_versions | length == 0
 
     - name: "Verify that target version {{ target_version }} is available for download"
       ansible.builtin.fail:
