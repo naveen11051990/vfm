@@ -145,9 +145,9 @@
       # This could use a loop or external vars; simplified here
       cisco.ios.ios_config:
       parents: interface gigabitEthernet 0/0
-        lines:
-          - description Floorone
-        save_when: modified
+      lines:
+        - description Floorone
+      save_when: modified
 
     - name: Configure SNMPv3 user and group
       cisco.ios.ios_config:
