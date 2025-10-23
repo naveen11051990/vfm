@@ -1,0 +1,159 @@
+---
+- name: Configure Catalyst 9300 access switch with L2 best practices
+  hosts: 192.168.29.164
+  gather_facts: no
+  connection: network_cli
+  vars:
+    # Basic variables — adjust to your environment
+
+    vlan_data: 10
+    vlan_servers: 20
+    vlan_guests: 30
+    vlan_voice: 200
+
+    allowed_vlans_trunk: "10,20,30,100,200"
+    access_port_range: "GigabitEthernet2/0/10-12"
+    unused_port_range: "GigabitEthernet2/0/13-24"
+    uplink_ports:
+      - "Te2/1/1"
+      - "Te2/1/2"
+
+    username_admin: "naveen"
+    secret_admin: "naveen@321!"
+
+  tasks:
+    - name: Set hostname, domain and enable SSH
+      cisco.ios.ios_config:
+        lines:
+          - hostname VFMSWITCH
+          - ip domain-name vfmswitch.com
+          - crypto key generate rsa modulus 2048
+          - ip ssh version 2
+          - ip ssh time-out 60
+          - ip ssh authentication-retries 2
+        save_when: modified
+
+    - name: Configure AAA and local user account
+      cisco.ios.ios_config:
+        lines:
+          - aaa new-model
+          - aaa authentication login default group tacacs+ local
+          - aaa authorization exec default group tacacs+ local
+          - aaa accounting commands 15 default start-stop group tacacs+
+          - username {{ username_admin }} privilege 15 secret {{ secret_admin }}
+        save_when: modified
+
+    - name: Disable HTTP/HTTPS services
+      cisco.ios.ios_config:
+        lines:
+          - no ip http server
+          - no ip http secure-server
+        save_when: modified
+
+    - name: Configure NTP, logging and timestamps
+      cisco.ios.ios_config:
+        lines:
+          - ntp server 192.168.29.3 prefer
+          - service timestamps log datetime msec localtime show-timezone
+          - logging host 192.168.29.3
+          - logging trap informational
+        save_when: modified
+
+    - name: Spanning-Tree global settings
+      cisco.ios.ios_config:
+        lines:
+          - spanning-tree mode rapid-pvst
+          - spanning-tree extend system-id
+          - spanning-tree loopguard default
+          - udld aggressive
+        save_when: modified
+
+    - name: Define VLANs
+      cisco.ios.ios_config:
+        lines:
+          - vlan {{ vlan_data }} name Users_Data
+          - vlan {{ vlan_servers }} name Servers
+          - vlan {{ vlan_guests }} name Guests
+          - vlan {{ mgmt_vlan }} name Management
+          - vlan {{ vlan_voice }} name Voice
+        save_when: modified
+
+    - name: Configure access ports for user PCs
+      cisco.ios.ios_config:
+        parents: interface range {{ access_port_range }}
+        lines:
+          - description User-Access-PC
+          - switchport mode access
+          - switchport access vlan {{ vlan_data }}
+          - switchport voice vlan {{ vlan_voice }}
+          - switchport nonegotiate
+          - spanning-tree portfast
+          - spanning-tree bpduguard enable
+          - switchport port-security
+          - switchport port-security maximum 2
+          - switchport port-security violation shutdown
+          - switchport port-security mac-address sticky
+          - storm-control broadcast level 1.00
+          - storm-control multicast level 1.00
+          - storm-control unkwown-unicast level 1.00
+          - no shutdown
+        save_when: modified
+
+    - name: Shut down unused ports
+      cisco.ios.ios_config:
+        parents: interface range {{ unused_port_range }}
+        lines:
+          - description Unused-shutdown
+          - switchport mode access
+          - switchport access vlan 999
+          - shutdown
+        save_when: modified
+
+    - name: Configure uplink ports and EtherChannel
+      cisco.ios.ios_config:
+        lines:
+          - interface {{ uplink_ports[0] }}
+          - description Uplink-to-Distro
+          - switchport trunk encapsulation dot1q
+          - switchport mode trunk
+          - switchport trunk allowed vlan {{ allowed_vlans_trunk }}
+          - switchport nonegotiate
+          - spanning-tree guard loop
+          - spanning-tree guard root
+          - channel-group 1 mode active
+          - interface {{ uplink_ports[1] }}
+          - description Uplink2-to-Distro
+          - switchport trunk encapsulation dot1q
+          - switchport mode trunk
+          - switchport trunk allowed vlan {{ allowed_vlans_trunk }}
+          - switchport nonegotiate
+          - spanning-tree guard loop
+          - spanning-tree guard root
+          - channel-group 1 mode active
+          - interface Port-channel1
+          - description PortChannel-Uplink-to-Distro
+          - switchport trunk encapsulation dot1q
+          - switchport mode trunk
+          - switchport trunk allowed vlan {{ allowed_vlans_trunk }}
+        save_when: modified
+
+    - name: Configure port-description for documentation
+      # This could use a loop or external vars; simplified here
+      cisco.ios.ios_config:
+        lines:
+          - interface GigabitEthernet0/0
+          - description Floor1-Room101-UserPC
+        save_when: modified
+
+    - name: Configure SNMPv3 user and group
+      cisco.ios.ios_config:
+        lines:
+          - snmp-server group NETOPS v3 auth
+          - snmp-server user netops NETOPS v3 auth sha admin priv aes 128 admin@123
+        save_when: modified
+
+    - name: Save running configuration to startup
+      cisco.ios.ios_config:
+        lines:
+          - write memory
+        save_when: modified
