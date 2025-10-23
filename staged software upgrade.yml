@@ -1,6 +1,6 @@
 ---
-- name: Staged PAN-OS software upgrade (Codex)
-  hosts: "UPGRADEFW"
+- name: Staged PAN-OS software upgrade
+  hosts: "{{ hosts | default('UPGRADEFW') }}"
   connection: local
 
   vars:
@@ -10,7 +10,7 @@
       password: "{{ password }}"
 
     # Target PAN-OS version to reach, e.g. "11.1.10-h1"
-    target_version: "{{ target_version }}"
+    target_version: "{{ target_os_version }}"
 
     # Reboot after each install step (recommended)
     reboot_between_steps: true
@@ -47,7 +47,7 @@
     - name: Derive series identifiers (major.minor)
       set_fact:
         current_series: "{{ (current_version | regex_search('^(\\d+\\.\\d+)')) | default('') }}"
-        target_series:  "{{ (target_version  | regex_search('^(\\d+\\.\\d+)')) | default('') }}"
+        target_series: "{{ (target_version  | regex_search('^(\\d+\\.\\d+)')) | default('') }}"
     - name: Refresh software index from update server
       paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
