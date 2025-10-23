@@ -1,6 +1,6 @@
 ---
 - name: Staged PAN-OS software upgrade
-  hosts: "{{ target | default('UPGRADEFW') }}"
+  hosts: "UPGRADEFW"
   connection: local
 
   vars:
@@ -11,7 +11,7 @@
       password: "{{ password }}"
 
     # Set the target PAN-OS version
-    target_version: "11.1.10-h1"
+    target_version: "11.1.2"
 
     # Suppress noisy retry logs from polling tasks
     quiet_polling: true
@@ -21,104 +21,74 @@
     - community.general
 
   tasks:
-    - name: Get PAN-OS device facts
-      paloaltonetworks.panos.panos_facts:
+    - name: Get current PAN-OS version
+      paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
-      register: panos_facts
+        cmd: "show system info"
+      register: system_info
 
     - name: Set current version fact
       ansible.builtin.set_fact:
-        current_version: "{{ panos_facts.ansible_facts.ansible_net_version }}"
+        current_version: "{{ (system_info.stdout_xml | from_xml).response.result.system['sw-version'] }}"
 
     - name: "Check if upgrade is needed (current: {{ current_version }}, target: {{ target_version }})"
       ansible.builtin.fail:
         msg: "Device is already at or above the target version."
-      when: current_version is version(target_version, '>=')
+      when: "current_version | version_compare(target_version, '>=')"
 
-    - name: Refresh software index from Palo Alto Networks
+    - name: Get available software versions from Palo Alto Networks
       paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
         cmd: "request system software check"
-      register: software_check
+      register: available_software_xml
 
-    - name: Wait for software check to complete
-      ansible.builtin.pause:
-        seconds: 10
+    - name: Parse available versions
+      ansible.builtin.set_fact:
+        available_versions: "{{ (available_software_xml.stdout_xml | from_xml).response.result['sw-updates'].versions.entry | map(attribute='version') | list }}"
 
-    - name: Get available software versions
+    - name: Determine the upgrade path
+      ansible.builtin.set_fact:
+        upgrade_path: >-
+          {{
+            (
+              available_versions | select('version_compare', current_version, '>')
+                                 | select('version_compare', target_version, '<')
+                                 | select('regex', '.*\.0$')
+                                 | list
+            ) + [target_version] | unique | sort(version_type='loose')
+          }}
+
+    - name: "Upgrade path determined: {{ upgrade_path }}"
+      ansible.builtin.debug:
+        msg: "The following versions will be installed in order: {{ upgrade_path }}"
+
+    - name: Perform staged upgrade
+      when: upgrade_path | length > 0
+      block:
+        - name: "Upgrading to version {{ item }}"
+          paloaltonetworks.panos.panos_software:
+            provider: "{{ device }}"
+            version: "{{ item }}"
+            download: true
+            install: true
+            restart: true
+
+        - name: "Wait for device to be ready after upgrading to {{ item }}"
+          paloaltonetworks.panos.panos_check:
+            provider: "{{ device }}"
+          register: ready_result
+          until: "ready_result is not failed and ready_result.msg == 'Device is ready.'"
+          retries: 120
+          delay: 30
+          no_log: "{{ quiet_polling }}"
+      loop: "{{ upgrade_path }}"
+
+    - name: Final version check
       paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
-        cmd: "request system software info"
-      register: software_info
+        cmd: "show system info"
+      register: final_system_info
 
-    - name: Parse available versions from software output
-      ansible.builtin.set_fact:
-        available_versions: '{{ software_info.stdout | regex_findall("version=\"([0-9]+\.[0-9]+\.[0-9]+(?:-h[0-9]+)?)\"") | unique | list }}'
-
-    - name: Debug available versions
+    - name: "Upgrade complete. Current version: {{ (final_system_info.stdout_xml | from_xml).response.result.system['sw-version'] }}"
       ansible.builtin.debug:
-        msg: "Available versions: {{ available_versions }}"
-
-    - name: Debug raw software info when no versions parsed
-      ansible.builtin.debug:
-        var: software_info.stdout
-      when: available_versions | length == 0
-
-    - name: "Verify that target version {{ target_version }} is available for download"
-      ansible.builtin.fail:
-        msg: "Target version {{ target_version }} is not in the list of available software. Available versions: {{ available_versions }}"
-      when: target_version not in available_versions
-
-    - name: Calculate upgrade path based on major.minor versions
-      ansible.builtin.set_fact:
-        upgrade_path: []
-
-    - name: Build staged upgrade path
-      ansible.builtin.set_fact:
-        upgrade_path: "{{ upgrade_path + [target_version] }}"
-      when: current_version is version(target_version, '<')
-
-    - name: "Display upgrade path"
-      ansible.builtin.debug:
-        msg: "Upgrade path: {{ current_version }} → {{ upgrade_path | join(' → ') }}"
-    - name: "Pre-flight check: Wait for device to be reachable"
-      ansible.builtin.wait_for:
-        host: "{{ device.ip_address }}"
-        port: 443
-        timeout: 30
-      delegate_to: localhost
-
-    # - name: "Pre-flight check: Get system resources"
-    #   paloaltonetworks.panos.panos_op:
-    #     provider: "{{ device }}"
-    #     cmd: "show system resources"
-    #   register: system_resources
-
-    # - name: "Pre-flight check: Check device readiness"
-    #   paloaltonetworks.panos.panos_check:
-    #     provider: "{{ device }}"
-    #   register: device_ready
-    #   failed_when: false
-
-    # - name: Perform staged upgrade
-    #   include_tasks: staged_upgrade_step.yml
-    #   loop: "{{ upgrade_path }}"
-    #   loop_control:
-    #     loop_var: version_item
-    #   when: upgrade_path | length > 0
-
-    # - name: "Post-upgrade check: Get final PAN-OS device facts"
-    #   paloaltonetworks.panos.panos_facts:
-    #     provider: "{{ device }}"
-    #   register: final_panos_facts
-
-    # - name: "Post-upgrade check: Verify final version is correct"
-    #   ansible.builtin.assert:
-    #     that:
-    #       - final_panos_facts.ansible_facts.ansible_net_version is version(target_version, '==')
-    #     fail_msg: "Upgrade failed. Device is on version {{ final_panos_facts.ansible_facts.ansible_net_version }} but should be on {{ target_version }}."
-    #     success_msg: "Upgrade successful! Device is now running version {{ target_version }}."
-
-    # - name: "Upgrade completed successfully"
-    #   ansible.builtin.debug:
-    #     msg: "Staged upgrade completed. Device upgraded from {{ current_version }} to {{ final_panos_facts.ansible_facts.ansible_net_version }}"
+        msg: "Successfully upgraded to {{ (final_system_info.stdout_xml | from_xml).response.result.system['sw-version'] }}"
