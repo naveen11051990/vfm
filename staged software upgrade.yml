@@ -33,155 +33,156 @@
     - name: "Check if upgrade is needed (current: {{ current_version }}, target: {{ target_version }})"
       ansible.builtin.fail:
         msg: "Device is already at or above the target version."
-      when: "current_version is version(target_version, '>=')"
+      when: current_version is version(target_version, '>=')
 
-    - name: Check for available software from Palo Alto Networks
-      paloaltonetworks.panos.panos_software:
+    - name: Refresh software index from Palo Alto Networks
+      paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
-        check: true
-      register: available_software_check
+        cmd: "request system software check"
+      register: software_check
 
-    - name: Parse available versions from structured output
+    - name: Wait for software check to complete
+      ansible.builtin.pause:
+        seconds: 10
+
+    - name: Get available software versions
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "show system software"
+      register: software_info
+
+    - name: Parse available versions from software output
       ansible.builtin.set_fact:
-        available_versions: "{{ available_software_check.versions.keys() | list }}"
+        available_versions: "{{ software_info.stdout | regex_findall('Version: ([0-9]+\\.[0-9]+\\.[0-9]+(?:-h[0-9]+)?)') | unique | list }}"
+
+    - name: Debug available versions
+      ansible.builtin.debug:
+        msg: "Available versions: {{ available_versions }}"
 
     - name: "Verify that target version {{ target_version }} is available for download"
       ansible.builtin.fail:
-        msg: "Target version {{ target_version }} is not in the list of available software. Please check the version number or the firewall's software update availability."
-      when: "target_version not in available_versions"
+        msg: "Target version {{ target_version }} is not in the list of available software. Available versions: {{ available_versions }}"
+      when: target_version not in available_versions
 
-    - name: Initialize upgrade path list
+    - name: Calculate upgrade path based on major.minor versions
       ansible.builtin.set_fact:
-        calculated_path: []
+        upgrade_path: []
 
-    - name: Get unique major.minor series from available versions
+    - name: Build staged upgrade path
       ansible.builtin.set_fact:
-        upgrade_series: "{{ (available_versions | map('regex_replace', '^(\\d+\\.\\d+)\\..*', '\\1') | unique | sort(version_type='loose')) }}"
+        upgrade_path: "{{ upgrade_path + [target_version] }}"
+      when: current_version is version(target_version, '<')
 
-    - name: Determine latest stable release for each intermediate series
-      ansible.builtin.set_fact:
-        calculated_path: "{{ calculated_path + [latest_in_series] }}"
-      loop: "{{ upgrade_series }}"
-      vars:
-        series_versions: "{{ available_versions | select('match', '^' + item + '\\.') }}"
-        latest_in_series: "{{ series_versions | sort(reverse=true, version_type='loose') | first }}"
-      when:
-        - item is version(current_version, '>=')
-        - item is version(target_version, '<')
-
-    - name: Finalize the upgrade path
-      ansible.builtin.set_fact:
-        upgrade_path: "{{ (calculated_path + [target_version]) | unique | sort(version_type='loose') }}"
-
-    - name: "Upgrade path determined: {{ upgrade_path }}"
+    - name: "Display upgrade path"
       ansible.builtin.debug:
-        msg: "The following versions will be installed in order: {{ upgrade_path }}"
-#    - name: "Pre-flight check: Wait for device to be reachable"
-#      ansible.builtin.wait_for:
-#        host: "{{ device.ip_address }}"
-#        port: 443
-#        timeout: 30
-#        msg: "Firewall management interface is not responding."
-#      delegate_to: localhost
-#
-#    - name: "Pre-flight check: Get system resources"
-#      paloaltonetworks.panos.panos_op:
-#        provider: "{{ device }}"
-#        cmd: "show system resources"
-#      register: system_resources
-#
-#    - name: "Pre-flight check: Assert sufficient disk space"
-#      ansible.builtin.assert:
-#        that:
-#          - "system_resources.stdout_xml.result.df.entry[1].use.replace('%', '') | int < 80"
-#        fail_msg: "Insufficient disk space for upgrade. Please free up space on the root partition."
-#        success_msg: "Disk space check passed."
-#
-#    - name: Perform staged upgrade
-#      when: upgrade_path | length > 0
-#      block:
-#        - name: "Download and Install version {{ item }}"
-#          block:
-#            - name: "Attempting to download version {{ item }}"
-#              paloaltonetworks.panos.panos_software:
-#                provider: "{{ device }}"
-#                version: "{{ item }}"
-#                download: true
-#                install: false
-#
-#          rescue:
-#            - name: "Failed to download version {{ item }}, retrying..."
-#              paloaltonetworks.panos.panos_software:
-#                provider: "{{ device }}"
-#                version: "{{ item }}"
-#                download: true
-#                install: false
-#              retries: 3
-#              delay: 60
-#
-#        - name: "Install version {{ item }}"
-#          paloaltonetworks.panos.panos_software:
-#            provider: "{{ device }}"
-#            version: "{{ item }}"
-#            restart: false
-#
-#        - name: "Restarting device to apply version {{ item }}"
-#          paloaltonetworks.panos.panos_op:
-#            provider: "{{ device }}"
-#            cmd: "request restart system"
-#          async: 45
-#          poll: 0
-#
-#        - name: "Wait for device to begin restart after upgrade to {{ item }}"
-#          ansible.builtin.wait_for:
-#            host: "{{ device.ip_address }}"
-#            port: 443
-#            state: stopped
-#            timeout: 300
-#          delegate_to: localhost
-#
-#        - name: "Wait for device to be ready after upgrading to {{ item }}"
-#          ansible.builtin.wait_for:
-#            host: "{{ device.ip_address }}"
-#            port: 443
-#            state: started
-#            timeout: 900
-#          delegate_to: localhost
-#
-#        - name: "Final check to ensure device is ready"
-#          paloaltonetworks.panos.panos_check:
-#            provider: "{{ device }}"
-#          register: ready_result
-#          until: "ready_result is not failed and ready_result.msg == 'Device is ready.'"
-#          retries: 60
-#          delay: 15
-#          no_log: "{{ quiet_polling }}"
-#
-#        - name: "Verify that version {{ item }} was installed"
-#          paloaltonetworks.panos.panos_facts:
-#            provider: "{{ device }}"
-#          register: post_upgrade_facts
-#
-#        - name: "Assert that device is on version {{ item }}"
-#          ansible.builtin.assert:
-#            that:
-#              - "post_upgrade_facts.ansible_facts.panos_version | version_compare(item, '==')"
-#            fail_msg: "Upgrade to {{ item }} failed. Device is on {{ post_upgrade_facts.ansible_facts.panos_version }}."
-#            success_msg: "Successfully upgraded to {{ item }}."
-#      loop: "{{ upgrade_path }}"
-#
-#    - name: "Post-flight check: Get final PAN-OS device facts"
-#      paloaltonetworks.panos.panos_facts:
-#        provider: "{{ device }}"
-#      register: final_panos_facts
-#
-#    - name: "Post-flight check: Assert final version is correct"
-#      ansible.builtin.assert:
-#        that:
-#          - "final_panos_facts.ansible_facts.panos_version | version_compare(target_version, '==')"
-#        fail_msg: "Upgrade failed. Device is on version {{ final_panos_facts.ansible_facts.panos_version }} but should be on {{ target_version }}."
-#        success_msg: "Upgrade successful. Device is on version {{ target_version }}."
-#
-#    - name: "Upgrade complete. Current version: {{ final_panos_facts.ansible_facts.panos_version }}"
-#      ansible.builtin.debug:
-#        msg: "Successfully upgraded to {{ final_panos_facts.ansible_facts.panos_version }}"
+        msg: "Upgrade path: {{ current_version }} → {{ upgrade_path | join(' → ') }}"
+    - name: "Pre-flight check: Wait for device to be reachable"
+      ansible.builtin.wait_for:
+        host: "{{ device.ip_address }}"
+        port: 443
+        timeout: 30
+      delegate_to: localhost
+
+    - name: "Pre-flight check: Get system resources"
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "show system resources"
+      register: system_resources
+
+    - name: "Pre-flight check: Check device readiness"
+      paloaltonetworks.panos.panos_check:
+        provider: "{{ device }}"
+      register: device_ready
+      failed_when: false
+
+    - name: Perform staged upgrade
+      when: upgrade_path | length > 0
+      block:
+        - name: "Download and install version {{ item }}"
+          block:
+            - name: "Attempting to download and install version {{ item }}"
+              paloaltonetworks.panos.panos_software:
+                provider: "{{ device }}"
+                version: "{{ item }}"
+                download: true
+                install: true
+                restart: false
+              register: software_install
+
+          rescue:
+            - name: "Retrying download and install for version {{ item }}"
+              paloaltonetworks.panos.panos_software:
+                provider: "{{ device }}"
+                version: "{{ item }}"
+                download: true
+                install: true
+                restart: false
+              retries: 2
+              delay: 30
+
+        - name: "Restart device to apply version {{ item }}"
+          paloaltonetworks.panos.panos_op:
+            provider: "{{ device }}"
+            cmd: "request restart system"
+          async: 60
+          poll: 0
+          register: restart_job
+
+        - name: "Wait for device to begin restart after upgrade to {{ item }}"
+          ansible.builtin.wait_for:
+            host: "{{ device.ip_address }}"
+            port: 443
+            state: stopped
+            timeout: 300
+          delegate_to: localhost
+
+        - name: "Wait for device to come back online after upgrading to {{ item }}"
+          ansible.builtin.wait_for:
+            host: "{{ device.ip_address }}"
+            port: 443
+            state: started
+            timeout: 900
+          delegate_to: localhost
+
+        - name: "Wait additional time for services to stabilize"
+          ansible.builtin.pause:
+            seconds: 60
+
+        - name: "Check device readiness after upgrade to {{ item }}"
+          paloaltonetworks.panos.panos_check:
+            provider: "{{ device }}"
+          register: ready_result
+          until: ready_result is not failed and ready_result.msg == 'Device is ready.'
+          retries: 30
+          delay: 30
+          no_log: "{{ quiet_polling }}"
+
+        - name: "Verify that version {{ item }} was installed successfully"
+          paloaltonetworks.panos.panos_facts:
+            provider: "{{ device }}"
+          register: post_upgrade_facts
+
+        - name: "Assert that device is running version {{ item }}"
+          ansible.builtin.assert:
+            that:
+              - post_upgrade_facts.ansible_facts.ansible_net_version is version(item, '==')
+            fail_msg: "Upgrade to {{ item }} failed. Device is on {{ post_upgrade_facts.ansible_facts.ansible_net_version }}."
+            success_msg: "Successfully upgraded to {{ item }}."
+
+      loop: "{{ upgrade_path }}"
+
+    - name: "Post-upgrade check: Get final PAN-OS device facts"
+      paloaltonetworks.panos.panos_facts:
+        provider: "{{ device }}"
+      register: final_panos_facts
+
+    - name: "Post-upgrade check: Verify final version is correct"
+      ansible.builtin.assert:
+        that:
+          - final_panos_facts.ansible_facts.ansible_net_version is version(target_version, '==')
+        fail_msg: "Upgrade failed. Device is on version {{ final_panos_facts.ansible_facts.ansible_net_version }} but should be on {{ target_version }}."
+        success_msg: "Upgrade successful! Device is now running version {{ target_version }}."
+
+    - name: "Upgrade completed successfully"
+      ansible.builtin.debug:
+        msg: "Staged upgrade completed. Device upgraded from {{ current_version }} to {{ final_panos_facts.ansible_facts.ansible_net_version }}"
