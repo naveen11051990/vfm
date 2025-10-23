@@ -146,7 +146,7 @@
       cisco.ios.ios_config:
         lines:
           - interface GigabitEthernet0/0
-          - description Floor1-Room101-UserPC
+          - description Floorone
         save_when: modified
 
     - name: Configure SNMPv3 user and group
