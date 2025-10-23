@@ -88,12 +88,12 @@
 
     - name: Compute series indices
       set_fact:
-        current_idx: "{{ (series_ordered.index(current_series)) if (current_series in series_ordered) else -1 }}"
-        target_idx: "{{ (series_ordered.index(target_series)) if (target_series in series_ordered) else -1 }}"
+        current_idx: "{{ ((series_ordered.index(current_series)) if (current_series in series_ordered) else -1) | int }}"
+        target_idx: "{{ ((series_ordered.index(target_series)) if (target_series in series_ordered) else -1) | int }}"
 
     - name: Compute intermediate series slice
       set_fact:
-        intermediate_series: "{{ series_ordered[current_idx+1:target_idx] if (current_idx is defined and target_idx is defined and current_idx >= 0 and target_idx >= 0 and target_idx > current_idx) else [] }}"
+        intermediate_series: "{{ series_ordered[(current_idx | int)+1:(target_idx | int)] if (current_idx is defined and target_idx is defined and (current_idx | int) >= 0 and (target_idx | int) >= 0 and (target_idx | int) > (current_idx | int)) else [] }}"
 
     - name: Plan step within current series when target is later series
       vars:
