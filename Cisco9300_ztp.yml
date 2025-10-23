@@ -121,7 +121,6 @@
         lines:
           - interface {{ uplink_ports[0] }}
           - description Uplink-to-Distro
-          - switchport trunk encapsulation dot1q
           - switchport mode trunk
           - switchport trunk allowed vlan {{ allowed_vlans_trunk }}
           - switchport nonegotiate
@@ -129,8 +128,7 @@
           - spanning-tree guard root
           - channel-group 1 mode active
           - interface {{ uplink_ports[1] }}
-          - description Uplink2-to-Distro
-          - switchport trunk encapsulation dot1q
+          - description Uplink2-to-Distro-
           - switchport mode trunk
           - switchport trunk allowed vlan {{ allowed_vlans_trunk }}
           - switchport nonegotiate
@@ -139,7 +137,6 @@
           - channel-group 1 mode active
           - interface Port-channel1
           - description PortChannel-Uplink-to-Distro
-          - switchport trunk encapsulation dot1q
           - switchport mode trunk
           - switchport trunk allowed vlan {{ allowed_vlans_trunk }}
         save_when: modified
