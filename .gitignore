@@ -219,4 +219,6 @@ __marimo__/
 reporting/legacy/
 
 AGENTS.md
+GEMINI.md
+inventories/
 *.tmp.*
