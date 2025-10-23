@@ -11,7 +11,7 @@
       password: "{{ password }}"
 
     # Set the target PAN-OS version
-    target_version: "11.1.2"
+    target_version: "11.1.10-h1"
 
     # Suppress noisy retry logs from polling tasks
     quiet_polling: true
