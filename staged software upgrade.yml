@@ -33,7 +33,7 @@
     - name: "Check if upgrade is needed (current: {{ current_version }}, target: {{ target_version }})"
       ansible.builtin.fail:
         msg: "Device is already at or above the target version."
-      when: "current_version | version_compare(target_version, '>=')"
+      when: "current_version is version(target_version, '>=')"
 
     - name: Check for available software from Palo Alto Networks
       paloaltonetworks.panos.panos_software:
@@ -65,8 +65,8 @@
         series_versions: "{{ available_versions | select('match', '^' + item + '\\.') }}"
         latest_in_series: "{{ series_versions | sort(reverse=true, version_type='loose') | first }}"
       when:
-        - item | version_compare(current_version, '>=', 'major.minor')
-        - item | version_compare(target_version, '<', 'major.minor')
+        - item is version(current_version, '>=')
+        - item is version(target_version, '<')
 
     - name: Finalize the upgrade path
       ansible.builtin.set_fact:
