@@ -78,6 +78,11 @@
         current_latest: "{{ (current_series_versions | last) | default('') }}"
       set_fact:
         planned_versions: "{{ planned_versions + ([current_latest] if (target_series != current_series and current_latest != '' and current_latest != current_version) else []) }}"
+      when:
+        - current_series is defined
+        - target_series is defined
+        - current_series | length > 0
+        - target_series | length > 0
 
     - name: Plan intermediate series (base then latest)
       vars:
@@ -89,6 +94,10 @@
       set_fact:
         planned_versions: "{{ planned_versions + ([series_base] if series_base != '' else []) + ([series_latest] if series_latest != '' else []) }}"
       when:
+        - current_series is defined
+        - target_series is defined
+        - current_series | length > 0
+        - target_series | length > 0
         - series is version(current_series, '>')
         - series is version(target_series, '<')
       loop: "{{ available_series }}"
@@ -105,6 +114,9 @@
                 | ternary([target_base], []))
              + ((target_version is defined and target_version != '' and target_version != target_base)
                 | ternary([target_version], [])) }}
+      when:
+        - target_series is defined
+        - target_series | length > 0
 
     - name: Handle same-series direct upgrade case
       set_fact:
@@ -149,4 +161,9 @@
     #   no_log: "{{ quiet_polling }}"
     - name: Short-circuit when target is not newer
       meta: end_play
-      when: not (current_version is version(target_version, '<'))
+      when:
+        - current_version is defined
+        - target_version is defined
+        - current_version is match('^\\d')
+        - target_version is match('^\\d')
+        - not (current_version is version(target_version, '<'))
