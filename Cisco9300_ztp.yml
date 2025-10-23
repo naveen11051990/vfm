@@ -1,17 +1,17 @@
 ---
-- name: Configure Catalyst 9300 access switch with L2 best practices
-  hosts:
-  sw01:
-    ansible_host: 192.168.29.164
-    ansible_connection: network_cli
-    ansible_network_os: cisco.ios.ios
+- name: Configure L2 switch _ Best pratice template _ India
+  hosts: 192.168.29.164
+  gather_facts: no
+  connection: network_cli
+  collections:
+    - cisco.ios
+
+  vars:
     ansible_user: naveen
-    ansible_password: naveen@321!
-    # optionally if your device uses enable secret:
+    ansible_password: "naveen@321!"
     ansible_become: yes
     ansible_become_method: enable
-    ansible_become_password: naveen@321!
-    # Basic variables — adjust to your environment
+
 
     vlan_data: 10
     vlan_servers: 20
