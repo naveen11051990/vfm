@@ -1,0 +1,149 @@
+---
+- name: Staged PAN-OS software upgrade (Codex)
+  hosts: "UPGRADEFW"
+  connection: local
+
+  vars:
+    device:
+      ip_address: "{{ ip_address }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+
+    # Target PAN-OS version to reach, e.g. "11.1.10-h1"
+    target_version: "{{ target_version }}"
+
+    # Reboot after each install step (recommended)
+    reboot_between_steps: true
+
+    # Suppress noisy logs during long polling
+    quiet_polling: true
+
+  collections:
+    - paloaltonetworks.panos
+    - community.general
+
+  tasks:
+    - name: Ensure target_version is provided
+      assert:
+        that:
+          - target_version is defined
+          - target_version | length > 0
+        fail_msg: "You must provide -e target_version=<panos_version> to run a staged upgrade."
+
+    - name: Gather system info (to detect current PAN-OS)
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "show system info"
+      register: system_info
+
+    - name: Parse current PAN-OS version
+      set_fact:
+        current_version: "{{ (system_info.stdout_xml | regex_search('<sw-version>([^<]+)</sw-version>', '\\1')) | default('unknown') }}"
+
+    - name: Derive series identifiers (major.minor)
+      set_fact:
+        current_series: "{{ (current_version | regex_search('^(\\d+\\.\\d+)')) | default('') }}"
+        target_series:  "{{ (target_version  | regex_search('^(\\d+\\.\\d+)')) | default('') }}"
+    - name: Refresh software index from update server
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "request system software check"
+      register: sw_check
+
+    - name: Get available software versions info
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "request system software info"
+      register: sw_info
+
+    - name: Extract available versions from software info
+      set_fact:
+        available_versions_raw: "{{ sw_info.stdout_xml | regex_findall('<version>([^<]+)</version>') | list }}"
+
+    - name: Sort and normalize available versions
+      set_fact:
+        available_versions: "{{ available_versions_raw | unique | community.general.version_sort }}"
+        available_series: "{{ available_versions | map('regex_search','^(\\d+\\.\\d+)') | list | unique | community.general.version_sort }}"
+
+    - name: Initialize planned upgrade list
+      set_fact:
+        planned_versions: []
+
+    - name: Plan step within current series when target is later series
+      vars:
+        current_series_versions: "{{ available_versions | select('search', '^' ~ (current_series | replace('.', '\\.') ) ~ '\\.') | list | community.general.version_sort }}"
+        current_latest: "{{ (current_series_versions | last) | default('') }}"
+      set_fact:
+        planned_versions: "{{ planned_versions + ([current_latest] if (target_series != current_series and current_latest != '' and current_latest != current_version) else []) }}"
+
+    - name: Plan intermediate series (base then latest)
+      vars:
+        series: "{{ item }}"
+        series_versions: "{{ available_versions | select('search', '^' ~ (series | replace('.', '\\.') ) ~ '\\.') | list | community.general.version_sort }}"
+        series_base_candidates: "{{ series_versions | select('search', '^' ~ (series | replace('.', '\\.') ) ~ '\\.0($|-)') | list }}"
+        series_base: "{{ (series_base_candidates | first) | default((series_versions | first) | default('')) }}"
+        series_latest: "{{ (series_versions | last) | default('') }}"
+      set_fact:
+        planned_versions: "{{ planned_versions + ([series_base] if series_base != '' else []) + ([series_latest] if series_latest != '' else []) }}"
+      when:
+        - series is version(current_series, '>')
+        - series is version(target_series, '<')
+      loop: "{{ available_series }}"
+
+    - name: Plan target series steps (base then target)
+      vars:
+        target_series_versions: "{{ available_versions | select('search', '^' ~ (target_series | replace('.', '\\.') ) ~ '\\.') | list | community.general.version_sort }}"
+        target_base_candidates: "{{ target_series_versions | select('search', '^' ~ (target_series | replace('.', '\\.') ) ~ '\\.0($|-)') | list }}"
+        target_base: "{{ (target_base_candidates | first) | default((target_series_versions | first) | default('')) }}"
+      set_fact:
+        planned_versions: >-
+          {{ planned_versions
+             + ((current_series != target_series and target_base != '' and target_base != current_version)
+                | ternary([target_base], []))
+             + ((target_version is defined and target_version != '' and target_version != target_base)
+                | ternary([target_version], [])) }}
+
+    - name: Handle same-series direct upgrade case
+      set_fact:
+        planned_versions: "{{ [target_version] if (current_series == target_series and current_version != target_version) else planned_versions }}"
+
+    - name: Show computed staged upgrade path
+      debug:
+        msg: >-
+          Current: {{ current_version }} | Target: {{ target_version }} | Plan: {{ planned_versions | join(' -> ') if planned_versions|length > 0 else 'Already at target' }}
+
+    - name: Short-circuit when already at target version
+      meta: end_play
+      when: current_version == target_version or planned_versions | length == 0
+
+    # The following execution block is commented out to allow dry-run path verification.
+    # Uncomment to perform actual staged downloads, installs, and reboots.
+    # - name: Execute staged upgrades step by step
+    #   vars:
+    #     desired: "{{ item }}"
+    #   block:
+    #     - name: Install PAN-OS {{ desired }} (download+install+{{ 'reboot' if reboot_between_steps else 'no-reboot' }})
+    #       paloaltonetworks.panos.panos_software:
+    #         provider: "{{ device }}"
+    #         version: "{{ desired }}"
+    #         download: true
+    #         install: true
+    #         restart: "{{ reboot_between_steps | bool }}"
+    #
+    #     - name: Wait for device to be ready after reboot ({{ desired }})
+    #       paloaltonetworks.panos.panos_check:
+    #         provider: "{{ device }}"
+    #       changed_when: false
+    #       register: ready_result
+    #       until: ready_result is not failed and ready_result.msg == 'Device is ready.'
+    #       retries: 100
+    #       delay: 15
+    #       when: reboot_between_steps | bool
+    #
+    #   loop: "{{ planned_versions }}"
+    #   loop_control:
+    #     label: "{{ item }}"
+    #   no_log: "{{ quiet_polling }}"
+    - name: Short-circuit when target is not newer
+      meta: end_play
+      when: not (current_version is version(target_version, '<'))
