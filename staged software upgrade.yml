@@ -36,9 +36,10 @@
         cmd: "show system info"
       register: system_info
 
-    - name: Parse current PAN-OS version
+    - name: Parse current PAN-OS version (scalar)
       set_fact:
-        current_version: "{{ (system_info.stdout_xml | regex_search('<sw-version>([^<]+)</sw-version>', '\\1')) | default('unknown') }}"
+        current_version_raw: "{{ system_info.stdout_xml | regex_findall('<sw-version>([^<]+)</sw-version>') }}"
+        current_version: "{{ (current_version_raw[0] if (current_version_raw | length) > 0 else 'unknown') }}"
 
     - name: Derive series identifiers (major.minor)
       set_fact:
@@ -68,54 +69,66 @@
       set_fact:
         available_series: "{{ available_versions | map('regex_search','^(\\d+\\.\\d+)') | list | select('string') | unique | community.general.version_sort }}"
 
-    - name: Initialize planned upgrade list
+    - name: Validate target_version is in available list
+      assert:
+        that:
+          - target_version in available_versions
+        fail_msg: "Target version {{ target_version }} not found in 'request system software info'. Ensure it is visible or run a software check."
+
+    - name: Initialize planned upgrade list and series indices
       set_fact:
         planned_versions: []
+        series_ordered: "{{ available_series }}"
+        current_idx: "{{ (series_ordered.index(current_series)) if (current_series in series_ordered) else -1 }}"
+        target_idx: "{{ (series_ordered.index(target_series)) if (target_series in series_ordered) else -1 }}"
+        intermediate_series: "{{ series_ordered[current_idx+1:target_idx] if (current_idx >= 0 and target_idx >= 0 and target_idx > current_idx) else [] }}"
 
     - name: Plan step within current series when target is later series
       vars:
-        current_series_versions: "{{ available_versions | select('search', '^' ~ (current_series | replace('.', '\\.') ) ~ '\\.') | list | community.general.version_sort }}"
-        current_latest: "{{ (current_series_versions | last) | default('') }}"
+        cs_esc: "{{ current_series | replace('.', '\\.') }}"
+        cs_versions: "{{ available_versions | select('search', '^' ~ cs_esc ~ '\\.') | list | community.general.version_sort }}"
+        cs_bases: "{{ cs_versions | select('search', '^' ~ cs_esc ~ '\\.\\d+$') | list | community.general.version_sort }}"
+        cs_base_latest: "{{ (cs_bases | last) | default('') }}"
+        cs_hotfix_nums: "{{ cs_versions | select('search', '^' ~ (cs_base_latest | replace('.', '\\.')) ~ '-h\\d+$') | map('regex_search','-h(\\d+)$','\\1') | map('int') | list }}"
+        cs_hotfix_max: "{{ (cs_hotfix_nums | max) | default(0, true) }}"
+        cs_latest: "{{ (cs_hotfix_max > 0) | ternary(cs_base_latest ~ '-h' ~ cs_hotfix_max, cs_base_latest) }}"
       set_fact:
-        planned_versions: "{{ planned_versions + ([current_latest] if (target_series != current_series and current_latest != '' and current_latest != current_version) else []) }}"
+        planned_versions: "{{ planned_versions + ([cs_latest] if (target_series != current_series and cs_latest|length > 0 and cs_latest != current_version) else []) }}"
       when:
-        - current_series is defined
-        - target_series is defined
         - current_series | length > 0
         - target_series | length > 0
 
     - name: Plan intermediate series (base then latest)
       vars:
         series: "{{ item }}"
-        series_versions: "{{ available_versions | select('search', '^' ~ (series | replace('.', '\\.') ) ~ '\\.') | list | community.general.version_sort }}"
-        series_base_candidates: "{{ series_versions | select('search', '^' ~ (series | replace('.', '\\.') ) ~ '\\.0($|-)') | list }}"
-        series_base: "{{ (series_base_candidates | first) | default((series_versions | first) | default('')) }}"
-        series_latest: "{{ (series_versions | last) | default('') }}"
+        s_esc: "{{ series | replace('.', '\\.') }}"
+        s_versions: "{{ available_versions | select('search', '^' ~ s_esc ~ '\\.') | list | community.general.version_sort }}"
+        s_base_exact: "{{ s_versions | select('search', '^' ~ s_esc ~ '\\.0($|-)') | list | first | default('') }}"
+        s_base: "{{ s_base_exact if s_base_exact|length > 0 else (s_versions | first | default('')) }}"
+        s_bases: "{{ s_versions | select('search', '^' ~ s_esc ~ '\\.\\d+$') | list | community.general.version_sort }}"
+        s_base_latest: "{{ (s_bases | last) | default('') }}"
+        s_hotfix_nums: "{{ s_versions | select('search', '^' ~ (s_base_latest | replace('.', '\\.')) ~ '-h\\d+$') | map('regex_search','-h(\\d+)$','\\1') | map('int') | list }}"
+        s_hotfix_max: "{{ (s_hotfix_nums | max) | default(0, true) }}"
+        s_latest: "{{ (s_hotfix_max > 0) | ternary(s_base_latest ~ '-h' ~ s_hotfix_max, s_base_latest) }}"
       set_fact:
-        planned_versions: "{{ planned_versions + ([series_base] if series_base != '' else []) + ([series_latest] if series_latest != '' else []) }}"
+        planned_versions: "{{ planned_versions + ([s_base] if s_base|length > 0 else []) + ([s_latest] if s_latest|length > 0 and s_latest != s_base else []) }}"
       when:
-        - current_series is defined
-        - target_series is defined
-        - current_series | length > 0
-        - target_series | length > 0
-        - series is version(current_series, '>')
-        - series is version(target_series, '<')
-      loop: "{{ available_series }}"
+        - intermediate_series | length > 0
+      loop: "{{ intermediate_series }}"
 
     - name: Plan target series steps (base then target)
       vars:
-        target_series_versions: "{{ available_versions | select('search', '^' ~ (target_series | replace('.', '\\.') ) ~ '\\.') | list | community.general.version_sort }}"
-        target_base_candidates: "{{ target_series_versions | select('search', '^' ~ (target_series | replace('.', '\\.') ) ~ '\\.0($|-)') | list }}"
-        target_base: "{{ (target_base_candidates | first) | default((target_series_versions | first) | default('')) }}"
+        ts_esc: "{{ target_series | replace('.', '\\.') }}"
+        ts_versions: "{{ available_versions | select('search', '^' ~ ts_esc ~ '\\.') | list | community.general.version_sort }}"
+        ts_base: "{{ ts_versions | select('search', '^' ~ ts_esc ~ '\\.0($|-)') | list | first | default((ts_versions | first) | default('')) }}"
       set_fact:
         planned_versions: >-
           {{ planned_versions
-             + ((current_series != target_series and target_base != '' and target_base != current_version)
-                | ternary([target_base], []))
-             + ((target_version is defined and target_version != '' and target_version != target_base)
+             + ((current_series != target_series and ts_base|length > 0 and ts_base != current_version)
+                | ternary([ts_base], []))
+             + ((target_version is defined and target_version != '' and target_version != ts_base)
                 | ternary([target_version], [])) }}
       when:
-        - target_series is defined
         - target_series | length > 0
 
     - name: Handle same-series direct upgrade case
