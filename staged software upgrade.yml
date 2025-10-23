@@ -18,6 +18,14 @@
     # Suppress noisy logs during long polling
     quiet_polling: true
 
+    # Tuning for downloads and reboots
+    download_retries: 3
+    download_delay: 60
+    restart_down_timeout: 300
+    restart_up_timeout: 900
+    ready_retries: 60
+    ready_delay: 15
+
   collections:
     - paloaltonetworks.panos
     - community.general
@@ -157,34 +165,146 @@
       meta: end_play
       when: current_version == target_version or planned_versions | length == 0
 
-    # The following execution block is commented out to allow dry-run path verification.
-    # Uncomment to perform actual staged downloads, installs, and reboots.
-    # - name: Execute staged upgrades step by step
-    #   vars:
-    #     desired: "{{ item }}"
+    # - name: Execute staged upgrades with per-step reboot
+    #   when: reboot_between_steps | bool
     #   block:
-    #     - name: Install PAN-OS {{ desired }} (download+install+{{ 'reboot' if reboot_between_steps else 'no-reboot' }})
+    #     - name: Download PAN-OS {{ item }} (with retry)
     #       paloaltonetworks.panos.panos_software:
     #         provider: "{{ device }}"
-    #         version: "{{ desired }}"
+    #         version: "{{ item }}"
     #         download: true
+    #         install: false
+    #       register: dl_result
+    #       retries: "{{ download_retries }}"
+    #       delay: "{{ download_delay }}"
+    #       until: dl_result is not failed
+
+    #     - name: Install PAN-OS {{ item }} (no restart)
+    #       paloaltonetworks.panos.panos_software:
+    #         provider: "{{ device }}"
+    #         version: "{{ item }}"
+    #         download: false
     #         install: true
-    #         restart: "{{ reboot_between_steps | bool }}"
-    #
-    #     - name: Wait for device to be ready after reboot ({{ desired }})
+    #         restart: false
+
+    #     - name: Restart device to apply version {{ item }}
+    #       paloaltonetworks.panos.panos_op:
+    #         provider: "{{ device }}"
+    #         cmd: "request restart system"
+    #       async: 45
+    #       poll: 0
+
+    #     - name: Wait for device to stop responding (reboot start) {{ item }}
+    #       ansible.builtin.wait_for:
+    #         host: "{{ device.ip_address }}"
+    #         port: 443
+    #         state: stopped
+    #         timeout: "{{ restart_down_timeout }}"
+    #       delegate_to: localhost
+
+    #     - name: Wait for device to start responding (reboot complete) {{ item }}
+    #       ansible.builtin.wait_for:
+    #         host: "{{ device.ip_address }}"
+    #         port: 443
+    #         state: started
+    #         timeout: "{{ restart_up_timeout }}"
+    #       delegate_to: localhost
+
+    #     - name: Final readiness check after reboot {{ item }}
     #       paloaltonetworks.panos.panos_check:
     #         provider: "{{ device }}"
-    #       changed_when: false
     #       register: ready_result
     #       until: ready_result is not failed and ready_result.msg == 'Device is ready.'
-    #       retries: 100
-    #       delay: 15
-    #       when: reboot_between_steps | bool
-    #
+    #       retries: "{{ ready_retries }}"
+    #       delay: "{{ ready_delay }}"
+    #       no_log: "{{ quiet_polling }}"
+
+    #     - name: Verify device is on version {{ item }}
+    #       paloaltonetworks.panos.panos_facts:
+    #         provider: "{{ device }}"
+    #       register: post_upgrade_facts
+
+    #     - name: Assert version {{ item }} installed
+    #       assert:
+    #         that:
+    #           - post_upgrade_facts.ansible_facts.panos_version == item
+    #         fail_msg: "Upgrade to {{ item }} failed. Device is on {{ post_upgrade_facts.ansible_facts.panos_version }}."
+    #         success_msg: "Successfully upgraded to {{ item }}."
     #   loop: "{{ planned_versions }}"
     #   loop_control:
     #     label: "{{ item }}"
-    #   no_log: "{{ quiet_polling }}"
+
+    # - name: Execute staged upgrades with single final reboot
+    #   when: not (reboot_between_steps | bool)
+    #   block:
+    #     - name: Download PAN-OS {{ item }} (with retry)
+    #       paloaltonetworks.panos.panos_software:
+    #         provider: "{{ device }}"
+    #         version: "{{ item }}"
+    #         download: true
+    #         install: false
+    #       register: dl_result
+    #       retries: "{{ download_retries }}"
+    #       delay: "{{ download_delay }}"
+    #       until: dl_result is not failed
+
+    #     - name: Install PAN-OS {{ item }} (no restart)
+    #       paloaltonetworks.panos.panos_software:
+    #         provider: "{{ device }}"
+    #         version: "{{ item }}"
+    #         download: false
+    #         install: true
+    #         restart: false
+    #   loop: "{{ planned_versions }}"
+    #   loop_control:
+    #     label: "{{ item }}"
+
+    # - name: Restart once after final install
+    #   when: not (reboot_between_steps | bool)
+    #   block:
+    #     - name: Restart device to apply final version
+    #       paloaltonetworks.panos.panos_op:
+    #         provider: "{{ device }}"
+    #         cmd: "request restart system"
+    #       async: 45
+    #       poll: 0
+
+    #     - name: Wait for device to stop responding (reboot start)
+    #       ansible.builtin.wait_for:
+    #         host: "{{ device.ip_address }}"
+    #         port: 443
+    #         state: stopped
+    #         timeout: "{{ restart_down_timeout }}"
+    #       delegate_to: localhost
+
+    #     - name: Wait for device to start responding (reboot complete)
+    #       ansible.builtin.wait_for:
+    #         host: "{{ device.ip_address }}"
+    #         port: 443
+    #         state: started
+    #         timeout: "{{ restart_up_timeout }}"
+    #       delegate_to: localhost
+
+    #     - name: Final readiness check after final reboot
+    #       paloaltonetworks.panos.panos_check:
+    #         provider: "{{ device }}"
+    #       register: ready_result
+    #       until: ready_result is not failed and ready_result.msg == 'Device is ready.'
+    #       retries: "{{ ready_retries }}"
+    #       delay: "{{ ready_delay }}"
+    #       no_log: "{{ quiet_polling }}"
+
+    #     - name: Verify final target version installed
+    #       paloaltonetworks.panos.panos_facts:
+    #         provider: "{{ device }}"
+    #       register: final_panos_facts
+
+    #     - name: Assert device is on target version {{ target_version }}
+    #       assert:
+    #         that:
+    #           - final_panos_facts.ansible_facts.panos_version == target_version
+    #         fail_msg: "Upgrade failed. Device is on {{ final_panos_facts.ansible_facts.panos_version }} but should be on {{ target_version }}."
+    #         success_msg: "Successfully upgraded to {{ target_version }}."
     - name: Short-circuit when target is not newer
       meta: end_play
       when:
