@@ -78,7 +78,6 @@
           - vlan {{ vlan_data }} name Users_Data
           - vlan {{ vlan_servers }} name Servers
           - vlan {{ vlan_guests }} name Guests
-          - vlan {{ mgmt_vlan }} name Management
           - vlan {{ vlan_voice }} name Voice
         save_when: modified
 
