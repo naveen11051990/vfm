@@ -100,9 +100,9 @@
           - switchport port-security maximum 2
           - switchport port-security violation shutdown
           - switchport port-security mac-address sticky
-          - storm-control broadcast level 1.00
-          - storm-control multicast level 1.00
-          - storm-control unkwown-unicast level 1.00
+          - storm-control broadcast level 90.00
+          - storm-control multicast level 90.00
+          - storm-control unkwown-unicast level 90.00
           - no shutdown
         save_when: modified
 
