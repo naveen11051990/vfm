@@ -75,7 +75,7 @@
     - name: Define VLANs
       cisco.ios.ios_config:
         lines:
-          - vlan {{ vlan_data }} name Users_Data
+          - vlan {{ vlan_data }} name Users
           - vlan {{ vlan_servers }} name Servers
           - vlan {{ vlan_guests }} name Guests
           - vlan {{ vlan_voice }} name Voice
