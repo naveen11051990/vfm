@@ -1,0 +1,20 @@
+---
+- name: Download PAN-OS {{ version_item }} (with retry)
+  paloaltonetworks.panos.panos_software:
+    provider: "{{ device }}"
+    version: "{{ version_item }}"
+    download: true
+    install: false
+  register: dl_result
+  retries: "{{ download_retries }}"
+  delay: "{{ download_delay }}"
+  until: dl_result is not failed
+
+- name: Install PAN-OS {{ version_item }} (no restart)
+  paloaltonetworks.panos.panos_software:
+    provider: "{{ device }}"
+    version: "{{ version_item }}"
+    download: false
+    install: true
+    restart: false
+

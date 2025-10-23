@@ -1,0 +1,64 @@
+---
+- name: Download PAN-OS {{ version_item }} (with retry)
+  paloaltonetworks.panos.panos_software:
+    provider: "{{ device }}"
+    version: "{{ version_item }}"
+    download: true
+    install: false
+  register: dl_result
+  retries: "{{ download_retries }}"
+  delay: "{{ download_delay }}"
+  until: dl_result is not failed
+
+- name: Install PAN-OS {{ version_item }} (no restart)
+  paloaltonetworks.panos.panos_software:
+    provider: "{{ device }}"
+    version: "{{ version_item }}"
+    download: false
+    install: true
+    restart: false
+
+- name: Restart device to apply version {{ version_item }}
+  paloaltonetworks.panos.panos_op:
+    provider: "{{ device }}"
+    cmd: "request restart system"
+  async: 45
+  poll: 0
+
+- name: Wait for device to stop responding (reboot start) {{ version_item }}
+  ansible.builtin.wait_for:
+    host: "{{ device.ip_address }}"
+    port: 443
+    state: stopped
+    timeout: "{{ restart_down_timeout }}"
+  delegate_to: localhost
+
+- name: Wait for device to start responding (reboot complete) {{ version_item }}
+  ansible.builtin.wait_for:
+    host: "{{ device.ip_address }}"
+    port: 443
+    state: started
+    timeout: "{{ restart_up_timeout }}"
+  delegate_to: localhost
+
+- name: Final readiness check after reboot {{ version_item }}
+  paloaltonetworks.panos.panos_check:
+    provider: "{{ device }}"
+  register: ready_result
+  until: ready_result is not failed and ready_result.msg == 'Device is ready.'
+  retries: "{{ ready_retries }}"
+  delay: "{{ ready_delay }}"
+  no_log: "{{ quiet_polling }}"
+
+- name: Verify device is on version {{ version_item }}
+  paloaltonetworks.panos.panos_facts:
+    provider: "{{ device }}"
+  register: post_upgrade_facts
+
+- name: Assert version {{ version_item }} installed
+  assert:
+    that:
+      - post_upgrade_facts.ansible_facts.panos_version == version_item
+    fail_msg: "Upgrade to {{ version_item }} failed. Device is on {{ post_upgrade_facts.ansible_facts.panos_version }}."
+    success_msg: "Successfully upgraded to {{ version_item }}."
+
