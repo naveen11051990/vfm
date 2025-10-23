@@ -25,9 +25,6 @@
       - "Te2/1/1"
       - "Te2/1/2"
 
-    ansible_user: "naveen"
-    ansible_password: "naveen@321!"
-
   tasks:
     - name: Set hostname, domain and enable SSH
       cisco.ios.ios_config:
