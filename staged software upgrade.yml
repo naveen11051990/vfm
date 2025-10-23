@@ -104,8 +104,9 @@
         cs_hotfix_nums: "{{ cs_versions | select('search', '^' ~ (cs_base_latest | replace('.', '\\.')) ~ '-h\\d+$') | map('regex_search','-h(\\d+)$','\\1') | map('int') | list }}"
         cs_hotfix_max: "{{ ((cs_hotfix_nums | max) | default(0, true)) | int }}"
         cs_latest: "{{ ((cs_hotfix_max | int) > 0) | ternary(cs_base_latest ~ '-h' ~ (cs_hotfix_max | string), cs_base_latest) }}"
+        current_is_base: "{{ current_version is match('^' ~ cs_esc ~ '\\.0$') }}"
       set_fact:
-        planned_versions: "{{ planned_versions + ([cs_latest] if (target_series != current_series and cs_latest|length > 0 and cs_latest != current_version) else []) }}"
+        planned_versions: "{{ planned_versions + ([cs_latest] if (target_series != current_series and current_is_base and cs_latest|length > 0 and cs_latest != current_version) else []) }}"
       when:
         - current_series | length > 0
         - target_series | length > 0
