@@ -1,5 +1,5 @@
 ---
-- name: Configure VLANs and SSH on Cisco Catalyst 9300
+- name: Configure VLANs and assign ports on Cisco Catalyst 9300
   hosts: 192.168.29.164
   gather_facts: no
   connection: network_cli
@@ -7,13 +7,22 @@
     - cisco.ios
 
   vars:
-    vlan10_interfaces:
+    # VLAN definitions
+    vlan_defs:
+      - vlan_id: 30
+        name: USERS
+      - vlan_id: 40
+        name: SERVERS
+
+    # Interface lists
+    vlan30_interfaces:
       - GigabitEthernet2/0/10
       - GigabitEthernet2/0/11
       - GigabitEthernet2/0/12
       - GigabitEthernet2/0/13
       - GigabitEthernet2/0/14
-    vlan20_interfaces:
+
+    vlan40_interfaces:
       - GigabitEthernet2/0/15
       - GigabitEthernet2/0/16
       - GigabitEthernet2/0/17
@@ -22,32 +31,35 @@
       - GigabitEthernet2/0/20
 
   tasks:
-    - name: Create VLANs 10 and 20
+    - name: Create VLANs 30 and 40
       cisco.ios.ios_vlans:
-        config:
-          - name: USERS
-            vlan_id: 30
-          - name: SERVERS
-            vlan_id: 40
+        config: "{{ vlan_defs }}"
+        state: merged
 
-    - name: Assign VLAN 30 to interfaces GigabitEthernet2/0/10-14
-      cisco.ios.ios_config:
-        lines:
-          - "interface {{ item }}"
-          - "switchport mode access"
-          - "switchport access vlan 30"
-        parents: "interface range {{ item }}"
-      loop: "{{ vlan30_interfaces }}"
+    - name: Assign VLAN 30 to interfaces Gi2/0/10-14
+      cisco.ios.ios_l2_interfaces:
+        config:
+          {% for intf in vlan30_interfaces %}
+          - name: "{{ intf }}"
+            mode: access
+            access:
+              vlan: 30
+          {% endfor %}
+        state: merged
       when: vlan30_interfaces is defined
 
-    - name: Assign VLAN 40 to interfaces GigabitEthernet2/0/15-20
-      cisco.ios.ios_config:
-        lines:
-          - "interface {{ item }}"
-          - "switchport mode access"
-          - "switchport access vlan 40"
-        parents: "interface range {{ item }}"
-      loop: "{{ vlan40_interfaces }}"
+    - name: Assign VLAN 40 to interfaces Gi2/0/15-20
+      cisco.ios.ios_l2_interfaces:
+        config:
+          {% for intf in vlan40_interfaces %}
+          - name: "{{ intf }}"
+            mode: access
+            access:
+              vlan: 40
+          {% endfor %}
+        state: merged
       when: vlan40_interfaces is defined
 
-    
+    - name: Save running-config to startup-config
+      cisco.ios.ios_config:
+        save_when: changed
