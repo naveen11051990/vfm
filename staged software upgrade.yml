@@ -62,33 +62,33 @@
       ansible.builtin.debug:
         msg: "The following versions will be installed in order: {{ upgrade_path }}"
 
-    - name: Perform staged upgrade
-      when: upgrade_path | length > 0
-      block:
-        - name: "Upgrading to version {{ item }}"
-          paloaltonetworks.panos.panos_software:
-            provider: "{{ device }}"
-            version: "{{ item }}"
-            download: true
-            install: true
-            restart: true
+    # - name: Perform staged upgrade
+    #   when: upgrade_path | length > 0
+    #   block:
+    #     - name: "Upgrading to version {{ item }}"
+    #       paloaltonetworks.panos.panos_software:
+    #         provider: "{{ device }}"
+    #         version: "{{ item }}"
+    #         download: true
+    #         install: true
+    #         restart: true
 
-        - name: "Wait for device to be ready after upgrading to {{ item }}"
-          paloaltonetworks.panos.panos_check:
-            provider: "{{ device }}"
-          register: ready_result
-          until: "ready_result is not failed and ready_result.msg == 'Device is ready.'"
-          retries: 120
-          delay: 30
-          no_log: "{{ quiet_polling }}"
-      loop: "{{ upgrade_path }}"
+    #     - name: "Wait for device to be ready after upgrading to {{ item }}"
+    #       paloaltonetworks.panos.panos_check:
+    #         provider: "{{ device }}"
+    #       register: ready_result
+    #       until: "ready_result is not failed and ready_result.msg == 'Device is ready.'"
+    #       retries: 120
+    #       delay: 30
+    #       no_log: "{{ quiet_polling }}"
+    #   loop: "{{ upgrade_path }}"
 
-    - name: Final version check
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "show system info"
-      register: final_system_info
+    # - name: Final version check
+    #   paloaltonetworks.panos.panos_op:
+    #     provider: "{{ device }}"
+    #     cmd: "show system info"
+    #   register: final_system_info
 
-    - name: "Upgrade complete. Current version: {{ (final_system_info.stdout_xml | from_xml).response.result.system['sw-version'] }}"
-      ansible.builtin.debug:
-        msg: "Successfully upgraded to {{ (final_system_info.stdout_xml | from_xml).response.result.system['sw-version'] }}"
+    # - name: "Upgrade complete. Current version: {{ (final_system_info.stdout_xml | from_xml).response.result.system['sw-version'] }}"
+    #   ansible.builtin.debug:
+    #     msg: "Successfully upgraded to {{ (final_system_info.stdout_xml | from_xml).response.result.system['sw-version'] }}"
