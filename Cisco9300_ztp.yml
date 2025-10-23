@@ -144,10 +144,10 @@
     - name: Configure port-description for documentation
       # This could use a loop or external vars; simplified here
       cisco.ios.ios_config:
-      parents: interface gigabitEthernet 0/0
-      lines:
+       parents: interface gigabitEthernet 0/0
+       lines:
         - description Floorone
-      save_when: modified
+       save_when: modified
 
     - name: Configure SNMPv3 user and group
       cisco.ios.ios_config:
