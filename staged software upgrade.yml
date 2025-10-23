@@ -78,13 +78,22 @@
           - target_version in available_versions
         fail_msg: "Target version {{ target_version }} not found in 'request system software info'. Ensure it is visible or run a software check."
 
-    - name: Initialize planned upgrade list and series indices
+    - name: Initialize planned upgrade list
       set_fact:
         planned_versions: []
+
+    - name: Capture ordered series list
+      set_fact:
         series_ordered: "{{ available_series }}"
+
+    - name: Compute series indices
+      set_fact:
         current_idx: "{{ (series_ordered.index(current_series)) if (current_series in series_ordered) else -1 }}"
         target_idx: "{{ (series_ordered.index(target_series)) if (target_series in series_ordered) else -1 }}"
-        intermediate_series: "{{ series_ordered[current_idx+1:target_idx] if (current_idx >= 0 and target_idx >= 0 and target_idx > current_idx) else [] }}"
+
+    - name: Compute intermediate series slice
+      set_fact:
+        intermediate_series: "{{ series_ordered[current_idx+1:target_idx] if (current_idx is defined and target_idx is defined and current_idx >= 0 and target_idx >= 0 and target_idx > current_idx) else [] }}"
 
     - name: Plan step within current series when target is later series
       vars:
