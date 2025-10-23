@@ -48,7 +48,7 @@
     - name: Get available software versions
       paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
-        cmd: "show system software"
+        cmd: "request system software info"
       register: software_info
 
     - name: Parse available versions from software output
@@ -83,37 +83,37 @@
         timeout: 30
       delegate_to: localhost
 
-    - name: "Pre-flight check: Get system resources"
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "show system resources"
-      register: system_resources
+    # - name: "Pre-flight check: Get system resources"
+    #   paloaltonetworks.panos.panos_op:
+    #     provider: "{{ device }}"
+    #     cmd: "show system resources"
+    #   register: system_resources
 
-    - name: "Pre-flight check: Check device readiness"
-      paloaltonetworks.panos.panos_check:
-        provider: "{{ device }}"
-      register: device_ready
-      failed_when: false
+    # - name: "Pre-flight check: Check device readiness"
+    #   paloaltonetworks.panos.panos_check:
+    #     provider: "{{ device }}"
+    #   register: device_ready
+    #   failed_when: false
 
-    - name: Perform staged upgrade
-      include_tasks: staged_upgrade_step.yml
-      loop: "{{ upgrade_path }}"
-      loop_control:
-        loop_var: version_item
-      when: upgrade_path | length > 0
+    # - name: Perform staged upgrade
+    #   include_tasks: staged_upgrade_step.yml
+    #   loop: "{{ upgrade_path }}"
+    #   loop_control:
+    #     loop_var: version_item
+    #   when: upgrade_path | length > 0
 
-    - name: "Post-upgrade check: Get final PAN-OS device facts"
-      paloaltonetworks.panos.panos_facts:
-        provider: "{{ device }}"
-      register: final_panos_facts
+    # - name: "Post-upgrade check: Get final PAN-OS device facts"
+    #   paloaltonetworks.panos.panos_facts:
+    #     provider: "{{ device }}"
+    #   register: final_panos_facts
 
-    - name: "Post-upgrade check: Verify final version is correct"
-      ansible.builtin.assert:
-        that:
-          - final_panos_facts.ansible_facts.ansible_net_version is version(target_version, '==')
-        fail_msg: "Upgrade failed. Device is on version {{ final_panos_facts.ansible_facts.ansible_net_version }} but should be on {{ target_version }}."
-        success_msg: "Upgrade successful! Device is now running version {{ target_version }}."
+    # - name: "Post-upgrade check: Verify final version is correct"
+    #   ansible.builtin.assert:
+    #     that:
+    #       - final_panos_facts.ansible_facts.ansible_net_version is version(target_version, '==')
+    #     fail_msg: "Upgrade failed. Device is on version {{ final_panos_facts.ansible_facts.ansible_net_version }} but should be on {{ target_version }}."
+    #     success_msg: "Upgrade successful! Device is now running version {{ target_version }}."
 
-    - name: "Upgrade completed successfully"
-      ansible.builtin.debug:
-        msg: "Staged upgrade completed. Device upgraded from {{ current_version }} to {{ final_panos_facts.ansible_facts.ansible_net_version }}"
+    # - name: "Upgrade completed successfully"
+    #   ansible.builtin.debug:
+    #     msg: "Staged upgrade completed. Device upgraded from {{ current_version }} to {{ final_panos_facts.ansible_facts.ansible_net_version }}"
