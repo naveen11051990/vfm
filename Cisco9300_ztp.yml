@@ -75,10 +75,14 @@
     - name: Define VLANs
       cisco.ios.ios_config:
         lines:
-          - vlan {{ vlan_data }} name Users
-          - vlan {{ vlan_servers }} name Servers
-          - vlan {{ vlan_guests }} name Guests
-          - vlan {{ vlan_voice }} name Voice
+          - vlan {{ vlan_data }} 
+          - name Users
+          - vlan {{ vlan_servers }} 
+          - name Servers
+          - vlan {{ vlan_guests }} 
+          - name Guests
+          - vlan {{ vlan_voice }} 
+          - name Voice
         save_when: modified
 
     - name: Configure access ports for user PCs
