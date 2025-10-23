@@ -1,9 +1,16 @@
 ---
 - name: Configure Catalyst 9300 access switch with L2 best practices
-  hosts: 192.168.29.164
-  gather_facts: no
-  connection: network_cli
-  vars:
+  hosts:
+  sw01:
+    ansible_host: 192.168.29.164
+    ansible_connection: network_cli
+    ansible_network_os: cisco.ios.ios
+    ansible_user: naveen
+    ansible_password: naveen@321!
+    # optionally if your device uses enable secret:
+    ansible_become: yes
+    ansible_become_method: enable
+    ansible_become_password: naveen@321!
     # Basic variables — adjust to your environment
 
     vlan_data: 10
@@ -18,8 +25,8 @@
       - "Te2/1/1"
       - "Te2/1/2"
 
-    username_admin: "naveen"
-    secret_admin: "naveen@321!"
+    ansible_user: "naveen"
+    ansible_password: "naveen@321!"
 
   tasks:
     - name: Set hostname, domain and enable SSH
@@ -40,7 +47,7 @@
           - aaa authentication login default group tacacs+ local
           - aaa authorization exec default group tacacs+ local
           - aaa accounting commands 15 default start-stop group tacacs+
-          - username {{ username_admin }} privilege 15 secret {{ secret_admin }}
+          - username {{ ansible_user }} privilege 15 secret {{ ansible_password }}
         save_when: modified
 
     - name: Disable HTTP/HTTPS services
