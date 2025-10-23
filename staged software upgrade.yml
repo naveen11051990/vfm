@@ -36,9 +36,12 @@
         cmd: "show system info"
       register: system_info
 
-    - name: Parse current PAN-OS version (scalar)
+    - name: Parse current PAN-OS version (list)
       set_fact:
         current_version_raw: "{{ system_info.stdout_xml | regex_findall('<sw-version>([^<]+)</sw-version>') }}"
+
+    - name: Reduce current version to scalar
+      set_fact:
         current_version: "{{ (current_version_raw[0] if (current_version_raw | length) > 0 else 'unknown') }}"
 
     - name: Derive series identifiers (major.minor)
