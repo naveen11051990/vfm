@@ -71,20 +71,13 @@
             provider: "{{ device }}"
             rule_name: "Rule_from_Ansible_Allow_HTTP_Example2"
             description: "Allow HTTP traffic from internal to external"
-            source_zone:
-              - "inside-users"
-            destination_zone:
-              - "outside-internet"
-            source_ip:
-              - "192.168.60.8/32"
-            destination_ip:
-              - "199.199.199.199/32"
-            source_user:
-              - "any"
-            application:
-              - "web-browsing"
-            service:
-              - "service-http"
+            source_zone: "inside-users"
+            destination_zone: "outside-internet"
+            source_ip: "192.168.60.8/32"
+            destination_ip: "199.199.199.199/32"
+            source_user: "any"
+            application: "web-browsing"
+            service: "service-http"
             action: "allow"
             log_start: false
             log_end: true
