@@ -9,37 +9,42 @@
       ip_address: "{{ ip_address }}"
       username: "{{ username }}"
       password: "{{ password }}"
-    recommended_dns_primary: "1.1.1.1"
-    recommended_dns_secondary: "2.2.2.2"
+    recommended_dns_primary: "8.8.8.8"
+    recommended_dns_secondary: "8.8.4.4"
 
   collections:
     - paloaltonetworks.panos
 
   tasks:
-    - name: Gather full config of the firewall
+    - name: Gather system configuration of the firewall
       paloaltonetworks.panos.panos_facts:
         provider: "{{ device }}"
-        gather_subset: ["config"]
+        gather_subset: ["system"]
       register: pan_config
 
     - name: Extract configured DNS servers
       set_fact:
         dns_servers: >-
-          {{ pan_config.ansible_facts['net_config'].devices.entry.system.dns.server | list }}
+          {{
+            pan_config.ansible_facts['net_config'].devices.entry.system.dns.server
+            | default([])
+            | map(attribute='entry')
+            | list
+          }}
 
     - name: Check DNS primary correct
       assert:
         that:
-          - dns_servers.0 == recommended_dns_primary
+          - dns_servers | length > 0 and dns_servers[0] == recommended_dns_primary
         fail_msg: >
-          "Primary DNS server is NON-COMPLIANT: found {{ dns_servers.0 }} but expected {{ recommended_dns_primary }}"
+          "Primary DNS server is NON-COMPLIANT: found {{ dns_servers[0] }} but expected {{ recommended_dns_primary }}"
         success_msg: >
           "Primary DNS server COMPLIANT"
 
     - name: Check DNS secondary correct
       assert:
         that:
-          - dns_servers | length > 1 and dns_servers.1 == recommended_dns_secondary
+          - dns_servers | length > 1 and dns_servers[1] == recommended_dns_secondary
         fail_msg: >
           "Secondary DNS server is NON-COMPLIANT or missing: found {{ dns_servers }} but expected second = {{ recommended_dns_secondary }}"
         success_msg: >
