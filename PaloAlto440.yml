@@ -1,0 +1,109 @@
+---
+- name: Create a security policy rule on Palo Alto firewall
+  hosts: "PRODUCTIONFIREWALL"
+  connection: local
+  gather_facts: false
+
+  vars:
+    device:
+      ip_address: "{{ ip_address }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+
+  collections:
+    - paloaltonetworks.panos
+
+  tasks:
+
+ - name: Create source address object
+      paloaltonetworks.panos.panos_address_object:
+        provider: "{{ device }}"
+        name: "source-server-vfm"
+        value: "192.168.120.8/32"
+        description: "Address object 1 from Ansible"
+      
+
+  - name: Create destination address object
+      paloaltonetworks.panos.panos_address_object:
+        provider: "{{ device }}"
+        name: "salesforce
+        -server"
+        value: "199.82.53.65"
+        description: "Address object 2 from Ansible"
+
+  - name: Commit candidate configuration
+      paloaltonetworks.panos.panos_commit_firewall:
+        provider: "{{ device }}"
+
+
+  - name: Create new Virtual Router
+      paloaltonetworks.panos.panos_virtual_router:
+        provider: "{{ device }}"
+        vsys: "vsys1"
+        name: "vfm-vrouter"
+        state: present
+
+    - name: Create zone for Internet
+      paloaltonetworks.panos.panos_zone:
+        provider: "{{ device }}"
+        vsys: "vsys1"
+        zone: "salesforce"
+        mode: "layer3"
+        enable_userid: false
+        state: present
+
+    - name: Create zone for DMZ
+      paloaltonetworks.panos.panos_zone:
+        provider: "{{ device }}"
+        vsys: "vsys1"
+        zone: "dmz"
+        mode: "layer3"
+        enable_userid: false
+        state: present
+
+    - name: Create zone for Users
+      paloaltonetworks.panos.panos_zone:
+        provider: "{{ device }}"
+        vsys: "vsys1"
+        zone: "users"
+        mode: "layer3"
+        enable_userid: true
+        state: present
+
+    - name: Commit candidate configuration
+      paloaltonetworks.panos.panos_commit:
+        provider: "{{ device }}"
+
+
+    - name: Create / add security rule
+      paloaltonetworks.panos.panos_security_rule:
+        provider: "{{ device }}"
+        rule_name: "Rule_from_AAP_Allow_HTTP_Example1"
+        description: "Allow HTTP traffic from internal to external"
+        source_zone:
+          - "Inside"
+        destination_zone:
+          - "Outside"
+        source_ip:
+          - "10.0.2.0/24"
+        destination_ip:
+          - "any"
+        source_user:
+          - "any"
+        application:
+          - "web-browsing"
+        service:
+          - "service-http"
+        action: "allow"
+        log_start: false
+        log_end: true
+        commit: true    # commit immediately after creating rule
+      register: rule_create
+  - name: Debug result
+      ansible.builtin.debug:
+      var: rule_create
+ 
+
+
+
+   
