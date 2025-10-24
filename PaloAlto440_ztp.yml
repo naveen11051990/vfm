@@ -82,10 +82,11 @@
             log_start: false
             log_end: true
             commit: true    # commit immediately after creating rule
-            register: rule_create
+      register: rule_create
+      
     - name: Debug result
       ansible.builtin.debug:
-          var: rule_create
+        var: rule_create
 
     - name: Commit candidate configuration
       paloaltonetworks.panos.panos_commit_firewall:
