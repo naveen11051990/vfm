@@ -4,101 +4,101 @@
   connection: local
   gather_facts: false
 
+  collections:
+    - paloaltonetworks.panos
+
   vars:
     device:
       ip_address: "{{ ip_address }}"
       username: "{{ username }}"
       password: "{{ password }}"
 
-  collections:
-    - paloaltonetworks.panos
-
+  
+  
   tasks:
-
-- name: Create source address object
+    - name: Create source address object
       paloaltonetworks.panos.panos_address_object:
-        provider: "{{ device }}"
-        name: "source-server-vfm"
-        value: "192.168.60.0/24"
-        description: "Address object 1 from Ansible"
-      
+          provider: "{{ device }}"
+          name: "source-server-vfm"
+          value: "192.168.60.0/24"
+          description: "Address object 1 from Ansible"
 
- - name: Create destination address object
+    - name: Create destination address object
       paloaltonetworks.panos.panos_address_object:
-        provider: "{{ device }}"
-        name: "salesforce-server"
-        value: "199.199.199.199"
-        description: "Address object 2 from Ansible"
+          provider: "{{ device }}"
+          name: "salesforce-server"
+          value: "199.199.199.199"
+          description: "Address object 2 from Ansible"
 
 
-  - name: Create new Virtual Router
+    - name: Create new Virtual Router
       paloaltonetworks.panos.panos_virtual_router:
-        provider: "{{ device }}"
-        vsys: "vsys1"
-        name: "vfm-vrouter"
-        state: present
+            provider: "{{ device }}"
+            vsys: "vsys1"
+            name: "vfm-vrouter"
+            state: present
 
-  - name: Create zone for Internet
+    - name: Create zone for Internet
       paloaltonetworks.panos.panos_zone:
-        provider: "{{ device }}"
-        vsys: "vsys1"
-        zone: "outside-internet"
-        mode: "layer3"
-        enable_userid: false
-        state: present
+            provider: "{{ device }}"
+            vsys: "vsys1"
+            zone: "outside-internet"
+            mode: "layer3"
+            enable_userid: false
+            state: present
 
     - name: Create zone for DMZ
       paloaltonetworks.panos.panos_zone:
-        provider: "{{ device }}"
-        vsys: "vsys1"
-        zone: "dmz"
-        mode: "layer3"
-        enable_userid: false
-        state: present
+            provider: "{{ device }}"
+            vsys: "vsys1"
+            zone: "dmz"
+            mode: "layer3"
+            enable_userid: false
+            state: present
 
     - name: Create zone for Users
       paloaltonetworks.panos.panos_zone:
-        provider: "{{ device }}"
-        vsys: "vsys1"
-        zone: "inside-users"
-        mode: "layer3"
-        enable_userid: true
-        state: present
+            provider: "{{ device }}"
+            vsys: "vsys1"
+            zone: "inside-users"
+            mode: "layer3"
+            enable_userid: true
+            state: present
 
 
     - name: Create / add security rule
       paloaltonetworks.panos.panos_security_rule:
-        provider: "{{ device }}"
-        rule_name: "Rule_from_Ansible_Allow_HTTP_Example2"
-        description: "Allow HTTP traffic from internal to external"
-        source_zone:
-          - "inside-users"
-        destination_zone:
-          - "outside-internet"
-        source_ip:
-          - "source-server-vfm"
-        destination_ip:
-          - "salesforce-server"
-        source_user:
-          - "any"
-        application:
-          - "web-browsing"
-        service:
-          - "service-http"
-        action: "allow"
-        log_start: false
-        log_end: true
-        commit: true    # commit immediately after creating rule
-      register: rule_create
-  - name: Debug result
+            provider: "{{ device }}"
+            rule_name: "Rule_from_Ansible_Allow_HTTP_Example2"
+            description: "Allow HTTP traffic from internal to external"
+            source_zone:
+              - "inside-users"
+            destination_zone:
+              - "outside-internet"
+            source_ip:
+              - "source-server-vfm"
+            destination_ip:
+              - "salesforce-server"
+            source_user:
+              - "any"
+            application:
+              - "web-browsing"
+            service:
+              - "service-http"
+            action: "allow"
+            log_start: false
+            log_end: true
+            commit: true    # commit immediately after creating rule
+            register: rule_create
+    - name: Debug result
       ansible.builtin.debug:
-      var: rule_create
+          var: rule_create
 
- - name: Commit candidate configuration
-     paloaltonetworks.panos.panos_commit_firewall:
-      provider: "{{ device }}"
- 
-
+    - name: Commit candidate configuration
+      paloaltonetworks.panos.panos_commit_firewall:
+          provider: "{{ device }}"
 
 
-   
+
+
+      
