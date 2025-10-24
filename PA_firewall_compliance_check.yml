@@ -16,10 +16,10 @@
     - paloaltonetworks.panos
 
   tasks:
-    - name: Gather system configuration of the firewall
+    - name: Gather full configuration of the firewall
       paloaltonetworks.panos.panos_facts:
         provider: "{{ device }}"
-        gather_subset: ["system"]
+        gather_subset: ["all"]
       register: pan_config
 
     - name: Extract configured DNS servers
