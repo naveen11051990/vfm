@@ -18,26 +18,26 @@
 
   tasks:
 
- - name: Gather full config of the firewall  
-   paloaltonetworks.panos.panos_facts:  
+- name: Gather full config of the firewall  
+  paloaltonetworks.panos.panos_facts:  
      provider: "{{ device }}"  
      gather_subset: ['config']  
-   register: pan_config  
+  register: pan_config  
 
- - name: Extract configured NTP servers  
-   set_fact:  
-     ntp_servers: >-  
-       {{ pan_config.ansible_facts['net_config'].devices.entry.system.ntp.server | map(attribute='entry') | list }}  
+- name: Extract configured NTP servers  
+  set_fact:  
+    ntp_servers: >-  
+      {{ pan_config.ansible_facts['net_config'].devices.entry.system.ntp.server | map(attribute='entry') | list }}  
 
- - name: Extract configured DNS servers  
-   set_fact:  
-     dns_servers: >-  
-       {{ pan_config.ansible_facts['net_config'].devices.entry.system.dns.server | list }}  
+- name: Extract configured DNS servers  
+  set_fact:  
+    dns_servers: >-  
+      {{ pan_config.ansible_facts['net_config'].devices.entry.system.dns.server | list }}  
 
- - name: Check NTP primary correct  
-   assert:  
+- name: Check NTP primary correct  
+  assert:  
     that:  
-        - ntp_servers.0 == recommended_ntp_primary  
+       - ntp_servers.0 == recommended_ntp_primary  
     fail_msg: >  
           "Primary NTP server is NON-COMPLIANT: found {{ ntp_servers.0 }} but expected {{ recommended_ntp_primary }}"  
     success_msg: >  
