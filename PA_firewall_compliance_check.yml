@@ -18,11 +18,10 @@
     - paloaltonetworks.panos
 
   tasks:
-
     - name: Gather full config of the firewall
       paloaltonetworks.panos.panos_facts:
         provider: "{{ device }}"
-        gather_subset: ['config']
+        gather_subset: ["config"]
       register: pan_config
 
     - name: Extract configured NTP servers
