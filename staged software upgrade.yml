@@ -218,16 +218,22 @@
           delay: "{{ ready_delay }}"
           no_log: "{{ quiet_polling }}"
 
-        - name: Verify final target version installed
-          paloaltonetworks.panos.panos_facts:
+        - name: Fetch system info for final version verification
+          paloaltonetworks.panos.panos_op:
             provider: "{{ device }}"
-          register: final_panos_facts
+            cmd: "show system info"
+          register: final_sysinfo
+
+        - name: Parse installed version from system info (final)
+          set_fact:
+            final_installed_list: "{{ final_sysinfo.stdout_xml | regex_findall('<sw-version>([^<]+)</sw-version>') }}"
+            final_installed_version: "{{ (final_installed_list[0] if (final_installed_list | length) > 0 else '') }}"
 
         - name: Assert device is on target version {{ target_version }}
           assert:
             that:
-              - final_panos_facts.ansible_facts.panos_version == target_version
-            fail_msg: "Upgrade failed. Device is on {{ final_panos_facts.ansible_facts.panos_version }} but should be on {{ target_version }}."
+              - final_installed_version == target_version
+            fail_msg: "Upgrade failed. Device reports {{ final_installed_version }} but should be {{ target_version }}."
             success_msg: "Successfully upgraded to {{ target_version }}."
     - name: Short-circuit when target is not newer
       meta: end_play
