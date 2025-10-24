@@ -31,10 +31,6 @@
         value: "199.82.53.65"
         description: "Address object 2 from Ansible"
 
-  - name: Commit candidate configuration
-      paloaltonetworks.panos.panos_commit_firewall:
-        provider: "{{ device }}"
-
 
   - name: Create new Virtual Router
       paloaltonetworks.panos.panos_virtual_router:
@@ -43,7 +39,7 @@
         name: "vfm-vrouter"
         state: present
 
-    - name: Create zone for Internet
+  - name: Create zone for Internet
       paloaltonetworks.panos.panos_zone:
         provider: "{{ device }}"
         vsys: "vsys1"
@@ -69,10 +65,6 @@
         mode: "layer3"
         enable_userid: true
         state: present
-
-    - name: Commit candidate configuration
-      paloaltonetworks.panos.panos_commit:
-        provider: "{{ device }}"
 
 
     - name: Create / add security rule
@@ -102,6 +94,10 @@
   - name: Debug result
       ansible.builtin.debug:
       var: rule_create
+
+ - name: Commit candidate configuration
+     paloaltonetworks.panos.panos_commit_firewall:
+      provider: "{{ device }}"
  
 
 
