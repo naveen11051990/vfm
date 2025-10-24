@@ -34,13 +34,7 @@
             | list
           }}
 
-    - name: Show rule violations - non standard ports (if any)
-      ansible.builtin.debug:
-        msg: "{{ insecure_rules | map(attribute='rule_name') | list }}"
-
-
-
-
+    
     - name: Get all security rules - Any_Any rules
       paloaltonetworks.panos.panos_security_rule:
         provider: "{{ device }}"
@@ -64,6 +58,10 @@
           }}
 
     - name: Show rule violations - Any-Any rules (if any)
+      ansible.builtin.debug:
+        msg: "{{ insecure_rules | map(attribute='rule_name') | list }}"
+
+    - name: Show rule violations - non standard ports (if any)
       ansible.builtin.debug:
         msg: "{{ insecure_rules | map(attribute='rule_name') | list }}"
 
