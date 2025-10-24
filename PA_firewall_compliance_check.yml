@@ -1,37 +1,26 @@
----
-- name: Fetch configured DNS servers – PAN-OS
-  hosts: "PRODUCTIONFIREWALL"
-  connection: local
-  gather_facts: no
+- name: Extract configured DNS servers (all entries)
+  set_fact:
+    dns_servers: >-
+      {{
+        pan_config.ansible_facts['ansible_net_config']
+        | regex_findall("<entry>\\s*<ip>([0-9\\.]+)</ip>\\s*</entry>")
+      }}
 
-  vars:
-    device:
-      ip_address: "{{ ip_address }}"
-      username: "{{ username }}"
-      password: "{{ password }}"
+- name: Show all DNS servers found
+  debug:
+    msg: "DNS servers configured: {{ dns_servers }}"
 
-  collections:
-    - paloaltonetworks.panos
+- name: Check DNS primary correct
+  assert:
+    that:
+      - dns_servers | length > 0 and dns_servers[0] == recommended_dns_primary
+    fail_msg: "Primary DNS NON-COMPLIANT: found {{ dns_servers[0] }} expected {{ recommended_dns_primary }}"
+    success_msg: "Primary DNS COMPLIANT"
 
-  tasks:
-    - name: Gather full configuration of the firewall
-      paloaltonetworks.panos.panos_facts:
-        provider: "{{ device }}"
-        gather_subset: ["config"]
-      register: pan_config
-
-    - name: Output raw configuration snippet for review
-      ansible.builtin.debug:
-        msg: "{{ pan_config.ansible_facts.ansible_net_config }}"
-
-    - name: Extract configured DNS servers (placeholder logic)
-      set_fact:
-        dns_servers: >-
-          {{
-            pan_config.ansible_facts.ansible_net_config
-            | regex_findall("(?<=<primary>)[0-9\\.]+(?=</primary>)")
-          }}
-
-    - name: Show configured DNS servers
-      ansible.builtin.debug:
-        msg: "Configured DNS servers are: {{ dns_servers }}"
+- name: Check DNS secondary correct
+  assert:
+    that:
+      - dns_servers | length > 1 and dns_servers[1] == recommended_dns_secondary
+    fail_msg: "Secondary DNS NON-COMPLIANT or missing: found {{ dns_servers }} expected second = {{ recommended_dns_secondary }}"
+    success_msg: "Secondary DNS COMPLIANT"
+  when: dns_servers | length > 1
