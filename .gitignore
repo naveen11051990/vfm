@@ -222,3 +222,5 @@ AGENTS.md
 GEMINI.md
 inventories/
 *.tmp.*
+.ansible/
+.vscode/
