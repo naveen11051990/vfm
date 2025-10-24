@@ -83,6 +83,14 @@
             log_end: true
             commit: true    # commit immediately after creating rule
       register: rule_create
+
+    - name: Configure DNS & NTP servers
+      paloaltonetworks.panos.panos_mgtconfig:
+        provider: "{{ provider }}"
+        dns_server_primary: "{{ 8.8.8.8 }}"
+        dns_server_secondary: "{{ 192.168.29.3 }}"
+        ntp_server_primary: "{{ 1.1.1.1 }}"
+        ntp_server_secondary: "{{ 2.2.2.2 }}"
       
     - name: Debug result
       ansible.builtin.debug:
