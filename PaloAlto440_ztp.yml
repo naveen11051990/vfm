@@ -19,16 +19,15 @@
       paloaltonetworks.panos.panos_address_object:
         provider: "{{ device }}"
         name: "source-server-vfm"
-        value: "192.168.120.8/32"
+        value: "192.168.60.8/32"
         description: "Address object 1 from Ansible"
       
 
  - name: Create destination address object
       paloaltonetworks.panos.panos_address_object:
         provider: "{{ device }}"
-        name: "salesforce
-        -server"
-        value: "199.82.53.65"
+        name: "salesforce-server"
+        value: "199.82.53.66"
         description: "Address object 2 from Ansible"
 
 
@@ -43,7 +42,7 @@
       paloaltonetworks.panos.panos_zone:
         provider: "{{ device }}"
         vsys: "vsys1"
-        zone: "salesforce"
+        zone: "outside-internet"
         mode: "layer3"
         enable_userid: false
         state: present
@@ -61,7 +60,7 @@
       paloaltonetworks.panos.panos_zone:
         provider: "{{ device }}"
         vsys: "vsys1"
-        zone: "users"
+        zone: "inside-users"
         mode: "layer3"
         enable_userid: true
         state: present
@@ -73,13 +72,13 @@
         rule_name: "Rule_from_AAP_Allow_HTTP_Example1"
         description: "Allow HTTP traffic from internal to external"
         source_zone:
-          - "Inside"
+          - "inside-users"
         destination_zone:
-          - "Outside"
+          - "outside-internet"
         source_ip:
-          - "10.0.2.0/24"
+          - "source-server-vfm"
         destination_ip:
-          - "any"
+          - "salesforce-server"
         source_user:
           - "any"
         application:
