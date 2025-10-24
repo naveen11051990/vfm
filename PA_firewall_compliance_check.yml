@@ -1,5 +1,5 @@
 ---
-- name: Compliance and Security Rule Validation – PAN-OS
+- name: DNS Server Compliance Check - PAN-OS
   hosts: "PRODUCTIONFIREWALL"
   connection: local
   gather_facts: no
@@ -9,107 +9,38 @@
       ip_address: "{{ ip_address }}"
       username: "{{ username }}"
       password: "{{ password }}"
-    recommended_ntp_primary: "10.1.1.10"
-    recommended_ntp_secondary: "10.1.1.11"
-    recommended_dns_primary: "8.8.8.8"
-    recommended_dns_secondary: "8.8.4.4"
+    recommended_dns_primary: "1.1.1.1"
+    recommended_dns_secondary: "2.2.2.2"
 
   collections:
     - paloaltonetworks.panos
-    - community.general
 
   tasks:
-    - name: Gather full configuration
+    - name: Gather full config of the firewall
       paloaltonetworks.panos.panos_facts:
         provider: "{{ device }}"
         gather_subset: ["config"]
       register: pan_config
 
-    - name: Parse NTP server entries from XML
-      community.general.xml:
-        xmlstring: "{{ pan_config.ansible_facts.ansible_net_config }}"
-        xpath: "/config/devices/entry/deviceconfig/system/ntp/server/entry/@name"
-        content: text
-      register: ntp_entries
-
-    - name: Set fact for ntp_servers list
+    - name: Extract configured DNS servers
       set_fact:
-        ntp_servers: "{{ ntp_entries.matches | list }}"
+        dns_servers: >-
+          {{ pan_config.ansible_facts['net_config'].devices.entry.system.dns.server | list }}
 
-    - name: Parse DNS server entries from XML
-      community.general.xml:
-        xmlstring: "{{ pan_config.ansible_facts.ansible_net_config }}"
-        xpath: "/config/devices/entry/deviceconfig/system/dns/server/entry/ip"
-        content: text
-      register: dns_entries
-
-    - name: Set fact for dns_servers list
-      set_fact:
-        dns_servers: "{{ dns_entries.matches | list }}"
-
-    - name: Check primary NTP server compliance
+    - name: Check DNS primary correct
       assert:
         that:
-          - ntp_servers[0] == recommended_ntp_primary
-        fail_msg: "Primary NTP server NON‑COMPLIANT: found {{ ntp_servers[0] }} expected {{ recommended_ntp_primary }}"
-        success_msg: "Primary NTP server COMPLIANT"
+          - dns_servers.0 == recommended_dns_primary
+        fail_msg: >
+          "Primary DNS server is NON-COMPLIANT: found {{ dns_servers.0 }} but expected {{ recommended_dns_primary }}"
+        success_msg: >
+          "Primary DNS server COMPLIANT"
 
-    - name: Check secondary NTP server compliance
+    - name: Check DNS secondary correct
       assert:
         that:
-          - ntp_servers | length > 1 and ntp_servers[1] == recommended_ntp_secondary
-        fail_msg: "Secondary NTP server NON‑COMPLIANT or missing: found {{ ntp_servers }} expected second {{ recommended_ntp_secondary }}"
-        success_msg: "Secondary NTP server COMPLIANT"
-
-    - name: Check primary DNS server compliance
-      assert:
-        that:
-          - dns_servers[0] == recommended_dns_primary
-        fail_msg: "Primary DNS server NON‑COMPLIANT: found {{ dns_servers[0] }} expected {{ recommended_dns_primary }}"
-        success_msg: "Primary DNS server COMPLIANT"
-
-    - name: Check secondary DNS server compliance
-      assert:
-        that:
-          - dns_servers | length > 1 and dns_servers[1] == recommended_dns_secondary
-        fail_msg: "Secondary DNS server NON‑COMPLIANT or missing: found {{ dns_servers }} expected second {{ recommended_dns_secondary }}"
-        success_msg: "Secondary DNS server COMPLIANT"
-
-    - name: Get all security rules
-      paloaltonetworks.panos.panos_security_rule:
-        provider: "{{ device }}"
-        gathered_filter: "*"
-        state: gathered
-      register: sec_rules
-
-    - name: Output all security rules
-      ansible.builtin.debug:
-        msg: "{{ sec_rules }}"
-
-    - name: Identify any-any rules
-      ansible.builtin.set_fact:
-        any_any_rules: >-
-          {{
-            sec_rules.gathered
-            | selectattr('source_ip', 'equalto', ['any'])
-            | selectattr('destination_ip', 'equalto', ['any'])
-            | selectattr('service', 'equalto', ['any'])
-            | list
-          }}
-
-    - name: Show any-any rules violations
-      ansible.builtin.debug:
-        msg: "{{ any_any_rules | map(attribute='rule_name') | list }}"
-
-    - name: Identify non-standard port rules
-      ansible.builtin.set_fact:
-        non_standard_port_rules: >-
-          {{
-            sec_rules.gathered
-            | selectattr('service', 'ne', 'application-default')
-            | list
-          }}
-
-    - name: Show non-standard port rules violations
-      ansible.builtin.debug:
-        msg: "{{ non_standard_port_rules | map(attribute='rule_name') | list }}"
+          - dns_servers | length > 1 and dns_servers.1 == recommended_dns_secondary
+        fail_msg: >
+          "Secondary DNS server is NON-COMPLIANT or missing: found {{ dns_servers }} but expected second = {{ recommended_dns_secondary }}"
+        success_msg: >
+          "Secondary DNS server COMPLIANT"
