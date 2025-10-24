@@ -1,0 +1,73 @@
+---
+- name: Gather security rules - Non standard ports policies
+  hosts: "PRODUCTIONFIREWALL"
+  connection: local
+
+  vars:
+    device:
+      ip_address: "{{ ip_address }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+
+  collections:
+    - paloaltonetworks.panos
+
+  tasks:
+    - name: Get all security rules
+      paloaltonetworks.panos.panos_security_rule:
+        provider: "{{ device }}"
+        gathered_filter: "*"
+        state: gathered
+      register: sec_rules
+
+    - name: Output
+      ansible.builtin.debug:
+        msg: "{{ sec_rules }}"
+
+    - name: Filter any any rules
+      ansible.builtin.set_fact:
+        insecure_rules: >-
+          {{
+            (sec_rules.gathered | default([]))
+            | rejectattr('service', 'equalto', ['443'])
+            | selectattr('application', 'equalto', ['ssl'])
+            | list
+          }}
+
+    - name: Show rule violations - non standard ports (if any)
+      ansible.builtin.debug:
+        msg: "{{ insecure_rules | map(attribute='rule_name') | list }}"
+
+
+
+
+    - name: Get all security rules - Any_Any rules
+      paloaltonetworks.panos.panos_security_rule:
+        provider: "{{ device }}"
+        gathered_filter: "*"
+        state: gathered
+      register: sec_rules
+
+    - name: Output
+      ansible.builtin.debug:
+        msg: "{{ sec_rules }}"
+
+    - name: Filter any any rules
+      ansible.builtin.set_fact:
+        insecure_rules: >-
+          {{
+            (sec_rules.gathered | default([]))
+            | selectattr('source_ip', 'equalto', ['any'])
+            | selectattr('destination_ip', 'equalto', ['any'])
+            | selectattr('service', 'equalto', ['any'])
+            | list
+          }}
+
+    - name: Show rule violations - Any-Any rules (if any)
+      ansible.builtin.debug:
+        msg: "{{ insecure_rules | map(attribute='rule_name') | list }}"
+
+
+
+
+
