@@ -224,9 +224,12 @@
             cmd: "show system info"
           register: final_sysinfo
 
-        - name: Parse installed version from system info (final)
+        - name: Parse installed version list from system info (final)
           set_fact:
             final_installed_list: "{{ final_sysinfo.stdout_xml | regex_findall('<sw-version>([^<]+)</sw-version>') }}"
+
+        - name: Reduce final installed version to scalar
+          set_fact:
             final_installed_version: "{{ (final_installed_list[0] if (final_installed_list | length) > 0 else '') }}"
 
         - name: Assert device is on target version {{ target_version }}

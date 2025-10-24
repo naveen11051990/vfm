@@ -56,9 +56,12 @@
     cmd: "show system info"
   register: post_upgrade_sysinfo
 
-- name: Parse installed version from system info
+- name: Parse installed version list from system info
   set_fact:
     installed_version_list: "{{ post_upgrade_sysinfo.stdout_xml | regex_findall('<sw-version>([^<]+)</sw-version>') }}"
+
+- name: Reduce installed version to scalar
+  set_fact:
     installed_version: "{{ (installed_version_list[0] if (installed_version_list | length) > 0 else '') }}"
 
 - name: Assert version {{ version_item }} installed
