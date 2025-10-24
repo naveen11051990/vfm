@@ -76,9 +76,9 @@
             destination_zone:
               - "outside-internet"
             source_ip:
-              - "source-server-vfm"
+              - "192.168.60.0/24"
             destination_ip:
-              - "salesforce-server"
+              - "199.199.199.199/32"
             source_user:
               - "any"
             application:
