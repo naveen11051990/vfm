@@ -113,30 +113,23 @@
       ansible.builtin.set_fact:
         dns_ntp_overall_compliant: "{{ (dns_primary_ok and dns_secondary_ok and ntp_primary_ok and ntp_secondary_ok) | bool }}"
 
-    - name: Build final consolidated report
+    - name: Build final consolidated report (concise)
       ansible.builtin.set_fact:
         final_report:
           security:
-            total_rules: "{{ (sec_rules.gathered | default([])) | length }}"
-            any_any_rule_names: "{{ any_any_insecure_rules | map(attribute='rule_name') | list }}"
-            ssl_nonstandard_port_rule_names: "{{ ssl_nonstandard_port_rules | map(attribute='rule_name') | list }}"
+            any_any: "{{ any_any_insecure_rules | map(attribute='rule_name') | list }}"
+            any_any_count: "{{ (any_any_insecure_rules | default([])) | length }}"
+            ssl_nonstandard_ports: "{{ ssl_nonstandard_port_rules | map(attribute='rule_name') | list }}"
+            ssl_nonstandard_ports_count: "{{ (ssl_nonstandard_port_rules | default([])) | length }}"
           dns_ntp:
-            expected:
-              dns_primary: "{{ expected_dns_primary }}"
-              dns_secondary: "{{ expected_dns_secondary }}"
-              ntp_primary: "{{ expected_ntp_primary }}"
-              ntp_secondary: "{{ expected_ntp_secondary }}"
-            actual:
-              dns_primary: "{{ dns_primary_current | default('unset') }}"
-              dns_secondary: "{{ dns_secondary_current | default('unset') }}"
-              ntp_primary: "{{ ntp_primary_current | default('unset') }}"
-              ntp_secondary: "{{ ntp_secondary_current | default('unset') }}"
-            results:
-              dns_primary: "{{ 'COMPLIANT' if dns_primary_ok | bool else 'NON-COMPLIANT' }}"
-              dns_secondary: "{{ 'COMPLIANT' if dns_secondary_ok | bool else 'NON-COMPLIANT' }}"
-              ntp_primary: "{{ 'COMPLIANT' if ntp_primary_ok | bool else 'NON-COMPLIANT' }}"
-              ntp_secondary: "{{ 'COMPLIANT' if ntp_secondary_ok | bool else 'NON-COMPLIANT' }}"
-              overall: "{{ 'COMPLIANT' if dns_ntp_overall_compliant | bool else 'NON-COMPLIANT' }}"
+            dns_primary: >-
+              {{ (dns_primary_current | default('unset')) ~ ' : ' ~ ('COMPLIANT' if dns_primary_ok | bool else 'NON-COMPLIANT') }}
+            dns_secondary: >-
+              {{ (dns_secondary_current | default('unset')) ~ ' : ' ~ ('COMPLIANT' if dns_secondary_ok | bool else 'NON-COMPLIANT') }}
+            ntp_primary: >-
+              {{ (ntp_primary_current | default('unset')) ~ ' : ' ~ ('COMPLIANT' if ntp_primary_ok | bool else 'NON-COMPLIANT') }}
+            ntp_secondary: >-
+              {{ (ntp_secondary_current | default('unset')) ~ ' : ' ~ ('COMPLIANT' if ntp_secondary_ok | bool else 'NON-COMPLIANT') }}
 
     - name: Consolidated output
       ansible.builtin.debug:
