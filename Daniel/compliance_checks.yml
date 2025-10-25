@@ -108,7 +108,10 @@
         dns_secondary_ok: "{{ (dns_secondary_current | default('')) == (expected_dns_secondary | default('')) }}"
         ntp_primary_ok: "{{ (ntp_primary_current | default('')) == (expected_ntp_primary | default('')) }}"
         ntp_secondary_ok: "{{ (ntp_secondary_current | default('')) == (expected_ntp_secondary | default('')) }}"
-        dns_ntp_overall_compliant: "{{ ( (dns_primary_ok and dns_secondary_ok and ntp_primary_ok and ntp_secondary_ok) | bool ) }}"
+
+    - name: Compute overall DNS/NTP compliance
+      ansible.builtin.set_fact:
+        dns_ntp_overall_compliant: "{{ (dns_primary_ok and dns_secondary_ok and ntp_primary_ok and ntp_secondary_ok) | bool }}"
 
     - name: Build final consolidated report
       ansible.builtin.set_fact:
@@ -138,4 +141,3 @@
     - name: Consolidated output
       ansible.builtin.debug:
         msg: "{{ final_report }}"
-
