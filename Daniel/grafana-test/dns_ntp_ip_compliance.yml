@@ -12,6 +12,10 @@
 
     # Logging configuration
     log_dir: /var/log/ansible-playbooks
+    # Where to write logs. Set -e log_host=<hostname> when running under AWX/EE.
+    # Defaults to localhost (controller/execution node).
+    log_host: "{{ log_host | default('localhost') }}"
+    log_become: true
 
   collections:
     - paloaltonetworks.panos
@@ -141,6 +145,8 @@
     # GRAFANA LOGGING TASK - ADDED AT THE END
     # ============================================================================
     - name: Ensure log directory exists
+      become: "{{ log_become }}"
+      delegate_to: "{{ log_host }}"
       ansible.builtin.file:
         path: "{{ log_dir }}"
         state: directory
@@ -157,8 +163,13 @@
         log_filename: "dns-ntp-compliance-{{ inventory_hostname }}-{{ log_timestamp_compact }}.log"
 
     - name: Create structured compliance log for Grafana dashboard
+      become: "{{ log_become }}"
+      delegate_to: "{{ log_host }}"
       ansible.builtin.copy:
         dest: "{{ log_dir }}/{{ log_filename }}"
+        owner: root
+        group: root
+        mode: "0644"
         content: |-
           # DNS/NTP Compliance Check Report
           host: {{ inventory_hostname }}
