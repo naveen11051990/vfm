@@ -85,7 +85,7 @@
         ntp_primary_current: >-
           {{
             (
-              ntp_servers_block
+              cfg_xml
               | regex_findall('<primary-ntp-server>[\\s\\S]*?<ntp-server-address>\\s*([^<\\s]+)')
               | first
             ) | default('')
@@ -93,7 +93,7 @@
         ntp_secondary_current: >-
           {{
             (
-              ntp_servers_block
+              cfg_xml
               | regex_findall('<secondary-ntp-server>[\\s\\S]*?<ntp-server-address>\\s*([^<\\s]+)')
               | first
             ) | default('')
