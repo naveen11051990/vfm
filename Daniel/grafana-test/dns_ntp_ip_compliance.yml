@@ -59,24 +59,15 @@
         dns_primary_current: "{{ (dns_block | regex_findall('<primary>([0-9\\.]+)</primary>') | first) | default('') }}"
         dns_secondary_current: "{{ (dns_block | regex_findall('<secondary>([0-9\\.]+)</secondary>') | first) | default('') }}"
 
+    - name: Extract NTP blocks (primary/secondary) for robust parsing
+      set_fact:
+        ntp_primary_block: "{{ (cfg_xml | regex_search('(?s)<primary-ntp-server>.*?</primary-ntp-server>')) | default('') }}"
+        ntp_secondary_block: "{{ (cfg_xml | regex_search('(?s)<secondary-ntp-server>.*?</secondary-ntp-server>')) | default('') }}"
+
     - name: Extract current NTP primary/secondary (new schema first)
       set_fact:
-        ntp_primary_current: >-
-          {{
-            (
-              cfg_xml
-              | regex_findall('<primary-ntp-server>[\\s\\S]*?<ntp-server-address>\\s*([^<\\s]+)')
-              | first
-            ) | default('')
-          }}
-        ntp_secondary_current: >-
-          {{
-            (
-              cfg_xml
-              | regex_findall('<secondary-ntp-server>[\\s\\S]*?<ntp-server-address>\\s*([^<\\s]+)')
-              | first
-            ) | default('')
-          }}
+        ntp_primary_current: "{{ (ntp_primary_block | regex_findall('<ntp-server-address>\\s*([^<\\s]+)', multiline=True) | first) | default('') }}"
+        ntp_secondary_current: "{{ (ntp_secondary_block | regex_findall('<ntp-server-address>\\s*([^<\\s]+)', multiline=True) | first) | default('') }}"
 
     - name: Fallback extraction for legacy <ntp> primary/secondary if needed
       set_fact:
