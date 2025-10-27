@@ -3,14 +3,16 @@
   hosts: 192.168.29.164
   gather_facts: no
   connection: network_cli
-  collections:
-    - cisco.ios
 
-   vars:
+  vars:
     ansible_user: admin
     ansible_password: "admin@123"
     ansible_become: yes
     ansible_become_method: enable
+
+
+    collections:
+    - cisco.ios
 
     vlan_data: 10
     vlan_servers: 20
