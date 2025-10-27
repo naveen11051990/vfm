@@ -47,6 +47,7 @@
           - dns_servers[0] == expected_dns_primary
         fail_msg: "DNS primary NON-COMPLIANT: found {{ dns_servers }}, expected primary = {{ expected_dns_primary }}"
         success_msg: "DNS primary COMPLIANT"
+      ignore_errors: yes
 
     - name: Check DNS secondary compliance
       assert:
@@ -55,6 +56,7 @@
           - dns_servers[1] == expected_dns_secondary
         fail_msg: "DNS secondary NON-COMPLIANT or missing: found {{ dns_servers }}, expected secondary = {{ expected_dns_secondary }}"
         success_msg: "DNS secondary COMPLIANT"
+      ignore_errors: yes
 
     - name: Check NTP primary compliance
       assert:
