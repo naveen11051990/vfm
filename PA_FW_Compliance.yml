@@ -1,5 +1,5 @@
 ---
-- name: Combined compliance checks
+- name: Compliance Check – DNS / NTP / Syslog – PAN-OS
   hosts: "{{ hosts | default('PRODUCTIONFIREWALL') }}"
   connection: local
   gather_facts: no
@@ -9,137 +9,90 @@
       ip_address: "{{ ip_address }}"
       username: "{{ username }}"
       password: "{{ password }}"
-    expected_syslog_ip: "192.168.29.3"
+    expected_dns_primary: "{{ dns_primary | default('8.8.8.8') }}"
+    expected_dns_secondary: "{{ dns_secondary | default('8.8.4.4') }}"
+    expected_ntp_primary: "{{ ntp_primary | default('10.1.1.10') }}"
+    expected_ntp_secondary: "{{ ntp_secondary | default('10.1.1.11') }}"
+    expected_syslog_ip: "{{ syslog_ip | default('192.168.29.3') }}"
 
   collections:
     - paloaltonetworks.panos
 
   tasks:
-    - name: Gather all security rules
-      paloaltonetworks.panos.panos_security_rule:
-        provider: "{{ device }}"
-        gathered_filter: "*"
-        state: gathered
-      register: sec_rules
-
-    - name: Compute any-any insecure rules
-      ansible.builtin.set_fact:
-        any_any_insecure_rules: >-
-          {{
-            (sec_rules.gathered | default([]))
-            | selectattr('source_ip', 'equalto', ['any'])
-            | selectattr('destination_ip', 'equalto', ['any'])
-            | selectattr('service', 'equalto', ['any'])
-            | list
-          }}
-
-    - name: Compute SSL on non-standard ports rules
-      ansible.builtin.set_fact:
-        ssl_nonstandard_port_rules: >-
-          {{
-            (sec_rules.gathered | default([]))
-            | rejectattr('service', 'equalto', ['443'])
-            | selectattr('application', 'equalto', ['ssl'])
-            | list
-          }}
-
-    - name: Load expected DNS/NTP values
-      ansible.builtin.set_fact:
-        expected_dns_primary: "{{ dns_primary | default('') }}"
-        expected_dns_secondary: "{{ dns_secondary | default('') }}"
-        expected_ntp_primary: "{{ ntp_primary | default('') }}"
-        expected_ntp_secondary: "{{ ntp_secondary | default('') }}"
-
-    - name: Ensure expected DNS/NTP variables are provided
-      ansible.builtin.assert:
-        that:
-          - expected_dns_primary is defined and expected_dns_primary | length > 0
-          - expected_dns_secondary is defined and expected_dns_secondary | length > 0
-          - expected_ntp_primary is defined and expected_ntp_primary | length > 0
-          - expected_ntp_secondary is defined and expected_ntp_secondary | length > 0
-        fail_msg: >-
-          Provide expected DNS/NTP IPs via extra vars, e.g.:
-          -e dns_primary=192.168.29.3 -e dns_secondary=8.8.8.8 -e ntp_primary=192.168.29.3 -e ntp_secondary=4.2.2.2
-
-    - name: Gather running configuration
+    - name: Gather configuration (full) from the firewall
       paloaltonetworks.panos.panos_facts:
         provider: "{{ device }}"
         gather_subset: ["config"]
       register: pan_config
 
-    - name: Extract DNS, NTP, and Syslog config blocks
-      ansible.builtin.set_fact:
-        cfg_xml: "{{ pan_config.ansible_facts.ansible_net_config | default('') }}"
-        dns_block: "{{ (cfg_xml | regex_search('(?s)<dns-setting>.*?</dns-setting>')) | default('') }}"
-        ntp_servers_block: "{{ (cfg_xml | regex_search('(?s)<ntp-servers>.*?</ntp-servers>')) | default('') }}"
-        ntp_legacy_block: "{{ (cfg_xml | regex_search('(?s)<ntp>.*?</ntp>')) | default('') }}"
-        syslog_block: "{{ (cfg_xml | regex_search('(?s)<syslog-server>.*?</syslog-server>')) | default('') }}"
+    - name: Ensure configuration XML was retrieved
+      ansible.builtin.assert:
+        that:
+          - pan_config.ansible_facts.ansible_net_config is defined
+          - pan_config.ansible_facts.ansible_net_config | length > 0
+        fail_msg: "Failed to retrieve configuration XML from firewall – cannot proceed."
 
-    - name: Extract current DNS primary/secondary
+    - name: Set cfg_xml fact to the retrieved config
       ansible.builtin.set_fact:
-        dns_primary_current: "{{ (dns_block | regex_findall('<primary>([0-9\\.]+)</primary>') | first) | default('') }}"
-        dns_secondary_current: "{{ (dns_block | regex_findall('<secondary>([0-9\\.]+)</secondary>') | first) | default('') }}"
+        cfg_xml: "{{ pan_config.ansible_facts.ansible_net_config }}"
 
-    - name: Extract current NTP primary/secondary (new schema)
+    - name: Extract configured DNS server entries
       ansible.builtin.set_fact:
-        ntp_primary_current: >-
+        dns_servers: >-
           {{
-            (
-              ntp_servers_block
-              | regex_findall('<primary-ntp-server>[\\s\\S]*?<ntp-server-address>([0-9\\.]+)</ntp-server-address>')
-              | first
-            ) | default('')
-          }}
-        ntp_secondary_current: >-
-          {{
-            (
-              ntp_servers_block
-              | regex_findall('<secondary-ntp-server>[\\s\\S]*?<ntp-server-address>([0-9\\.]+)</ntp-server-address>')
-              | first
-            ) | default('')
+            cfg_xml
+            | regex_findall('<dns\-server>\s*<entry>\s*<ip>([0-9\.]+)</ip>\s*</entry>\s*<entry>\s*<ip>([0-9\.]+)</ip>\s*</entry>')
+            | first
+            | default([])
           }}
 
-    - name: Fallback extraction for legacy <ntp> schema
+    - name: Extract primary and secondary DNS from list
       ansible.builtin.set_fact:
-        ntp_primary_current: "{{ ntp_primary_current if (ntp_primary_current | length) > 0 else ((ntp_legacy_block | regex_findall('<primary>([0-9\\.]+)</primary>') | first) | default('')) }}"
-        ntp_secondary_current: "{{ ntp_secondary_current if (ntp_secondary_current | length) > 0 else ((ntp_legacy_block | regex_findall('<secondary>([0-9\\.]+)</secondary>') | first) | default('')) }}"
+        dns_primary_current: "{{ dns_servers.0 | default('') }}"
+        dns_secondary_current: "{{ dns_servers.1 | default('') }}"
 
-    - name: Extract current Syslog IP(s)
+    - name: Extract configured NTP server entries (new schema)
       ansible.builtin.set_fact:
-        syslog_current_ip: "{{ (syslog_block | regex_findall('<server>([0-9\\.]+)</server>') | first) | default('') }}"
+        ntp_servers: >-
+          {{
+            cfg_xml
+            | regex_findall('<ntp\-server>\s*<primary>([0-9\.]+)</primary>.*?<secondary>([0-9\.]+)</secondary>')
+            | first
+            | default([])
+          }}
 
-    - name: Compute DNS/NTP/Syslog compliance booleans
+    - name: Extract primary and secondary NTP from list
       ansible.builtin.set_fact:
-        dns_primary_ok: "{{ (dns_primary_current | default('')) == (expected_dns_primary | default('')) }}"
-        dns_secondary_ok: "{{ (dns_secondary_current | default('')) == (expected_dns_secondary | default('')) }}"
-        ntp_primary_ok: "{{ (ntp_primary_current | default('')) == (expected_ntp_primary | default('')) }}"
-        ntp_secondary_ok: "{{ (ntp_secondary_current | default('')) == (expected_ntp_secondary | default('')) }}"
-        syslog_ok: "{{ (syslog_current_ip | default('')) == (expected_syslog_ip | default('')) }}"
+        ntp_primary_current: "{{ ntp_servers.0 | default('') }}"
+        ntp_secondary_current: "{{ ntp_servers.1 | default('') }}"
 
-    - name: Compute overall DNS/NTP/Syslog compliance
+    - name: Extract configured Syslog server IP
       ansible.builtin.set_fact:
-        dns_ntp_syslog_overall_compliant: "{{ (dns_primary_ok and dns_secondary_ok and ntp_primary_ok and ntp_secondary_ok and syslog_ok) | bool }}"
+        syslog_current_ip: >-
+          {{
+            (cfg_xml
+             | regex_findall('<syslog\-server>\s*<entry>\s*<ip>([0-9\.]+)</ip>'))
+            | first
+            | default('')
+          }}
 
-    - name: Build final consolidated report (concise)
+    - name: Compute compliance booleans
       ansible.builtin.set_fact:
-        final_report:
-          security:
-            any_any: "{{ any_any_insecure_rules | map(attribute='rule_name') | list }}"
-            any_any_count: "{{ (any_any_insecure_rules | default([])) | length }}"
-            ssl_nonstandard_ports: "{{ ssl_nonstandard_port_rules | map(attribute='rule_name') | list }}"
-            ssl_nonstandard_ports_count: "{{ (ssl_nonstandard_port_rules | default([])) | length }}"
-          dns_ntp_syslog:
-            dns_primary: >-
-              {{ (dns_primary_current | default('unset')) ~ ' : ' ~ ('COMPLIANT' if dns_primary_ok | bool else 'NON-COMPLIANT') }}
-            dns_secondary: >-
-              {{ (dns_secondary_current | default('unset')) ~ ' : ' ~ ('COMPLIANT' if dns_secondary_ok | bool else 'NON-COMPLIANT') }}
-            ntp_primary: >-
-              {{ (ntp_primary_current | default('unset')) ~ ' : ' ~ ('COMPLIANT' if ntp_primary_ok | bool else 'NON-COMPLIANT') }}
-            ntp_secondary: >-
-              {{ (ntp_secondary_current | default('unset')) ~ ' : ' ~ ('COMPLIANT' if ntp_secondary_ok | bool else 'NON-COMPLIANT') }}
-            syslog_server: >-
-              {{ (syslog_current_ip | default('unset')) ~ ' : ' ~ ('COMPLIANT' if syslog_ok | bool else 'NON-COMPLIANT') }}
+        dns_primary_ok: "{{ dns_primary_current == expected_dns_primary }}"
+        dns_secondary_ok: "{{ dns_secondary_current == expected_dns_secondary }}"
+        ntp_primary_ok: "{{ ntp_primary_current == expected_ntp_primary }}"
+        ntp_secondary_ok: "{{ ntp_secondary_current == expected_ntp_secondary }}"
+        syslog_ok: "{{ syslog_current_ip == expected_syslog_ip }}"
 
-    - name: Consolidated output
+    - name: Build compliance report summary
+      ansible.builtin.set_fact:
+        compliance_report:
+          dns_primary: "{{ dns_primary_current }} : {{ 'COMPLIANT' if dns_primary_ok else 'NON-COMPLIANT' }}"
+          dns_secondary: "{{ dns_secondary_current }} : {{ 'COMPLIANT' if dns_secondary_ok else 'NON-COMPLIANT' }}"
+          ntp_primary: "{{ ntp_primary_current }} : {{ 'COMPLIANT' if ntp_primary_ok else 'NON-COMPLIANT' }}"
+          ntp_secondary: "{{ ntp_secondary_current }} : {{ 'COMPLIANT' if ntp_secondary_ok else 'NON-COMPLIANT' }}"
+          syslog_server: "{{ syslog_current_ip }} : {{ 'COMPLIANT' if syslog_ok else 'NON-COMPLIANT' }}"
+
+    - name: Display compliance report
       ansible.builtin.debug:
-        msg: "{{ final_report }}"
+        msg: "{{ compliance_report }}"
