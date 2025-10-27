@@ -1,0 +1,57 @@
+---
+- name: Switch Drift Detection – Cisco 9300
+  hosts: 192.168.29.164
+  gather_facts: no
+  connection: network_cli
+
+  vars:
+    ansible_user: admin
+    ansible_password: admin@123
+    expected_syslog_ip: "192.168.29.3"
+    expected_dns_primary: "192.168.29.3"
+    expected_dns_secondary: "192.168.29.3"
+    expected_ntp_primary: "192.168.29.3"
+    expected_ntp_secondary: "192.168.29.3"
+
+  collections:
+    - cisco.ios
+
+  tasks:
+    - name: Gather running configuration
+      cisco.ios.ios_command:
+        commands:
+          - show running-config
+      register: running_cfg
+
+    - name: Extract all access-port interface blocks
+      set_fact:
+        access_interfaces: >-
+          {{
+            running_cfg.stdout[0]
+            | split('\ninterface ')
+            | select('match','^GigabitEthernet')
+            | map('regex_replace','^GigabitEthernet','GigabitEthernet')
+            | list
+          }}
+
+    - name: Loop through access interfaces and check port-security
+      loop: "{{ access_interfaces }}"
+      loop_control:
+        label: "{{ item.split('\n')[0] }}"
+      vars:
+        iface_block: "{{ item }}"
+        iface_name: "{{ item.split('\n')[0] }}"
+      block:
+        - name: Check if port-security is configured on {{ iface_name }}
+          set_fact:
+            portsec_enabled: "{{ ('switchport port-security' in iface_block) | bool }}"
+
+        - name: Report drift if port-security disabled on {{ iface_name }}
+          ansible.builtin.debug:
+            msg: "DRIFT DETECTED: Port-Security disabled on interface {{ iface_name }}"
+          when: portsec_enabled == false
+
+    - name: Summarise drift detection result
+      ansible.builtin.debug:
+        msg: >
+          "Checked {{ access_interfaces | length }} access interfaces on host {{ inventory_hostname }} – drift reported if any above."
