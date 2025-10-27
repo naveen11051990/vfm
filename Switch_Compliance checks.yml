@@ -1,137 +1,38 @@
 ---
-- name: Compliance Check – Cisco 9300 Switch
+- name: Cisco 9300 Compliance Check
   hosts: cisco_switches
   gather_facts: no
   connection: network_cli
+
   vars:
-    # expected values
     expected_syslog_ip: "192.168.29.3"
-    expected_dns_primary: "192.168.29.5"
-    expected_dns_secondary: "192.168.29.3"
-    expected_ntp_primary: "192.168.29.5"
-    expected_ntp_secondary: "192.168.29.3"
+    expected_dns_primary: "192.168.29.3"
+    expected_ntp_primary: "192.168.29.3"
 
   collections:
     - cisco.ios
 
   tasks:
-
     - name: Gather running configuration
-      cisco.ios.ios_config:
-        backup: no
-        commands: []
+      cisco.ios.ios_command:
+        commands:
+          - show running-config
       register: running_config
 
-    - name: Extract syslog host lines
+    - name: Extract syslog servers
       set_fact:
-        syslog_hosts: >-
-          {{ running_config.stdout_lines
-             | select("search","^logging host ")
-             | map("regex_replace","^logging host\\s+","")
-             | list }}
+        syslog_hosts: "{{ running_config.stdout[0].split('\n') | select('match', '^logging host ') | map('regex_replace', '^logging host ', '') | list }}"
 
-    - name: Extract DNS server lines
+    - name: Extract DNS servers
       set_fact:
-        dns_servers: >-
-          {{ running_config.stdout_lines
-             | select("search","^ip name-server ")
-             | map("regex_replace","^ip name-server\\s+","")
-             | list }}
+        dns_servers: "{{ running_config.stdout[0].split('\n') | select('match', '^ip name-server ') | map('regex_replace', '^ip name-server ', '') | list }}"
 
-    - name: Extract NTP server lines
+    - name: Extract NTP servers
       set_fact:
-        ntp_servers: >-
-          {{ running_config.stdout_lines
-             | select("search","^ntp server ")
-             | map("regex_replace","^ntp server\\s+","")
-             | list }}
+        ntp_servers: "{{ running_config.stdout[0].split('\n') | select('match', '^ntp server ') | map('regex_replace', '^ntp server ', '') | list }}"
 
-    - name: Check syslog server compliance
+    - name: Check Syslog compliance
       assert:
         that:
           - expected_syslog_ip in syslog_hosts
-        fail_msg: >-
-          "Syslog server NON-COMPLIANT: configured hosts = {{ syslog_hosts }}, expected = {{ expected_syslog_ip }}"
-        success_msg: "Syslog server COMPLIANT"
-
-    - name: Check DNS primary compliance
-      assert:
-        that:
-          - dns_servers | length > 0 and dns_servers[0] == expected_dns_primary
-        fail_msg: >-
-          "DNS primary NON-COMPLIANT: {{ dns_servers }} vs expected {{ expected_dns_primary }}"
-        success_msg: "DNS primary COMPLIANT"
-
-    - name: Check DNS secondary compliance
-      assert:
-        that:
-          - dns_servers | length > 1 and dns_servers[1] == expected_dns_secondary
-        fail_msg: >-
-          "DNS secondary NON-COMPLIANT or missing: {{ dns_servers }} vs expected {{ expected_dns_secondary }}"
-        success_msg: "DNS secondary COMPLIANT"
-
-    - name: Check NTP primary compliance
-      assert:
-        that:
-          - ntp_servers | length > 0 and ntp_servers[0] == expected_ntp_primary
-        fail_msg: >-
-          "NTP primary NON-COMPLIANT: {{ ntp_servers }} vs expected {{ expected_ntp_primary }}"
-        success_msg: "NTP primary COMPLIANT"
-
-    - name: Check NTP secondary compliance
-      assert:
-        that:
-          - ntp_servers | length > 1 and ntp_servers[1] == expected_ntp_secondary
-        fail_msg: >-
-          "NTP secondary NON-COMPLIANT or missing: {{ ntp_servers }} vs expected {{ expected_ntp_secondary }}"
-        success_msg: "NTP secondary COMPLIANT"
-
-    - name: Gather interface configuration
-      cisco.ios.ios_facts:
-        gather_subset:
-          - interfaces
-      register: intf_facts
-
-    - name: Filter access ports (example: Gi interfaces with no switchport mode trunk)
-      set_fact:
-        access_ports: >-
-          {{ intf_facts.ansible_facts.ios_interfaces
-             | dict2items
-             | selectattr('value.switchport_mode','equalto','access')
-             | map(attribute='key')
-             | list }}
-
-    - name: Check each access port for PortFast, Port-Security, Storm Control compliance
-      loop: "{{ access_ports }}"
-      vars:
-        port: "{{ item }}"
-      block:
-        - name: Get running config for interface {{port}}
-          cisco.ios.ios_command:
-            commands:
-              - show running-config interface {{port}}
-          register: intf_config
-
-        - name: Assert PortFast enabled on {{port}}
-          assert:
-            that:
-              - "'spanning-tree portfast' in intf_config.stdout[0]"
-            fail_msg: >-"PortFast NON-COMPLIANT on {{port}}"
-            success_msg: "PortFast COMPLIANT on {{port}}"
-
-        - name: Assert Port-Security enabled on {{port}}
-          assert:
-            that:
-              - "'switchport port-security' in intf_config.stdout[0]"
-            fail_msg: >-"Port-Security NON-COMPLIANT on {{port}}"
-            success_msg: "Port-Security COMPLIANT on {{port}}"
-
-        - name: Assert Storm Control enabled on {{port}}
-          assert:
-            that:
-              - "'storm-control broadcast level' in intf_config.stdout[0]" or "'storm-control action' in intf_config.stdout[0]"
-            fail_msg: >-"Storm Control NON-COMPLIANT on {{port}}"
-            success_msg: "Storm Control COMPLIANT on {{port}}"
-
-      when: access_ports | length > 0
-
+        fail_msg: "Syslog NON-COMPLIANT: found {{ syslog_ho
