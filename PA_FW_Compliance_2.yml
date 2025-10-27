@@ -64,29 +64,14 @@
       ansible.builtin.set_fact:
         cfg_xml: "{{ pan_config.ansible_facts.ansible_net_config }}"
 
-    - name: Extract DNS config block and possible server list (for fallback)
+    - name: Extract DNS config block
       ansible.builtin.set_fact:
         dns_block: "{{ (cfg_xml | regex_search('(?s)<dns-setting>.*?</dns-setting>')) | default('') }}"
-        dns_servers: >-
-          {{
-            cfg_xml
-            | regex_findall('<dns\\-server>\\s*<entry>\\s*<ip>([0-9\\.]+)</ip>\\s*</entry>')
-          }}
 
-    - name: Set DNS primary/secondary values (prefer <dns-setting>, fallback to <dns-server> entries)
+    - name: Extract current DNS primary/secondary from dns-setting
       ansible.builtin.set_fact:
-        dns_primary_current: >-
-          {{
-            (
-              dns_block | regex_findall('<primary>([0-9\\.]+)</primary>') | first
-            ) | default(dns_servers.0 | default(''))
-          }}
-        dns_secondary_current: >-
-          {{
-            (
-              dns_block | regex_findall('<secondary>([0-9\\.]+)</secondary>') | first
-            ) | default(dns_servers.1 | default(''))
-          }}
+        dns_primary_current: "{{ (dns_block | regex_findall('<primary>([0-9\\.]+)</primary>') | first) | default('') }}"
+        dns_secondary_current: "{{ (dns_block | regex_findall('<secondary>([0-9\\.]+)</secondary>') | first) | default('') }}"
 
     - name: Extract NTP config blocks (new and legacy)
       ansible.builtin.set_fact:
