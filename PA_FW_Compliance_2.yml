@@ -64,12 +64,12 @@
       ansible.builtin.set_fact:
         cfg_xml: "{{ pan_config.ansible_facts.ansible_net_config }}"
 
-    - name: Dump full cfg_xml to console (for troubleshooting)
-      ansible.builtin.debug:
-        msg: |
-          ----- BEGIN CFG XML -----
-          {{ cfg_xml }}
-          ----- END CFG XML -----
+    # - name: Dump full cfg_xml to console (for troubleshooting)
+    #   ansible.builtin.debug:
+    #     msg: |
+    #       ----- BEGIN CFG XML -----
+    #       {{ cfg_xml }}
+    #       ----- END CFG XML -----
 
     # cfg_xml obtained; proceed with parsing
 
@@ -113,6 +113,10 @@
             (
               (cfg_xml
                | regex_findall('(?s)<syslog\\-server>.*?<entry[^>]*>.*?<(?:ip|server|ip\\-address)>([0-9\\.]+)</(?:ip|server|ip\\-address)>')
+              )
+              +
+              (cfg_xml
+               | regex_findall('(?s)<log\\-settings>.*?<syslog>.*?<entry[^>]*>.*?<server>.*?<entry[^>]*>.*?<(?:ip\\-address|server)>([0-9\\.]+)</(?:ip\\-address|server)>')
               )
               +
               (cfg_xml
