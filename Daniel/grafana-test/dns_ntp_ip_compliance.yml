@@ -16,6 +16,8 @@
     # Defaults to localhost (controller/execution node).
     log_host: "{{ log_host | default('localhost') }}"
     log_become: true
+    # Optional SSH overrides for the dynamic log target
+    # log_user, log_port, log_ssh_key, log_password can be provided via extra vars
 
   collections:
     - paloaltonetworks.panos
@@ -144,9 +146,18 @@
     # ============================================================================
     # GRAFANA LOGGING TASK - ADDED AT THE END
     # ============================================================================
+    - name: Define dynamic logging target host
+      ansible.builtin.add_host:
+        name: LOG_TARGET
+        ansible_host: "{{ log_host }}"
+        ansible_user: "{{ log_user | default(omit) }}"
+        ansible_port: "{{ log_port | default(omit) }}"
+        ansible_ssh_private_key_file: "{{ log_ssh_key | default(omit) }}"
+        ansible_password: "{{ log_password | default(omit) }}"
+
     - name: Ensure log directory exists
       become: "{{ log_become }}"
-      delegate_to: "{{ log_host }}"
+      delegate_to: LOG_TARGET
       ansible.builtin.file:
         path: "{{ log_dir }}"
         state: directory
@@ -164,7 +175,7 @@
 
     - name: Create structured compliance log for Grafana dashboard
       become: "{{ log_become }}"
-      delegate_to: "{{ log_host }}"
+      delegate_to: LOG_TARGET
       ansible.builtin.copy:
         dest: "{{ log_dir }}/{{ log_filename }}"
         owner: root
