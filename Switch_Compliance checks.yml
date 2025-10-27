@@ -41,7 +41,6 @@
         success_msg: "Syslog COMPLIANT"
       failed_when: false
       changed_when: false
-      register: res_syslog
 
     - name: Check DNS primary compliance
       assert:
@@ -52,7 +51,6 @@
         success_msg: "DNS primary COMPLIANT"
       failed_when: false
       changed_when: false
-      register: res_dns_primary
 
     - name: Check DNS secondary compliance
       assert:
@@ -63,7 +61,6 @@
         success_msg: "DNS secondary COMPLIANT"
       failed_when: false
       changed_when: false
-      register: res_dns_secondary
 
     - name: Check NTP primary compliance
       assert:
@@ -74,7 +71,6 @@
         success_msg: "NTP primary COMPLIANT"
       failed_when: false
       changed_when: false
-      register: res_ntp_primary
 
     - name: Check NTP secondary compliance
       assert:
@@ -85,7 +81,6 @@
         success_msg: "NTP secondary COMPLIANT"
       failed_when: false
       changed_when: false
-      register: res_ntp_secondary
 
     - name: Gather interface configuration sections
       cisco.ios.ios_command:
@@ -111,7 +106,6 @@
         label: "{{ item.split('\\n')[0] }}"
       failed_when: false
       changed_when: false
-      register: res_portfast
 
     - name: Assert Port-Security enabled on {{ item.split('\n')[0] }}
       vars:
@@ -127,7 +121,6 @@
         label: "{{ item.split('\\n')[0] }}"
       failed_when: false
       changed_when: false
-      register: res_portsec
 
     - name: Assert Storm Control enabled on {{ item.split('\n')[0] }}
       vars:
@@ -143,35 +136,3 @@
         label: "{{ item.split('\\n')[0] }}"
       failed_when: false
       changed_when: false
-      register: res_storm
-
-    - name: Build compliance summary facts
-      set_fact:
-        syslog_ok: "{{ res_syslog.evaluated_to | default(false) }}"
-        dns_primary_ok: "{{ res_dns_primary.evaluated_to | default(false) }}"
-        dns_secondary_ok: "{{ res_dns_secondary.evaluated_to | default(false) }}"
-        ntp_primary_ok: "{{ res_ntp_primary.evaluated_to | default(false) }}"
-        ntp_secondary_ok: "{{ res_ntp_secondary.evaluated_to | default(false) }}"
-        portfast_total: "{{ (res_portfast.results | default([])) | length }}"
-        portfast_bad: "{{ (res_portfast.results | default([])) | selectattr('evaluated_to','equalto', false) | list | length }}"
-        portsec_total: "{{ (res_portsec.results | default([])) | length }}"
-        portsec_bad: "{{ (res_portsec.results | default([])) | selectattr('evaluated_to','equalto', false) | list | length }}"
-        storm_total: "{{ (res_storm.results | default([])) | length }}"
-        storm_bad: "{{ (res_storm.results | default([])) | selectattr('evaluated_to','equalto', false) | list | length }}"
-
-    - name: Compute overall compliance
-      set_fact:
-        overall_compliant: "{{ syslog_ok and dns_primary_ok and dns_secondary_ok and ntp_primary_ok and ntp_secondary_ok and (portfast_bad == 0) and (portsec_bad == 0) and (storm_bad == 0) }}"
-
-    - name: Compliance Summary
-      debug:
-        msg:
-          overall: "{{ 'COMPLIANT' if overall_compliant else 'NON-COMPLIANT' }}"
-          syslog: "{{ 'COMPLIANT' if syslog_ok else 'NON-COMPLIANT' }}"
-          dns_primary: "{{ 'COMPLIANT' if dns_primary_ok else 'NON-COMPLIANT' }}"
-          dns_secondary: "{{ 'COMPLIANT' if dns_secondary_ok else 'NON-COMPLIANT' }}"
-          ntp_primary: "{{ 'COMPLIANT' if ntp_primary_ok else 'NON-COMPLIANT' }}"
-          ntp_secondary: "{{ 'COMPLIANT' if ntp_secondary_ok else 'NON-COMPLIANT' }}"
-          portfast: "{{ portfast_total - portfast_bad }} / {{ portfast_total }} compliant (non-compliant={{ portfast_bad }})"
-          port_security: "{{ portsec_total - portsec_bad }} / {{ portsec_total }} compliant (non-compliant={{ portsec_bad }})"
-          storm_control: "{{ storm_total - storm_bad }} / {{ storm_total }} compliant (non-compliant={{ storm_bad }})"
