@@ -10,7 +10,7 @@
       username: "{{ username }}"
       password: "{{ password }}"
     expected_dns_primary: "{{ dns_primary | default('8.8.8.8') }}"
-    expected_dns_secondary: "{{ dns_secondary | default('8.8.4.4') }}"
+    expected_dns_secondary: "{{ dns_secondary | default('192.168.29.3') }}"
     expected_ntp_primary: "{{ ntp_primary | default('10.1.1.10') }}"
     expected_ntp_secondary: "{{ ntp_secondary | default('10.1.1.11') }}"
     expected_syslog_ip: "{{ syslog_ip | default('192.168.29.3') }}"
