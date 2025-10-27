@@ -103,31 +103,41 @@
       set_fact:
         interface_blocks: "{{ intf_config.stdout[0].split('\ninterface ') | select('match','^GigabitEthernet') | list }}"
 
-    - name: Check PortFast, Port-Security, Storm Control on each access interface
+    - name: Assert PortFast enabled on {{ item.split('\n')[0] }}
+      vars:
+        iface_name: "{{ item.split('\n')[0] }}"
+        block_text: "{{ item }}"
+      assert:
+        that:
+          - "'spanning-tree portfast' in block_text"
+        fail_msg: "PortFast NON-COMPLIANT on {{ iface_name }}"
+        success_msg: "PortFast COMPLIANT on {{ iface_name }}"
       loop: "{{ interface_blocks }}"
       loop_control:
-        label: "{{ item.split('\n')[0] }}"
+        label: "{{ item.split('\\n')[0] }}"
+
+    - name: Assert Port-Security enabled on {{ item.split('\n')[0] }}
       vars:
-        block: "{{ item }}"
         iface_name: "{{ item.split('\n')[0] }}"
-      block:
-        - name: Assert PortFast enabled on {{ iface_name }}
-          assert:
-            that:
-              - "'spanning-tree portfast' in block"
-            fail_msg: "PortFast NON-COMPLIANT on {{ iface_name }}"
-            success_msg: "PortFast COMPLIANT on {{ iface_name }}"
+        block_text: "{{ item }}"
+      assert:
+        that:
+          - "'switchport port-security' in block_text"
+        fail_msg: "Port-Security NON-COMPLIANT on {{ iface_name }}"
+        success_msg: "Port-Security COMPLIANT on {{ iface_name }}"
+      loop: "{{ interface_blocks }}"
+      loop_control:
+        label: "{{ item.split('\\n')[0] }}"
 
-        - name: Assert Port-Security enabled on {{ iface_name }}
-          assert:
-            that:
-              - "'switchport port-security' in block"
-            fail_msg: "Port-Security NON-COMPLIANT on {{ iface_name }}"
-            success_msg: "Port-Security COMPLIANT on {{ iface_name }}"
-
-        - name: Assert Storm Control enabled on {{ iface_name }}
-          assert:
-            that:
-              - "'storm-control' in block"
-            fail_msg: "Storm Control NON-COMPLIANT on {{ iface_name }}"
-            success_msg: "Storm Control COMPLIANT on {{ iface_name }}"
+    - name: Assert Storm Control enabled on {{ item.split('\n')[0] }}
+      vars:
+        iface_name: "{{ item.split('\n')[0] }}"
+        block_text: "{{ item }}"
+      assert:
+        that:
+          - "'storm-control' in block_text"
+        fail_msg: "Storm Control NON-COMPLIANT on {{ iface_name }}"
+        success_msg: "Storm Control COMPLIANT on {{ iface_name }}"
+      loop: "{{ interface_blocks }}"
+      loop_control:
+        label: "{{ item.split('\\n')[0] }}"
