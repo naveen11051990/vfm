@@ -29,7 +29,7 @@
       paloaltonetworks.panos.panos_address_object:
           provider: "{{ device }}"
           name: "salesforce-server"
-          value: "199.199.199.199"
+          value: "199.199.199.198"
           description: "Address object 2 from Ansible"
 
 
@@ -73,12 +73,12 @@
     - name: Create / add security rule
       paloaltonetworks.panos.panos_security_rule:
             provider: "{{ device }}"
-            rule_name: "Rule_from_Ansible_Allow_HTTP_Example2"
+            rule_name: "Rule_from_Ansible_Allow_HTTP_Example3"
             description: "Allow HTTP traffic from internal to external"
             source_zone: "inside-users"
             destination_zone: "outside-internet"
             source_ip: "192.168.60.8/32"
-            destination_ip: "199.199.199.199/32"
+            destination_ip: "199.199.199.198/32"
             source_user: "any"
             application: "web-browsing"
             service: "service-http"
