@@ -7,11 +7,9 @@
   vars:
     ansible_user: admin
     ansible_password: admin@123
-    expected_syslog_ip: "192.168.29.3"
-    expected_dns_primary: "192.168.29.3"
-    expected_dns_secondary: "192.168.29.3"
-    expected_ntp_primary: "192.168.29.3"
-    expected_ntp_secondary: "192.168.29.3"
+    baseline_port_security: true
+    baseline_portfast: true
+    baseline_storm_control: true
 
   collections:
     - cisco.ios
@@ -23,35 +21,40 @@
           - show running-config
       register: running_cfg
 
-    - name: Extract all access-port interface blocks
+    - name: Parse interface blocks into list
       set_fact:
-        access_interfaces: >-
+        interface_blocks: >-
           {{
             running_cfg.stdout[0]
             | split('\ninterface ')
             | select('match','^GigabitEthernet')
-            | map('regex_replace','^GigabitEthernet','GigabitEthernet')
             | list
           }}
 
-    - name: Loop through access interfaces and check port-security
-      loop: "{{ access_interfaces }}"
+    - name: Check compliance on each access-port interface
+      loop: "{{ interface_blocks }}"
       loop_control:
         label: "{{ item.split('\n')[0] }}"
       vars:
         iface_block: "{{ item }}"
         iface_name: "{{ item.split('\n')[0] }}"
+        portsec_ok: "{{ (baseline_port_security == false) or ('switchport port-security' in iface_block) }}"
+        portfast_ok: "{{ (baseline_portfast == false) or ('spanning-tree portfast' in iface_block) }}"
+        storm_ok: "{{ (baseline_storm_control == false) or ('storm-control' in iface_block) }}"
       block:
-        - name: Check if port-security is configured on {{ iface_name }}
-          set_fact:
-            portsec_enabled: "{{ ('switchport port-security' in iface_block) | bool }}"
-
-        - name: Report drift if port-security disabled on {{ iface_name }}
+        - name: Report Port-Security status on {{ iface_name }}
           ansible.builtin.debug:
-            msg: "DRIFT DETECTED: Port-Security disabled on interface {{ iface_name }}"
-          when: portsec_enabled == false
+            msg: "Port-Security on {{ iface_name }} : {{ 'COMPLIANT' if portsec_ok else 'NON-COMPLIANT' }}"
 
-    - name: Summarise drift detection result
+        - name: Report PortFast status on {{ iface_name }}
+          ansible.builtin.debug:
+            msg: "PortFast on {{ iface_name }} : {{ 'COMPLIANT' if portfast_ok else 'NON-COMPLIANT' }}"
+
+        - name: Report Storm Control status on {{ iface_name }}
+          ansible.builtin.debug:
+            msg: "Storm-Control on {{ iface_name }} : {{ 'COMPLIANT' if storm_ok else 'NON-COMPLIANT' }}"
+
+    - name: Summary for host {{ inventory_hostname }}
       ansible.builtin.debug:
         msg: >
-          "Checked {{ access_interfaces | length }} access interfaces on host {{ inventory_hostname }} – drift reported if any above."
+          "Completed interface compliance checks on {{ inventory_hostname }} – inspected {{ interface_blocks | length }} interfaces."
