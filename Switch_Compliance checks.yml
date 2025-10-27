@@ -35,4 +35,57 @@
       assert:
         that:
           - expected_syslog_ip in syslog_hosts
-        fail_msg: "Syslog NON-COMPLIANT: found {{ syslog_ho
+        fail_msg: "Syslog NON-COMPLIANT: found {{ syslog_hosts }}"
+        success_msg: "Syslog COMPLIANT"
+
+    - name: Check DNS compliance
+      assert:
+        that:
+          - expected_dns_primary in dns_servers
+        fail_msg: "DNS NON-COMPLIANT: found {{ dns_servers }}"
+        success_msg: "DNS COMPLIANT"
+
+    - name: Check NTP compliance
+      assert:
+        that:
+          - expected_ntp_primary in ntp_servers
+        fail_msg: "NTP NON-COMPLIANT: found {{ ntp_servers }}"
+        success_msg: "NTP COMPLIANT"
+
+    - name: Gather interface configuration
+      cisco.ios.ios_command:
+        commands:
+          - show running-config | section interface
+      register: intf_config
+
+    - name: Check PortFast, Port Security, and Storm Control compliance
+      vars:
+        interfaces: "{{ intf_config.stdout[0].split('interface ') | select('search', '^GigabitEthernet') | list }}"
+      block:
+        - name: Evaluate compliance for each interface
+          loop: "{{ interfaces }}"
+          loop_control:
+            label: "{{ item.split('\n')[0] }}"
+          vars:
+            config: "{{ item }}"
+          block:
+            - name: Check PortFast
+              assert:
+                that:
+                  - "'spanning-tree portfast' in config"
+                fail_msg: "PortFast NON-COMPLIANT on {{ item.split('\n')[0] }}"
+                success_msg: "PortFast COMPLIANT on {{ item.split('\n')[0] }}"
+
+            - name: Check Port Security
+              assert:
+                that:
+                  - "'switchport port-security' in config"
+                fail_msg: "Port Security NON-COMPLIANT on {{ item.split('\n')[0] }}"
+                success_msg: "Port Security COMPLIANT on {{ item.split('\n')[0] }}"
+
+            - name: Check Storm Control
+              assert:
+                that:
+                  - "'storm-control' in config"
+                fail_msg: "Storm Control NON-COMPLIANT on {{ item.split('\n')[0] }}"
+                success_msg: "Storm Control COMPLIANT on {{ item.split('\n')[0] }}"
