@@ -7,8 +7,8 @@
     - cisco.ios
 
   vars:
-    ansible_user: naveen
-    ansible_password: "naveen@321!"
+    ansible_user: admin
+    ansible_password: "admin@123"
     ansible_become: yes
     ansible_become_method: enable
 
