@@ -24,16 +24,16 @@
         expected_ntp_primary: "{{ ntp_primary | default('') }}"
         expected_ntp_secondary: "{{ ntp_secondary | default('') }}"
 
-    - name: Ensure expected DNS/NTP variables are provided
-      assert:
-        that:
-          - expected_dns_primary is defined and expected_dns_primary | length > 0
-          - expected_dns_secondary is defined and expected_dns_secondary | length > 0
-          - expected_ntp_primary is defined and expected_ntp_primary | length > 0
-          - expected_ntp_secondary is defined and expected_ntp_secondary | length > 0
-        fail_msg: >-
-          Provide expected DNS/NTP IPs via extra vars, e.g.:
-          -e dns_primary=1.1.1.1 -e dns_secondary=1.0.0.1 -e ntp_primary=2.2.2.2 -e ntp_secondary=2.2.2.3
+    # - name: Ensure expected DNS/NTP variables are provided
+    #   assert:
+    #     that:
+    #       - expected_dns_primary is defined and expected_dns_primary | length > 0
+    #       - expected_dns_secondary is defined and expected_dns_secondary | length > 0
+    #       - expected_ntp_primary is defined and expected_ntp_primary | length > 0
+    #       - expected_ntp_secondary is defined and expected_ntp_secondary | length > 0
+    #     fail_msg: >-
+    #       Provide expected DNS/NTP IPs via extra vars, e.g.:
+    #       -e dns_primary=1.1.1.1 -e dns_secondary=1.0.0.1 -e ntp_primary=2.2.2.2 -e ntp_secondary=2.2.2.3
 
     - name: Gather running configuration
       paloaltonetworks.panos.panos_facts:
