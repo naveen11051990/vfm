@@ -31,9 +31,9 @@
         any_any_insecure_rules: >-
           {{
             (sec_rules.gathered | default([]))
-            | selectattr('source_ip', 'equalto', ['any'])
-            | selectattr('destination_ip', 'equalto', ['any'])
-            | selectattr('service', 'equalto', ['any'])
+            | selectattr('source_ip','equalto',['any'])
+            | selectattr('destination_ip','equalto',['any'])
+            | selectattr('service','equalto',['any'])
             | list
           }}
 
@@ -42,8 +42,8 @@
         ssl_nonstandard_port_rules: >-
           {{
             (sec_rules.gathered | default([]))
-            | selectattr('application', 'equalto', ['ssl'])
-            | rejectattr('service', 'equalto', ['application-default'])
+            | selectattr('application','equalto',['ssl'])
+            | rejectattr('service','equalto',['application-default'])
             | list
           }}
 
@@ -54,48 +54,4 @@
       register: pan_config
 
     - name: Ensure configuration XML retrieved
-      ansible.builtin.assert:
-        that:
-          - pan_config.ansible_facts.ansible_net_config is defined
-          - pan_config.ansible_facts.ansible_net_config | length > 0
-        fail_msg: "Failed to retrieve configuration XML from firewall – cannot proceed."
-
-    - name: Set cfg_xml fact
-      ansible.builtin.set_fact:
-        cfg_xml: "{{ pan_config.ansible_facts.ansible_net_config }}"
-
-    - name: Extract configured DNS servers
-      ansible.builtin.set_fact:
-        dns_primary_current: "{{ (cfg_xml | regex_search('<primary>([0-9\\.]+)</primary>', '\\1')) | default('') }}"
-        dns_secondary_current: "{{ (cfg_xml | regex_search('<secondary>([0-9\\.]+)</secondary>', '\\1')) | default('') }}"
-
-    - name: Extract configured NTP servers
-      ansible.builtin.set_fact:
-        ntp_primary_current: "{{ (cfg_xml | regex_search('<primary-ntp-server>[\\s\\S]*?<ntp-server-address>([0-9\\.]+)</ntp-server-address>', '\\1', multiline=True)) | default('') }}"
-        ntp_secondary_current: "{{ (cfg_xml | regex_search('<secondary-ntp-server>[\\s\\S]*?<ntp-server-address>([0-9\\.]+)</ntp-server-address>', '\\1', multiline=True)) | default('') }}"
-
-    - name: Extract syslog server IP
-      ansible.builtin.set_fact:
-        syslog_current_ip: "{{ (cfg_xml | regex_search('<syslog-server>[\\s\\S]*?<ip>([0-9\\.]+)</ip>', '\\1', multiline=True)) | default('') }}"
-
-    - name: Compute compliance booleans
-      ansible.builtin.set_fact:
-        dns_primary_ok: "{{ dns_primary_current == expected_dns_primary }}"
-        dns_secondary_ok: "{{ dns_secondary_current == expected_dns_secondary }}"
-        ntp_primary_ok: "{{ ntp_primary_current == expected_ntp_primary }}"
-        ntp_secondary_ok: "{{ ntp_secondary_current == expected_ntp_secondary }}"
-        syslog_ok: "{{ syslog_current_ip == expected_syslog_ip }}"
-
-    - name: Build final consolidated report
-      ansible.builtin.set_fact:
-        compliance_report:
-          security:
-            any_any_rules: "{{ any_any_insecure_rules | map(attribute='rule_name') | list }}"
-            any_any_count: "{{ (any_any_insecure_rules | default([])) | length }}"
-            ssl_nonstandard_ports_rules: "{{ ssl_nonstandard_port_rules | map(attribute='rule_name') | list }}"
-            ssl_nonstandard_ports_count: "{{ (ssl_nonstandard_port_rules | default([])) | length }}"
-          dns_ntp_syslog:
-            dns_primary: "{{ dns_primary_current }} : {{ 'COMPLIANT' if dns_primary_ok else 'NON-COMPLIANT' }}"
-            dns_secondary: "{{ dns_secondary_current }} : {{ 'COMPLIANT' if dns_secondary_ok else 'NON-COMPLIANT' }}"
-            ntp_primary: "{{ ntp_primary_current }} : {{ 'COMPLIANT' if ntp_primary_ok else 'NON-COMPLIANT' }}"
-            ntp_secondary: "{{ ntp_
+      ansible.built
