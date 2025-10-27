@@ -152,9 +152,31 @@
       ansible.builtin.set_fact:
         log_filename: "dns-ntp-compliance-{{ inventory_hostname }}-{{ log_timestamp_compact }}.log"
 
-    - name: Create log content
-      ansible.builtin.set_fact:
-        log_content: |-
+    - name: Add log server to in-memory inventory
+      ansible.builtin.add_host:
+        name: LOG_SERVER
+        ansible_host: "{{ log_host }}"
+        ansible_user: "{{ log_user | default('root') }}"
+        ansible_password: "{{ log_password | default('') }}"
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+      when: log_host != 'localhost'
+      no_log: true
+
+    - name: Ensure log directory exists on remote server
+      ansible.builtin.file:
+        path: "{{ log_dir }}"
+        state: directory
+        mode: "0755"
+      delegate_to: LOG_SERVER
+      when: log_host != 'localhost'
+
+    - name: Create structured compliance log directly on remote server
+      ansible.builtin.copy:
+        dest: "{{ log_dir }}/{{ log_filename }}"
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
           # DNS/NTP Compliance Check Report
           host: {{ inventory_hostname }}
           device_ip: {{ device.ip_address }}
@@ -173,47 +195,40 @@
           ntp_secondary_expected: {{ expected_ntp_secondary }}
           ntp_secondary_actual: {{ ntp_secondary_current | default('') }}
           ntp_secondary_ok: {{ 'true' if ntp_secondary_ok | bool else 'false' }}
-
-    - name: Write log file locally (on AAP controller/EE)
-      ansible.builtin.copy:
-        dest: "/tmp/{{ log_filename }}"
-        content: "{{ log_content }}"
-        mode: "0644"
-      delegate_to: localhost
-
-    - name: Ensure log directory exists on target server
-      ansible.builtin.file:
-        path: "{{ log_dir }}"
-        state: directory
-        mode: "0755"
-      delegate_to: "{{ log_host }}"
-      become: "{{ log_become }}"
+      delegate_to: LOG_SERVER
+      become: true
       when: log_host != 'localhost'
+      register: log_creation_result
 
-    - name: Copy log file to target server
+    - name: Create log file locally if log_host is localhost
       ansible.builtin.copy:
-        src: "/tmp/{{ log_filename }}"
         dest: "{{ log_dir }}/{{ log_filename }}"
         owner: root
         group: root
         mode: "0644"
-      delegate_to: "{{ log_host }}"
-      become: "{{ log_become }}"
-      when: log_host != 'localhost'
-
-    - name: Copy log file to localhost if log_host is localhost
-      ansible.builtin.copy:
-        src: "/tmp/{{ log_filename }}"
-        dest: "{{ log_dir }}/{{ log_filename }}"
-        owner: root
-        group: root
-        mode: "0644"
+        content: |-
+          # DNS/NTP Compliance Check Report
+          host: {{ inventory_hostname }}
+          device_ip: {{ device.ip_address }}
+          timestamp: {{ log_timestamp_iso }}
+          execution_date: {{ log_execution_date }}
+          overall_compliant: {{ 'true' if dns_ntp_overall_compliant | bool else 'false' }}
+          dns_primary_expected: {{ expected_dns_primary }}
+          dns_primary_actual: {{ dns_primary_current | default('') }}
+          dns_primary_ok: {{ 'true' if dns_primary_ok | bool else 'false' }}
+          dns_secondary_expected: {{ expected_dns_secondary }}
+          dns_secondary_actual: {{ dns_secondary_current | default('') }}
+          dns_secondary_ok: {{ 'true' if dns_secondary_ok | bool else 'false' }}
+          ntp_primary_expected: {{ expected_ntp_primary }}
+          ntp_primary_actual: {{ ntp_primary_current | default('') }}
+          ntp_primary_ok: {{ 'true' if ntp_primary_ok | bool else 'false' }}
+          ntp_secondary_expected: {{ expected_ntp_secondary }}
+          ntp_secondary_actual: {{ ntp_secondary_current | default('') }}
+          ntp_secondary_ok: {{ 'true' if ntp_secondary_ok | bool else 'false' }}
       become: "{{ log_become }}"
       delegate_to: localhost
       when: log_host == 'localhost'
 
-    - name: Clean up temporary log file
-      ansible.builtin.file:
-        path: "/tmp/{{ log_filename }}"
-        state: absent
-      delegate_to: localhost
+    - name: Show log file creation result
+      ansible.builtin.debug:
+        msg: "Log file created: {{ log_host }}:{{ log_dir }}/{{ log_filename }}"
