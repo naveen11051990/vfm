@@ -66,17 +66,17 @@
 
     - name: Extract configured DNS servers
       ansible.builtin.set_fact:
-        dns_primary_current: "{{ (cfg_xml | regex_search('<primary>([0-9\\.]+)</primary>', '\\1')) | default('') }}"
-        dns_secondary_current: "{{ (cfg_xml | regex_search('<secondary>([0-9\\.]+)</secondary>', '\\1')) | default('') }}"
+        dns_primary_current: "{{ (cfg_xml | regex_search('<dns\\-setting>[\\s\\S]*?<primary>([0-9\\.]+)</primary>', '\\1', multiline=True)) | default('') }}"
+        dns_secondary_current: "{{ (cfg_xml | regex_search('<dns\\-setting>[\\s\\S]*?<secondary>([0-9\\.]+)</secondary>', '\\1', multiline=True)) | default('') }}"
 
     - name: Extract configured NTP servers
       ansible.builtin.set_fact:
-        ntp_primary_current: "{{ (cfg_xml | regex_search('<primary-ntp-server>[\\s\\S]*?<ntp-server-address>([0-9\\.]+)</ntp-server-address>', '\\1', multiline=True)) | default('') }}"
-        ntp_secondary_current: "{{ (cfg_xml | regex_search('<secondary-ntp-server>[\\s\\S]*?<ntp-server-address>([0-9\\.]+)</ntp-server-address>', '\\1', multiline=True)) | default('') }}"
+        ntp_primary_current: "{{ (cfg_xml | regex_search('<ntp>[\\s\\S]*?<primary>([0-9\\.]+)</primary>', '\\1', multiline=True)) | default('') }}"
+        ntp_secondary_current: "{{ (cfg_xml | regex_search('<ntp>[\\s\\S]*?<secondary>([0-9\\.]+)</secondary>', '\\1', multiline=True)) | default('') }}"
 
     - name: Extract syslog server IP
       ansible.builtin.set_fact:
-        syslog_current_ip: "{{ (cfg_xml | regex_search('<syslog-server>[\\s\\S]*?<ip>([0-9\\.]+)</ip>', '\\1', multiline=True)) | default('') }}"
+        syslog_current_ip: "{{ (cfg_xml | regex_search('<syslog\\-server>[\\s\\S]*?<ip>([0-9\\.]+)</ip>', '\\1', multiline=True)) | default('') }}"
 
     - name: Compute compliance booleans
       ansible.builtin.set_fact:
@@ -104,4 +104,3 @@
     - name: Display consolidated compliance report
       ansible.builtin.debug:
         msg: "{{ compliance_report }}"
-
