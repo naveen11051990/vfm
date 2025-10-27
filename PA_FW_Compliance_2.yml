@@ -102,6 +102,17 @@
         ntp_primary_current: "{{ ntp_primary_current if (ntp_primary_current | length) > 0 else ((ntp_legacy_block | regex_findall('<primary>([^<]+)</primary>') | first) | default('')) }}"
         ntp_secondary_current: "{{ ntp_secondary_current if (ntp_secondary_current | length) > 0 else ((ntp_legacy_block | regex_findall('<secondary>([^<]+)</secondary>') | first) | default('')) }}"
 
+    - name: Normalize NTP values (trim whitespace)
+      ansible.builtin.set_fact:
+        ntp_primary_current: "{{ (ntp_primary_current | default('')) | trim }}"
+        ntp_secondary_current: "{{ (ntp_secondary_current | default('')) | trim }}"
+
+    - name: Show extracted vs expected NTP values
+      ansible.builtin.debug:
+        msg:
+          - "NTP primary found={{ ntp_primary_current | default('') }}, expected={{ expected_ntp_primary }}"
+          - "NTP secondary found={{ ntp_secondary_current | default('') }}, expected={{ expected_ntp_secondary }}"
+
     - name: Extract syslog server IP
       ansible.builtin.set_fact:
         syslog_current_ip: >-
