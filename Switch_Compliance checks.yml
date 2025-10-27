@@ -1,5 +1,5 @@
 ---
-- name: Cisco 9300 Compliance Check
+- name: Compliance Check – Cisco 9300 Switch
   hosts: cisco_switches
   gather_facts: no
   connection: network_cli
@@ -7,85 +7,128 @@
   vars:
     expected_syslog_ip: "192.168.29.3"
     expected_dns_primary: "192.168.29.3"
+    expected_dns_secondary: "192.168.29.3"
     expected_ntp_primary: "192.168.29.3"
+    expected_ntp_secondary: "192.168.29.3"
 
   collections:
     - cisco.ios
 
   tasks:
+
     - name: Gather running configuration
       cisco.ios.ios_command:
         commands:
           - show running-config
       register: running_config
 
-    - name: Extract syslog servers
+    - name: Extract syslog server lines
       set_fact:
-        syslog_hosts: "{{ running_config.stdout[0].split('\n') | select('match', '^logging host ') | map('regex_replace', '^logging host ', '') | list }}"
+        syslog_hosts: >-
+          {{
+            running_config.stdout[0]
+            | split('\n')
+            | select('match','^logging host ')
+            | map('regex_replace','^logging host\\s+','')
+            | list
+          }}
 
-    - name: Extract DNS servers
+    - name: Extract DNS server lines
       set_fact:
-        dns_servers: "{{ running_config.stdout[0].split('\n') | select('match', '^ip name-server ') | map('regex_replace', '^ip name-server ', '') | list }}"
+        dns_servers: >-
+          {{
+            running_config.stdout[0]
+            | split('\n')
+            | select('match','^ip name-server ')
+            | map('regex_replace','^ip name-server\\s+','')
+            | list
+          }}
 
-    - name: Extract NTP servers
+    - name: Extract NTP server lines
       set_fact:
-        ntp_servers: "{{ running_config.stdout[0].split('\n') | select('match', '^ntp server ') | map('regex_replace', '^ntp server ', '') | list }}"
+        ntp_servers: >-
+          {{
+            running_config.stdout[0]
+            | split('\n')
+            | select('match','^ntp server ')
+            | map('regex_replace','^ntp server\\s+','')
+            | list
+          }}
 
-    - name: Check Syslog compliance
+    - name: Check Syslog server compliance
       assert:
         that:
           - expected_syslog_ip in syslog_hosts
-        fail_msg: "Syslog NON-COMPLIANT: found {{ syslog_hosts }}"
-        success_msg: "Syslog COMPLIANT"
+        fail_msg: "Syslog server NON-COMPLIANT: found {{ syslog_hosts }}, expected {{ expected_syslog_ip }}"
+        success_msg: "Syslog server COMPLIANT"
 
-    - name: Check DNS compliance
+    - name: Check DNS primary compliance
       assert:
         that:
-          - expected_dns_primary in dns_servers
-        fail_msg: "DNS NON-COMPLIANT: found {{ dns_servers }}"
-        success_msg: "DNS COMPLIANT"
+          - dns_servers | length > 0
+          - dns_servers[0] == expected_dns_primary
+        fail_msg: "DNS primary NON-COMPLIANT: found {{ dns_servers }}, expected primary = {{ expected_dns_primary }}"
+        success_msg: "DNS primary COMPLIANT"
 
-    - name: Check NTP compliance
+    - name: Check DNS secondary compliance
       assert:
         that:
-          - expected_ntp_primary in ntp_servers
-        fail_msg: "NTP NON-COMPLIANT: found {{ ntp_servers }}"
-        success_msg: "NTP COMPLIANT"
+          - dns_servers | length > 1
+          - dns_servers[1] == expected_dns_secondary
+        fail_msg: "DNS secondary NON-COMPLIANT or missing: found {{ dns_servers }}, expected secondary = {{ expected_dns_secondary }}"
+        success_msg: "DNS secondary COMPLIANT"
 
-    - name: Gather interface configuration
+    - name: Check NTP primary compliance
+      assert:
+        that:
+          - ntp_servers | length > 0
+          - ntp_servers[0] == expected_ntp_primary
+        fail_msg: "NTP primary NON-COMPLIANT: found {{ ntp_servers }}, expected primary = {{ expected_ntp_primary }}"
+        success_msg: "NTP primary COMPLIANT"
+
+    - name: Check NTP secondary compliance
+      assert:
+        that:
+          - ntp_servers | length > 1
+          - ntp_servers[1] == expected_ntp_secondary
+        fail_msg: "NTP secondary NON-COMPLIANT or missing: found {{ ntp_servers }}, expected secondary = {{ expected_ntp_secondary }}"
+        success_msg: "NTP secondary COMPLIANT"
+
+    - name: Gather interface configuration sections
       cisco.ios.ios_command:
         commands:
           - show running-config | section interface
       register: intf_config
 
-    - name: Check PortFast, Port Security, and Storm Control compliance
+    - name: Split interface blocks and store in list
+      set_fact:
+        interface_blocks: "{{ intf_config.stdout[0].split('\ninterface ') | select('match','^GigabitEthernet') | list }}"
+
+    - name: Check PortFast, Port-Security, Storm Control on each access interface
+      loop: "{{ interface_blocks }}"
+      loop_control:
+        label: "{{ item.split('\n')[0] }}"
       vars:
-        interfaces: "{{ intf_config.stdout[0].split('interface ') | select('search', '^GigabitEthernet') | list }}"
+        block: "{{ item }}"
+        iface_name: "{{ item.split('\n')[0] }}"
       block:
-        - name: Evaluate compliance for each interface
-          loop: "{{ interfaces }}"
-          loop_control:
-            label: "{{ item.split('\n')[0] }}"
-          vars:
-            config: "{{ item }}"
-          block:
-            - name: Check PortFast
-              assert:
-                that:
-                  - "'spanning-tree portfast' in config"
-                fail_msg: "PortFast NON-COMPLIANT on {{ item.split('\n')[0] }}"
-                success_msg: "PortFast COMPLIANT on {{ item.split('\n')[0] }}"
+        - name: Assert PortFast enabled on {{ iface_name }}
+          assert:
+            that:
+              - "'spanning-tree portfast' in block"
+            fail_msg: "PortFast NON-COMPLIANT on {{ iface_name }}"
+            success_msg: "PortFast COMPLIANT on {{ iface_name }}"
 
-            - name: Check Port Security
-              assert:
-                that:
-                  - "'switchport port-security' in config"
-                fail_msg: "Port Security NON-COMPLIANT on {{ item.split('\n')[0] }}"
-                success_msg: "Port Security COMPLIANT on {{ item.split('\n')[0] }}"
+        - name: Assert Port-Security enabled on {{ iface_name }}
+          assert:
+            that:
+              - "'switchport port-security' in block"
+            fail_msg: "Port-Security NON-COMPLIANT on {{ iface_name }}"
+            success_msg: "Port-Security COMPLIANT on {{ iface_name }}"
 
-            - name: Check Storm Control
-              assert:
-                that:
-                  - "'storm-control' in config"
-                fail_msg: "Storm Control NON-COMPLIANT on {{ item.split('\n')[0] }}"
-                success_msg: "Storm Control COMPLIANT on {{ item.split('\n')[0] }}"
+        - name: Assert Storm Control enabled on {{ iface_name }}
+          assert:
+            that:
+              - "'storm-control' in block"
+            fail_msg: "Storm Control NON-COMPLIANT on {{ iface_name }}"
+            success_msg: "Storm Control COMPLIANT on {{ iface_name }}"
