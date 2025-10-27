@@ -12,7 +12,6 @@
 
     # Logging configuration
     log_dir: /var/log/ansible-playbooks
-    log_filename: "dns-ntp-compliance-{{ inventory_hostname }}-{{ ansible_date_time.iso8601_basic_short }}.log"
 
   collections:
     - paloaltonetworks.panos
@@ -147,11 +146,14 @@
         state: directory
         mode: "0755"
 
-    - name: Compose log timestamps and filename
+    - name: Compose log timestamps
       ansible.builtin.set_fact:
         log_timestamp_compact: "{{ lookup('pipe', 'date -u +%Y%m%dT%H%M%SZ') }}"
         log_timestamp_iso: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }}"
         log_execution_date: "{{ lookup('pipe', 'date -u +%F') }}"
+
+    - name: Compose log filename
+      ansible.builtin.set_fact:
         log_filename: "dns-ntp-compliance-{{ inventory_hostname }}-{{ log_timestamp_compact }}.log"
 
     - name: Create structured compliance log for Grafana dashboard
