@@ -21,6 +21,10 @@
           - show running-config
       register: running_config
 
+    - name: Debug - Show logging lines from config
+      debug:
+        msg: "{{ running_config.stdout[0] | regex_findall('^logging\\s+.*$', multiline=True) }}"
+
     - name: Extract syslog server host IPs
       set_fact:
         syslog_hosts: >-
@@ -31,6 +35,10 @@
             | list
             | flatten
           }}
+
+    - name: Debug - Show extracted syslog hosts
+      debug:
+        var: syslog_hosts
 
     - name: Extract DNS server IPs
       set_fact:
