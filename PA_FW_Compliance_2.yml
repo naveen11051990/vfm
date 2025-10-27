@@ -64,12 +64,7 @@
       ansible.builtin.set_fact:
         cfg_xml: "{{ pan_config.ansible_facts.ansible_net_config }}"
 
-    - name: Dump full cfg_xml to console (for copy/paste)
-      ansible.builtin.debug:
-        msg: |-
-          ----- BEGIN CFG XML -----
-          {{ cfg_xml }}
-          ----- END CFG XML -----
+    # cfg_xml obtained; proceed with parsing
 
     - name: Extract DNS config block
       ansible.builtin.set_fact:
@@ -91,7 +86,7 @@
           {{
             (
               ntp_servers_block
-              | regex_findall('<primary-ntp-server>[\\s\\S]*?<ntp-server-address>([^<]+)</ntp-server-address>')
+              | regex_findall('<primary-ntp-server>[\\s\\S]*?<ntp-server-address>\\s*([^<\\s]+)')
               | first
             ) | default('')
           }}
@@ -99,7 +94,7 @@
           {{
             (
               ntp_servers_block
-              | regex_findall('<secondary-ntp-server>[\\s\\S]*?<ntp-server-address>([^<]+)</ntp-server-address>')
+              | regex_findall('<secondary-ntp-server>[\\s\\S]*?<ntp-server-address>\\s*([^<\\s]+)')
               | first
             ) | default('')
           }}
@@ -114,11 +109,7 @@
         ntp_primary_current: "{{ (ntp_primary_current | default('')) | trim }}"
         ntp_secondary_current: "{{ (ntp_secondary_current | default('')) | trim }}"
 
-    - name: Show extracted vs expected NTP values
-      ansible.builtin.debug:
-        msg:
-          - "NTP primary found={{ ntp_primary_current | default('') }}, expected={{ expected_ntp_primary }}"
-          - "NTP secondary found={{ ntp_secondary_current | default('') }}, expected={{ expected_ntp_secondary }}"
+    # Debugs removed after validation
 
     - name: Extract syslog server IP
       ansible.builtin.set_fact:
