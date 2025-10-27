@@ -7,10 +7,12 @@
     - cisco.ios
 
   vars:
-    ansible_user: admin
-    ansible_password: "admin@123"
-    ansible_become: yes
-    ansible_become_method: enable
+    cisco.ios.ios_user:
+    name: admin
+    secret: admin@123
+    privilege: 15
+    state: present
+
 
 
     vlan_data: 10
