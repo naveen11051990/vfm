@@ -6,9 +6,9 @@
   vars:
     # expected values
     expected_syslog_ip: "192.168.29.3"
-    expected_dns_primary: "192.168.29.3"
+    expected_dns_primary: "192.168.29.5"
     expected_dns_secondary: "192.168.29.3"
-    expected_ntp_primary: "192.168.29.3"
+    expected_ntp_primary: "192.168.29.5"
     expected_ntp_secondary: "192.168.29.3"
 
   collections:
