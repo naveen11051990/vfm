@@ -1,5 +1,5 @@
 ---
-- name: Combined compliance checks – PAN-OS
+- name: Compliance Check – PAN-OS DNS/NTP/Syslog + Security Rules
   hosts: "{{ hosts | default('PRODUCTIONFIREWALL') }}"
   connection: local
   gather_facts: no
@@ -9,6 +9,7 @@
       ip_address: "{{ ip_address }}"
       username: "{{ username }}"
       password: "{{ password }}"
+    # Expected values
     expected_dns_primary: "{{ dns_primary | default('8.8.8.8') }}"
     expected_dns_secondary: "{{ dns_secondary | default('192.168.29.3') }}"
     expected_ntp_primary: "{{ ntp_primary | default('10.1.1.10') }}"
@@ -47,7 +48,7 @@
             | list
           }}
 
-    - name: Gather running configuration
+    - name: Gather running configuration (full)
       paloaltonetworks.panos.panos_facts:
         provider: "{{ device }}"
         gather_subset: ["config"]
@@ -60,58 +61,50 @@
           - pan_config.ansible_facts.ansible_net_config | length > 0
         fail_msg: "Failed to retrieve configuration XML from firewall – cannot proceed."
 
-    - name: Set cfg_xml fact
+    - name: Set cfg_xml variable
       ansible.builtin.set_fact:
         cfg_xml: "{{ pan_config.ansible_facts.ansible_net_config }}"
 
-    - name: Extract configured DNS servers (with fallback patterns)
+    - name: Debug snippet of config for inspection
+      ansible.builtin.debug:
+        msg: |
+          First 300 characters of config XML:
+          {{ cfg_xml[:300] }}
+      # This helps you see what the XML looks like and figure out correct tags
+
+    - name: Extract DNS, NTP and Syslog server values (safe extraction)
       ansible.builtin.set_fact:
-        dns_primary_current: >-
+        dns_primary_current: >
           {{
-            (
-              (cfg_xml | regex_search('<dns(?:\\-setting)?>[\\s\\S]*?<primary>([0-9\\.]+)</primary>', '\\1', multiline=True))
-              or
-              (cfg_xml | regex_search('<dns-server>[\\s\\S]*?<ip>([0-9\\.]+)</ip>', '\\1', multiline=True))
-            ) | default('', true)
+            (cfg_xml | regex_findall('<primary>([0-9\\.]+)</primary>') | first | default('N/A'))
           }}
-        dns_secondary_current: >-
+        dns_secondary_current: >
           {{
-            (
-              (cfg_xml | regex_search('<dns(?:\\-setting)?>[\\s\\S]*?<secondary>([0-9\\.]+)</secondary>', '\\1', multiline=True))
-              or
-              (cfg_xml | regex_search('<dns-server>[\\s\\S]*?<entry>.*?<ip>([0-9\\.]+)</ip>', '\\1', multiline=True))
-            ) | default('', true)
+            (cfg_xml | regex_findall('<secondary>([0-9\\.]+)</secondary>') | first | default('N/A'))
+          }}
+        ntp_primary_current: >
+          {{
+            (cfg_xml | regex_findall('<primary-ntp-server>[\\s\\S]*?<ntp-server-address>([0-9\\.]+)</ntp-server-address>') | first | default('N/A'))
+          }}
+        ntp_secondary_current: >
+          {{
+            (cfg_xml | regex_findall('<secondary-ntp-server>[\\s\\S]*?<ntp-server-address>([0-9\\.]+)</ntp-server-address>') | first | default('N/A'))
+          }}
+        syslog_current_ip: >
+          {{
+            (cfg_xml | regex_findall('<syslog-server>[\\s\\S]*?<ip>([0-9\\.]+)</ip>') | first | default('N/A'))
           }}
 
-    - name: Extract configured NTP servers (with fallback patterns)
-      ansible.builtin.set_fact:
-        ntp_primary_current: >-
-          {{
-            (
-              (cfg_xml | regex_search('<ntp>[\\s\\S]*?<primary>([0-9\\.]+)</primary>', '\\1', multiline=True))
-              or
-              (cfg_xml | regex_search('<ntp-server>[\\s\\S]*?<ntp-server-address>([0-9\\.]+)</ntp-server-address>', '\\1', multiline=True))
-            ) | default('', true)
-          }}
-        ntp_secondary_current: >-
-          {{
-            (
-              (cfg_xml | regex_search('<ntp>[\\s\\S]*?<secondary>([0-9\\.]+)</secondary>', '\\1', multiline=True))
-              or
-              (cfg_xml | regex_search('<ntp-server>[\\s\\S]*?<secondary-ntp-server>[\\s\\S]*?<ntp-server-address>([0-9\\.]+)</ntp-server-address>', '\\1', multiline=True))
-            ) | default('', true)
-          }}
+    - name: Debug extracted values
+      ansible.builtin.debug:
+        msg:
+          - "DNS Primary: {{ dns_primary_current }}"
+          - "DNS Secondary: {{ dns_secondary_current }}"
+          - "NTP Primary: {{ ntp_primary_current }}"
+          - "NTP Secondary: {{ ntp_secondary_current }}"
+          - "Syslog Server: {{ syslog_current_ip }}"
 
-    - name: Extract syslog server IP (with fallback patterns)
-      ansible.builtin.set_fact:
-        syslog_current_ip: >-
-          {{
-            (
-              (cfg_xml | regex_search('<syslog(?:\\-server|Server)>[\\s\\S]*?<ip>([0-9\\.]+)</ip>', '\\1', multiline=True))
-            ) | default('', true)
-          }}
-
-    - name: Compute compliance booleans
+    - name: Compute compliance status booleans
       ansible.builtin.set_fact:
         dns_primary_ok: "{{ dns_primary_current == expected_dns_primary }}"
         dns_secondary_ok: "{{ dns_secondary_current == expected_dns_secondary }}"
