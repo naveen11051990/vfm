@@ -64,6 +64,13 @@
       ansible.builtin.set_fact:
         cfg_xml: "{{ pan_config.ansible_facts.ansible_net_config }}"
 
+    - name: Dump full cfg_xml to console (for troubleshooting)
+      ansible.builtin.debug:
+        msg: |
+          ----- BEGIN CFG XML -----
+          {{ cfg_xml }}
+          ----- END CFG XML -----
+
     # cfg_xml obtained; proceed with parsing
 
     - name: Extract DNS config block
