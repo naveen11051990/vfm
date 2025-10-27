@@ -29,9 +29,21 @@
       set_fact:
         dns_servers: "{{ running_config.stdout[0] | regex_findall('ip\\s+name-server\\s+((?:\\d{1,3}\\.){3}\\d{1,3})', multiline=True) }}"
 
+    - name: Debug - Show DNS servers
+      debug:
+        msg:
+          - "DNS lines: {{ running_config.stdout[0] | regex_findall('ip\\s+name-server.*$', multiline=True) }}"
+          - "Extracted DNS: {{ dns_servers }}"
+
     - name: Extract NTP server IPs
       set_fact:
         ntp_servers: "{{ running_config.stdout[0] | regex_findall('ntp\\s+server\\s+((?:\\d{1,3}\\.){3}\\d{1,3})', multiline=True) }}"
+
+    - name: Debug - Show NTP servers
+      debug:
+        msg:
+          - "NTP lines: {{ running_config.stdout[0] | regex_findall('ntp\\s+server.*$', multiline=True) }}"
+          - "Extracted NTP: {{ ntp_servers }}"
 
     - name: Check Syslog server compliance
       assert:
