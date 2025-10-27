@@ -1,0 +1,149 @@
+---
+- name: DNS/NTP IP compliance check
+  hosts: "{{ hosts | default('PRODUCTIONFIREWALL') }}"
+  connection: local
+  gather_facts: no
+
+  vars:
+    device:
+      ip_address: "{{ ip_address }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+
+    # Logging configuration
+    log_dir: /var/log/ansible-playbooks
+    log_filename: "dns-ntp-compliance-{{ inventory_hostname }}-{{ ansible_date_time.iso8601_basic_short }}.log"
+
+  collections:
+    - paloaltonetworks.panos
+
+  tasks:
+    - name: Load expected values from simple extra vars
+      set_fact:
+        expected_dns_primary: "{{ dns_primary | default('') }}"
+        expected_dns_secondary: "{{ dns_secondary | default('') }}"
+        expected_ntp_primary: "{{ ntp_primary | default('') }}"
+        expected_ntp_secondary: "{{ ntp_secondary | default('') }}"
+
+    - name: Ensure expected DNS/NTP variables are provided
+      assert:
+        that:
+          - expected_dns_primary is defined and expected_dns_primary | length > 0
+          - expected_dns_secondary is defined and expected_dns_secondary | length > 0
+          - expected_ntp_primary is defined and expected_ntp_primary | length > 0
+          - expected_ntp_secondary is defined and expected_ntp_secondary | length > 0
+        fail_msg: >-
+          Provide expected DNS/NTP IPs via extra vars, e.g.:
+          -e dns_primary=1.1.1.1 -e dns_secondary=1.0.0.1 -e ntp_primary=2.2.2.2 -e ntp_secondary=2.2.2.3
+
+    - name: Gather running configuration
+      paloaltonetworks.panos.panos_facts:
+        provider: "{{ device }}"
+        gather_subset: ["config"]
+      register: pan_config
+
+    - name: Extract DNS and NTP config blocks
+      set_fact:
+        cfg_xml: "{{ pan_config.ansible_facts.ansible_net_config | default('') }}"
+        dns_block: "{{ (pan_config.ansible_facts.ansible_net_config | regex_search('(?s)<dns-setting>.*?</dns-setting>')) | default('') }}"
+        ntp_servers_block: "{{ (pan_config.ansible_facts.ansible_net_config | regex_search('(?s)<ntp-servers>.*?</ntp-servers>')) | default('') }}"
+        ntp_legacy_block: "{{ (pan_config.ansible_facts.ansible_net_config | regex_search('(?s)<ntp>.*?</ntp>')) | default('') }}"
+
+    - name: Extract current DNS primary/secondary from dns-setting
+      set_fact:
+        dns_primary_current: "{{ (dns_block | regex_findall('<primary>([0-9\\.]+)</primary>') | first) | default('') }}"
+        dns_secondary_current: "{{ (dns_block | regex_findall('<secondary>([0-9\\.]+)</secondary>') | first) | default('') }}"
+
+    - name: Extract current NTP primary/secondary (new schema first)
+      set_fact:
+        ntp_primary_current: >-
+          {{
+            (
+              ntp_servers_block
+              | regex_findall('<primary-ntp-server>[\\s\\S]*?<ntp-server-address>([0-9\\.]+)</ntp-server-address>')
+              | first
+            ) | default('')
+          }}
+        ntp_secondary_current: >-
+          {{
+            (
+              ntp_servers_block
+              | regex_findall('<secondary-ntp-server>[\\s\\S]*?<ntp-server-address>([0-9\\.]+)</ntp-server-address>')
+              | first
+            ) | default('')
+          }}
+
+    - name: Fallback extraction for legacy <ntp> primary/secondary if needed
+      set_fact:
+        ntp_primary_current: "{{ ntp_primary_current if (ntp_primary_current | length) > 0 else ((ntp_legacy_block | regex_findall('<primary>([0-9\\.]+)</primary>') | first) | default('')) }}"
+        ntp_secondary_current: "{{ ntp_secondary_current if (ntp_secondary_current | length) > 0 else ((ntp_legacy_block | regex_findall('<secondary>([0-9\\.]+)</secondary>') | first) | default('')) }}"
+
+    - name: Show discovered current DNS/NTP settings
+      debug:
+        msg:
+          - "Current DNS primary={{ dns_primary_current | default('') }}, secondary={{ dns_secondary_current | default('') }}"
+          - "Current NTP primary={{ ntp_primary_current | default('') }}, secondary={{ ntp_secondary_current | default('') }}"
+
+    - name: Compute compliance booleans
+      set_fact:
+        dns_primary_ok: "{{ (dns_primary_current | default('')) == (expected_dns_primary | default('')) }}"
+        dns_secondary_ok: "{{ (dns_secondary_current | default('')) == (expected_dns_secondary | default('')) }}"
+        ntp_primary_ok: "{{ (ntp_primary_current | default('')) == (expected_ntp_primary | default('')) }}"
+        ntp_secondary_ok: "{{ (ntp_secondary_current | default('')) == (expected_ntp_secondary | default('')) }}"
+
+    - name: Report DNS compliance
+      debug:
+        msg:
+          - >-
+            DNS Primary: {{ 'COMPLIANT' if dns_primary_ok | bool else 'NON-COMPLIANT' }}
+            (found={{ dns_primary_current | default('unset') }}, expected={{ expected_dns_primary }})
+          - >-
+            DNS Secondary: {{ 'COMPLIANT' if dns_secondary_ok | bool else 'NON-COMPLIANT' }}
+            (found={{ dns_secondary_current | default('unset') }}, expected={{ expected_dns_secondary }})
+
+    - name: Report NTP compliance
+      debug:
+        msg:
+          - >-
+            NTP Primary: {{ 'COMPLIANT' if ntp_primary_ok | bool else 'NON-COMPLIANT' }}
+            (found={{ ntp_primary_current | default('unset') }}, expected={{ expected_ntp_primary }})
+          - >-
+            NTP Secondary: {{ 'COMPLIANT' if ntp_secondary_ok | bool else 'NON-COMPLIANT' }}
+            (found={{ ntp_secondary_current | default('unset') }}, expected={{ expected_ntp_secondary }})
+
+    - name: Overall compliance summary
+      set_fact:
+        dns_ntp_overall_compliant: "{{ (dns_primary_ok and dns_secondary_ok and ntp_primary_ok and ntp_secondary_ok) | bool }}"
+
+    - name: Show overall compliance result
+      debug:
+        msg: >-
+          Overall DNS/NTP Compliance: {{ 'COMPLIANT' if dns_ntp_overall_compliant | bool else 'NON-COMPLIANT' }}
+
+    - name: Detailed compliance report
+      vars:
+        report_lines:
+          - "Expected DNS: primary={{ expected_dns_primary }}, secondary={{ expected_dns_secondary }}"
+          - "Actual DNS: primary={{ dns_primary_current | default('unset') }}, secondary={{ dns_secondary_current | default('unset') }}"
+          - >-
+            DNS Result: primary={{ 'COMPLIANT' if dns_primary_ok | bool else 'NON-COMPLIANT' }};
+            secondary={{ 'COMPLIANT' if dns_secondary_ok | bool else 'NON-COMPLIANT' }}
+          - "Expected NTP: primary={{ expected_ntp_primary }}, secondary={{ expected_ntp_secondary }}"
+          - "Actual NTP: primary={{ ntp_primary_current | default('unset') }}, secondary={{ ntp_secondary_current | default('unset') }}"
+          - >-
+            NTP Result: primary={{ 'COMPLIANT' if ntp_primary_ok | bool else 'NON-COMPLIANT' }};
+            secondary={{ 'COMPLIANT' if ntp_secondary_ok | bool else 'NON-COMPLIANT' }}
+          - >-
+            Overall: {{ 'COMPLIANT' if dns_ntp_overall_compliant | bool else 'NON-COMPLIANT' }}
+      debug:
+        msg: "{{ report_lines }}"
+
+    # ============================================================================
+    # GRAFANA LOGGING TASK - ADDED AT THE END
+    # ============================================================================
+    - name: Create structured compliance log for Grafana dashboard
+      copy:
+        content: |
+          # DNS/NTP Compliance Check Report
+          timestamp: {{ ansible_date_time.iso8601 }}
+          execution_date: {{ ansible_date_time.
