@@ -1,0 +1,38 @@
+---
+- name: Switch Drift Detection – Cisco 9300
+  hosts: 192.168.29.164
+  gather_facts: no
+  connection: network_cli
+
+  vars:
+    ansible_user: admin
+    ansible_password: admin@123
+    baseline_port_security: true
+
+  collections:
+    - cisco.ios
+
+  tasks:
+    - name: Gather running configuration
+      cisco.ios.ios_command:
+        commands:
+          - show running-config
+      register: running_cfg
+
+    - name: Parse interface blocks into list
+      ansible.builtin.set_fact:
+        interface_blocks: >-
+          {{
+            running_cfg.stdout[0]
+            | split('\ninterface ')
+            | select('match','^GigabitEthernet')
+            | list
+          }}
+
+    - name: Loop through each access interface block
+      ansible.builtin.include_tasks: check_interface_portsec.yml
+      loop: "{{ interface_blocks }}"
+      loop_control:
+        loop_var: iface_block
+      vars:
+        iface_name: "{{ iface_block.split('\n')[0] }}"
