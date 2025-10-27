@@ -45,7 +45,6 @@
           - aaa authentication login default group tacacs+ local
           - aaa authorization exec default group tacacs+ local
           - aaa accounting commands 15 default start-stop group tacacs+
-          - username {{ ansible_user }} password {{ ansible_password }}
         save_when: modified
 
     - name: Disable HTTP/HTTPS services
