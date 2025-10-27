@@ -64,31 +64,58 @@
       ansible.builtin.set_fact:
         cfg_xml: "{{ pan_config.ansible_facts.ansible_net_config }}"
 
-    - name: Extract configured DNS servers
+    - name: Extract DNS config block and possible server list (for fallback)
       ansible.builtin.set_fact:
+        dns_block: "{{ (cfg_xml | regex_search('(?s)<dns-setting>.*?</dns-setting>')) | default('') }}"
         dns_servers: >-
           {{
             cfg_xml
             | regex_findall('<dns\\-server>\\s*<entry>\\s*<ip>([0-9\\.]+)</ip>\\s*</entry>')
           }}
 
-    - name: Set DNS primary/secondary values
+    - name: Set DNS primary/secondary values (prefer <dns-setting>, fallback to <dns-server> entries)
       ansible.builtin.set_fact:
-        dns_primary_current: "{{ dns_servers.0 | default('') }}"
-        dns_secondary_current: "{{ dns_servers.1 | default('') }}"
-
-    - name: Extract configured NTP servers
-      ansible.builtin.set_fact:
-        ntp_servers: >-
+        dns_primary_current: >-
           {{
-            cfg_xml
-            | regex_findall('<ntp\\-server>\\s*<primary>([0-9\\.]+)</primary>.*?<secondary>([0-9\\.]+)</secondary>')
+            (
+              dns_block | regex_findall('<primary>([0-9\\.]+)</primary>') | first
+            ) | default(dns_servers.0 | default(''))
+          }}
+        dns_secondary_current: >-
+          {{
+            (
+              dns_block | regex_findall('<secondary>([0-9\\.]+)</secondary>') | first
+            ) | default(dns_servers.1 | default(''))
           }}
 
-    - name: Set NTP primary/secondary values
+    - name: Extract NTP config blocks (new and legacy)
       ansible.builtin.set_fact:
-        ntp_primary_current: "{{ ntp_servers.0 | default('') }}"
-        ntp_secondary_current: "{{ ntp_servers.1 | default('') }}"
+        ntp_servers_block: "{{ (cfg_xml | regex_search('(?s)<ntp-servers>.*?</ntp-servers>')) | default('') }}"
+        ntp_legacy_block: "{{ (cfg_xml | regex_search('(?s)<ntp>.*?</ntp>')) | default('') }}"
+
+    - name: Extract current NTP primary/secondary (prefer <ntp-servers>, fallback to legacy <ntp>)
+      ansible.builtin.set_fact:
+        ntp_primary_current: >-
+          {{
+            (
+              ntp_servers_block
+              | regex_findall('<primary-ntp-server>[\\s\\S]*?<ntp-server-address>([^<]+)</ntp-server-address>')
+              | first
+            ) | default('')
+          }}
+        ntp_secondary_current: >-
+          {{
+            (
+              ntp_servers_block
+              | regex_findall('<secondary-ntp-server>[\\s\\S]*?<ntp-server-address>([^<]+)</ntp-server-address>')
+              | first
+            ) | default('')
+          }}
+
+    - name: Fallback extraction for legacy <ntp> schema if needed
+      ansible.builtin.set_fact:
+        ntp_primary_current: "{{ ntp_primary_current if (ntp_primary_current | length) > 0 else ((ntp_legacy_block | regex_findall('<primary>([^<]+)</primary>') | first) | default('')) }}"
+        ntp_secondary_current: "{{ ntp_secondary_current if (ntp_secondary_current | length) > 0 else ((ntp_legacy_block | regex_findall('<secondary>([^<]+)</secondary>') | first) | default('')) }}"
 
     - name: Extract syslog server IP
       ansible.builtin.set_fact:
