@@ -1,0 +1,9 @@
+---
+- name: Check Port-Security enabled on interface {{ iface_name }}
+  ansible.builtin.set_fact:
+    portsec_enabled: "{{ ('switchport port-security' in iface_block) | bool }}"
+
+- name: Report drift if Port-Security disabled on {{ iface_name }}
+  ansible.builtin.debug:
+    msg: "DRIFT DETECTED: Port-Security disabled on interface {{ iface_name }}"
+  when: not portsec_enabled
