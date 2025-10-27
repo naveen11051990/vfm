@@ -65,7 +65,7 @@
           {{
             (
               ntp_servers_block
-              | regex_findall('<primary-ntp-server>[\\s\\S]*?<ntp-server-address>([^<]+)</ntp-server-address>')
+              | regex_findall('<primary-ntp-server>[\\s\\S]*?<ntp-server-address>\\s*([^<\\s]+)')
               | first
             ) | default('')
           }}
@@ -73,7 +73,7 @@
           {{
             (
               ntp_servers_block
-              | regex_findall('<secondary-ntp-server>[\\s\\S]*?<ntp-server-address>([^<]+)</ntp-server-address>')
+              | regex_findall('<secondary-ntp-server>[\\s\\S]*?<ntp-server-address>\\s*([^<\\s]+)')
               | first
             ) | default('')
           }}
@@ -82,6 +82,11 @@
       set_fact:
         ntp_primary_current: "{{ ntp_primary_current if (ntp_primary_current | length) > 0 else ((ntp_legacy_block | regex_findall('<primary>([^<]+)</primary>') | first) | default('')) }}"
         ntp_secondary_current: "{{ ntp_secondary_current if (ntp_secondary_current | length) > 0 else ((ntp_legacy_block | regex_findall('<secondary>([^<]+)</secondary>') | first) | default('')) }}"
+
+    - name: Normalize NTP values (trim whitespace)
+      set_fact:
+        ntp_primary_current: "{{ (ntp_primary_current | default('')) | trim }}"
+        ntp_secondary_current: "{{ (ntp_secondary_current | default('')) | trim }}"
 
     - name: Show discovered current DNS/NTP settings
       debug:
