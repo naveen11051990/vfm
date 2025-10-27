@@ -21,46 +21,17 @@
           - show running-config
       register: running_config
 
-    - name: Debug - Show logging lines from config
-      debug:
-        msg: "{{ running_config.stdout[0] | regex_findall('^logging\\s+.*$', multiline=True) }}"
-
     - name: Extract syslog server host IPs
       set_fact:
-        syslog_hosts: >-
-          {{
-            running_config.stdout[0]
-            | regex_findall('^logging\\s+(?:host\\s+)?.*$', multiline=True)
-            | map('regex_findall','\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b')
-            | list
-            | flatten
-          }}
-
-    - name: Debug - Show extracted syslog hosts
-      debug:
-        var: syslog_hosts
+        syslog_hosts: "{{ running_config.stdout[0] | regex_findall('logging\\s+host\\s+((?:\\d{1,3}\\.){3}\\d{1,3})', multiline=True) }}"
 
     - name: Extract DNS server IPs
       set_fact:
-        dns_servers: >-
-          {{
-            running_config.stdout[0]
-            | regex_findall('^ip name-server\\s+.*$', multiline=True)
-            | map('regex_findall','\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b')
-            | list
-            | flatten
-          }}
+        dns_servers: "{{ running_config.stdout[0] | regex_findall('ip\\s+name-server\\s+((?:\\d{1,3}\\.){3}\\d{1,3})', multiline=True) }}"
 
     - name: Extract NTP server IPs
       set_fact:
-        ntp_servers: >-
-          {{
-            running_config.stdout[0]
-            | regex_findall('^ntp server\\s+.*$', multiline=True)
-            | map('regex_findall','\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b')
-            | list
-            | flatten
-          }}
+        ntp_servers: "{{ running_config.stdout[0] | regex_findall('ntp\\s+server\\s+((?:\\d{1,3}\\.){3}\\d{1,3})', multiline=True) }}"
 
     - name: Check Syslog server compliance
       assert:
