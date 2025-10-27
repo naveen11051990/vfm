@@ -1,13 +1,11 @@
 ---
 - name: Create a security policy rule on Palo Alto firewall
-- name: Fetch configured NTP servers – PAN-OS
   hosts: "PRODUCTIONFIREWALL"
   connection: local
   gather_facts: false
 
   collections:
     - paloaltonetworks.panos
-  gather_facts: no
 
   vars:
     device:
@@ -29,7 +27,7 @@
       paloaltonetworks.panos.panos_address_object:
           provider: "{{ device }}"
           name: "salesforce-server"
-          value: "199.199.199.198"
+          value: "199.199.199.197"
           description: "Address object 2 from Ansible"
 
 
@@ -67,8 +65,6 @@
             enable_userid: true
             state: present
 
-  collections:
-    - paloaltonetworks.panos
 
     - name: Create / add security rule
       paloaltonetworks.panos.panos_security_rule:
@@ -78,7 +74,7 @@
             source_zone: "inside-users"
             destination_zone: "outside-internet"
             source_ip: "192.168.60.8/32"
-            destination_ip: "199.199.199.198/32"
+            destination_ip: "199.199.199.199/32"
             source_user: "any"
             application: "web-browsing"
             service: "service-http"
@@ -87,12 +83,6 @@
             log_end: true
             commit: true    # commit immediately after creating rule
       register: rule_create
-  tasks:
-    - name: Gather configuration of the firewall
-      paloaltonetworks.panos.panos_facts:
-        provider: "{{ device }}"
-        gather_subset: ["config"]
-      register: pan_config
 
     - name: Configure DNS & NTP servers
       paloaltonetworks.panos.panos_mgtconfig:
@@ -103,26 +93,14 @@
             ntp_server_secondary: "2.2.2.2"
       
     - name: Debug result
-    - name: Output raw configuration snippet for review
       ansible.builtin.debug:
         var: rule_create
-        msg: "{{ pan_config.ansible_facts.ansible_net_config }}"
 
     - name: Commit candidate configuration
       paloaltonetworks.panos.panos_commit_firewall:
           provider: "{{ device }}"
-    - name: Extract configured NTP servers (simple regex extraction)
-      set_fact:
-        ntp_servers: >-
-          {{
-            pan_config.ansible_facts.ansible_net_config
-            | regex_findall("(?<=<ntp>).*?<primary>([0-9\\.]+)</primary>.*?<secondary>([0-9\\.]+)</secondary>", multiline=True)
-          }}
 
 
 
 
       
-    - name: Show configured NTP servers
-      ansible.builtin.debug:
-        msg: "Configured NTP servers (primary, secondary) = {{ ntp_servers }}"
