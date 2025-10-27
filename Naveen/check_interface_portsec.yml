@@ -1,9 +1,12 @@
 ---
-- name: Check Port-Security enabled on interface {{ iface_name }}
-  ansible.builtin.set_fact:
-    portsec_enabled: "{{ ('switchport port-security' in iface_block) | bool }}"
-
-- name: Report drift if Port-Security disabled on {{ iface_name }}
+- name: Check Port-Security on interface {{ iface_name }}
   ansible.builtin.debug:
-    msg: "DRIFT DETECTED: Port-Security disabled on interface {{ iface_name }}"
-  when: not portsec_enabled
+    msg: "Port-Security on {{ iface_name }} : {{ 'COMPLIANT' if ('switchport port-security' in iface_block) else 'NON-COMPLIANT' }}"
+
+- name: Check PortFast on interface {{ iface_name }}
+  ansible.builtin.debug:
+    msg: "PortFast on {{ iface_name }} : {{ 'COMPLIANT' if ('spanning-tree portfast' in iface_block) else 'NON-COMPLIANT' }}"
+
+- name: Check Storm-Control on interface {{ iface_name }}
+  ansible.builtin.debug:
+    msg: "Storm-Control on {{ iface_name }} : {{ 'COMPLIANT' if ('storm-control' in iface_block) else 'NON-COMPLIANT' }}"
