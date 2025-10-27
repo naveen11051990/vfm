@@ -116,7 +116,7 @@
               )
               +
               (cfg_xml
-               | regex_findall('(?s)<server\\-profile>.*?<syslog>.*?<ip\\-address>([0-9\\.]+)</ip\\-address>')
+               | regex_findall('(?s)<server\\-profile>.*?<syslog>.*?<entry[^>]*>.*?<(?:ip\\-address|server)>([0-9\\.]+)</(?:ip\\-address|server)>')
               )
             )
             | first | default('')
