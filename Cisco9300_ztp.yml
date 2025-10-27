@@ -6,7 +6,7 @@
   collections:
     - cisco.ios
 
-  vars:
+   vars:
     ansible_user: admin
     ansible_password: "admin@123"
     ansible_become: yes
