@@ -112,6 +112,10 @@
           {{
             (
               (cfg_xml
+               | regex_findall('(?s)<syslog>.*?<entry[^>]*>.*?<server>.*?<entry[^>]*>.*?<server>([0-9\\.]+)</server>')
+              )
+              +
+              (cfg_xml
                | regex_findall('(?s)<syslog\\-server>.*?<entry[^>]*>.*?<(?:ip|server|ip\\-address)>([0-9\\.]+)</(?:ip|server|ip\\-address)>')
               )
               +
