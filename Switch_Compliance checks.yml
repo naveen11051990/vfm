@@ -1,28 +1,27 @@
 ---
-- name: Compliance Check – Cisco 9300 Switch
+- name: Cisco 9300 Compliance Check
   hosts: cisco_switches
   gather_facts: no
   connection: network_cli
 
   vars:
     expected_syslog_ip: "192.168.29.3"
-    expected_dns_primary: "192.168.29.5"
+    expected_dns_primary: "192.168.29.3"
     expected_dns_secondary: "192.168.29.3"
-    expected_ntp_primary: "192.168.29.6"
+    expected_ntp_primary: "192.168.29.3"
     expected_ntp_secondary: "192.168.29.3"
 
   collections:
     - cisco.ios
 
   tasks:
-
     - name: Gather running configuration
       cisco.ios.ios_command:
         commands:
           - show running-config
       register: running_config
 
-    - name: Extract syslog server lines
+    - name: Extract syslog server host lines
       set_fact:
         syslog_hosts: >-
           {{
@@ -59,8 +58,8 @@
       assert:
         that:
           - expected_syslog_ip in syslog_hosts
-        fail_msg: "Syslog server NON-COMPLIANT: found {{ syslog_hosts }}, expected {{ expected_syslog_ip }}"
-        success_msg: "Syslog server COMPLIANT"
+        fail_msg: "Syslog NON-COMPLIANT: found {{ syslog_hosts }}, expected {{ expected_syslog_ip }}"
+        success_msg: "Syslog COMPLIANT"
 
     - name: Check DNS primary compliance
       assert:
@@ -100,7 +99,7 @@
           - show running-config | section interface
       register: intf_config
 
-    - name: Split interface blocks and store in list
+    - name: Split interface blocks into list
       set_fact:
         interface_blocks: "{{ intf_config.stdout[0].split('\ninterface ') | select('match','^GigabitEthernet') | list }}"
 
