@@ -10,15 +10,12 @@
       username: "{{ username }}"
       password: "{{ password }}"
 
-    # Logging configuration for Grafana/Promtail integration
-    # This directory should match where Promtail is configured to monitor on the controller
-    log_dir: /var/log/ansible-playbooks
-
-    # Set to true if log_dir requires elevated privileges (e.g., /var/log/*)
-    log_become: true
+    # Loki configuration
+    loki_url: "http://192.168.29.36:3100"
 
   collections:
     - paloaltonetworks.panos
+    - community.grafana
 
   tasks:
     - name: Load expected values from simple extra vars
@@ -138,81 +135,30 @@
         msg: "{{ report_lines }}"
 
     # ============================================================================
-    # GRAFANA LOGGING - Write to Controller Node (where Promtail monitors)
+    # GRAFANA LOKI LOGGING - Send report directly to Loki
     # ============================================================================
-    - name: Compose log timestamps
+    - name: Create Loki log content and labels
       ansible.builtin.set_fact:
-        log_timestamp_compact: "{{ lookup('pipe', 'date -u +%Y%m%dT%H%M%SZ') }}"
-        log_timestamp_iso: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }}"
-        log_execution_date: "{{ lookup('pipe', 'date -u +%F') }}"
+        loki_log_labels:
+          job: "dns_ntp_compliance"
+          hostname: "{{ inventory_hostname }}"
+          device_ip: "{{ device.ip_address }}"
+          overall_compliant: "{{ dns_ntp_overall_compliant | bool }}"
+          dns_compliant: "{{ (dns_primary_ok and dns_secondary_ok) | bool }}"
+          ntp_compliant: "{{ (ntp_primary_ok and ntp_secondary_ok) | bool }}"
+        loki_log_message: |
+          DNS/NTP Compliance Check Report for {{ inventory_hostname }} ({{ device.ip_address }})
+          Overall Result: {{ 'COMPLIANT' if dns_ntp_overall_compliant | bool else 'NON-COMPLIANT' }}
+          ---
+          DNS Primary: {{ 'COMPLIANT' if dns_primary_ok | bool else 'NON-COMPLIANT' }} (found={{ dns_primary_current | default('unset') }}, expected={{ expected_dns_primary }})
+          DNS Secondary: {{ 'COMPLIANT' if dns_secondary_ok | bool else 'NON-COMPLIANT' }} (found={{ dns_secondary_current | default('unset') }}, expected={{ expected_dns_secondary }})
+          ---
+          NTP Primary: {{ 'COMPLIANT' if ntp_primary_ok | bool else 'NON-COMPLIANT' }} (found={{ ntp_primary_current | default('unset') }}, expected={{ expected_ntp_primary }})
+          NTP Secondary: {{ 'COMPLIANT' if ntp_secondary_ok | bool else 'NON-COMPLIANT' }} (found={{ ntp_secondary_current | default('unset') }}, expected={{ expected_ntp_secondary }})
 
-    - name: Compose log filename
-      ansible.builtin.set_fact:
-        log_filename: "dns-ntp-compliance-{{ inventory_hostname }}-{{ log_timestamp_compact }}.log"
-
-    - name: Compose temporary log path
-      ansible.builtin.set_fact:
-        log_tmp_path: "/tmp/{{ log_filename }}"
-
-    - name: Create log content variable
-      ansible.builtin.set_fact:
-        log_file_content: |
-          # DNS/NTP Compliance Check Report
-          host={{ inventory_hostname }}
-          device_ip={{ device.ip_address }}
-          timestamp={{ log_timestamp_iso }}
-          execution_date={{ log_execution_date }}
-          overall_compliant={{ 'true' if dns_ntp_overall_compliant | bool else 'false' }}
-          dns_primary_expected={{ expected_dns_primary }}
-          dns_primary_actual={{ dns_primary_current | default('') }}
-          dns_primary_ok={{ 'true' if dns_primary_ok | bool else 'false' }}
-          dns_secondary_expected={{ expected_dns_secondary }}
-          dns_secondary_actual={{ dns_secondary_current | default('') }}
-          dns_secondary_ok={{ 'true' if dns_secondary_ok | bool else 'false' }}
-          ntp_primary_expected={{ expected_ntp_primary }}
-          ntp_primary_actual={{ ntp_primary_current | default('') }}
-          ntp_primary_ok={{ 'true' if ntp_primary_ok | bool else 'false' }}
-          ntp_secondary_expected={{ expected_ntp_secondary }}
-          ntp_secondary_actual={{ ntp_secondary_current | default('') }}
-          ntp_secondary_ok={{ 'true' if ntp_secondary_ok | bool else 'false' }}
-
-    - name: Write compliance log to a temporary file in the EE
-      ansible.builtin.copy:
-        content: "{{ log_file_content }}"
-        dest: "{{ log_tmp_path }}"
-        mode: "0644"
-
-    - name: Ensure log directory exists on controller
-      ansible.builtin.file:
-        path: "{{ log_dir }}"
-        state: directory
-        mode: "0755"
-      run_once: true
-      become: "{{ log_become }}"
-
-    - name: Fetch the log file from the EE to the Controller host
-      ansible.builtin.fetch:
-        src: "{{ log_tmp_path }}"
-        dest: "{{ log_dir }}/"
-        flat: yes
-      become: "{{ log_become }}"
-
-    - name: Clean up temporary log file from the EE
-      ansible.builtin.file:
-        path: "{{ log_tmp_path }}"
-        state: absent
-
-    - name: Verify log file was created on the controller
-      ansible.builtin.stat:
-        path: "{{ log_dir }}/{{ log_filename }}"
-      register: log_stat
-      become: "{{ log_become }}"
-
-    - name: Display log file status
-      ansible.builtin.debug:
-        msg:
-          - "Log file created: {{ log_stat.stat.exists }}"
-          - "Log file path: {{ log_dir }}/{{ log_filename }}"
-          - "Log file size: {{ log_stat.stat.size | default(0) }} bytes"
-          - "Promtail should pick this up from: {{ log_dir }}"
-      when: log_stat.stat.exists
+    - name: Send compliance report to Loki
+      community.grafana.loki_write:
+        url: "{{ loki_url }}"
+        labels: "{{ loki_log_labels }}"
+        message: "{{ loki_log_message }}"
+      # NOTE: Ensure the 'community.grafana' collection is installed in your Execution Environment.
