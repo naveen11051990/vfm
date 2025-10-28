@@ -2,16 +2,13 @@
 - name: DNS/NTP IP compliance check
   hosts: "{{ hosts | default('PRODUCTIONFIREWALL') }}"
   connection: local
-  gather_facts: no
+  gather_facts: yes
 
   vars:
     device:
       ip_address: "{{ ip_address }}"
       username: "{{ username }}"
       password: "{{ password }}"
-
-    # Loki configuration
-    loki_url: "http://192.168.29.36:3100"
 
   collections:
     - paloaltonetworks.panos
@@ -134,35 +131,90 @@
         msg: "{{ report_lines }}"
 
     # ============================================================================
-    # GRAFANA LOKI LOGGING - Send report directly to Loki API
+    # GRAFANA LOGGING TASK - Writes compliance results to persistent log file
     # ============================================================================
-    - name: Send compliance report to Loki via API
-      ansible.builtin.uri:
-        url: "{{ loki_url }}/loki/api/v1/push"
-        method: POST
-        body_format: json
-        headers:
-          Content-Type: "application/json"
-        body:
-          streams:
-            - stream: "{{ loki_log_labels }}"
-              values:
-                - [
-                    "{{ lookup('pipe', 'date +%s%N') }}",
-                    "{{ loki_log_message }}",
-                  ]
-      vars:
-        loki_log_labels:
-          job: "dns_ntp_compliance"
-          hostname: "{{ inventory_hostname }}"
-          device_ip: "{{ device.ip_address }}"
-          overall_compliant: "{{ dns_ntp_overall_compliant | bool }}"
-        loki_log_message: |
-          DNS/NTP Compliance Check Report for {{ inventory_hostname }} ({{ device.ip_address }})
-          Overall Result: {{ 'COMPLIANT' if dns_ntp_overall_compliant | bool else 'NON-COMPLIANT' }}
-          ---
-          DNS Primary: {{ 'COMPLIANT' if dns_primary_ok | bool else 'NON-COMPLIANT' }} (found={{ dns_primary_current | default('unset') }}, expected={{ expected_dns_primary }})
-          DNS Secondary: {{ 'COMPLIANT' if dns_secondary_ok | bool else 'NON-COMPLIANT' }} (found={{ dns_secondary_current | default('unset') }}, expected={{ expected_dns_secondary }})
-          ---
-          NTP Primary: {{ 'COMPLIANT' if ntp_primary_ok | bool else 'NON-COMPLIANT' }} (found={{ ntp_primary_current | default('unset') }}, expected={{ expected_ntp_primary }})
-          NTP Secondary: {{ 'COMPLIANT' if ntp_secondary_ok | bool else 'NON-COMPLIANT' }} (found={{ ntp_secondary_current | default('unset') }}, expected={{ expected_ntp_secondary }})
+    - name: Write DNS/NTP compliance results to Grafana log
+      copy:
+        content: |
+          ================================================================================
+          DNS/NTP COMPLIANCE CHECK REPORT
+          ================================================================================
+
+          Timestamp: {{ ansible_date_time.iso8601 }}
+          Execution Date: {{ ansible_date_time.date }}
+          Execution Time: {{ ansible_date_time.time }}
+          Job ID: {{ tower_job_id | default('manual-run') }}
+
+          --------------------------------------------------------------------------------
+          DEVICE INFORMATION
+          --------------------------------------------------------------------------------
+          Firewall Host: {{ inventory_hostname }}
+          Firewall IP: {{ ip_address }}
+
+          --------------------------------------------------------------------------------
+          COMPLIANCE SUMMARY
+          --------------------------------------------------------------------------------
+          Overall Status: {{ 'COMPLIANT ✓' if dns_ntp_overall_compliant | bool else 'NON-COMPLIANT ✗' }}
+          DNS Compliance: {{ 'COMPLIANT ✓' if (dns_primary_ok and dns_secondary_ok) | bool else 'NON-COMPLIANT ✗' }}
+          NTP Compliance: {{ 'COMPLIANT ✓' if (ntp_primary_ok and ntp_secondary_ok) | bool else 'NON-COMPLIANT ✗' }}
+
+          --------------------------------------------------------------------------------
+          DNS CONFIGURATION CHECK
+          --------------------------------------------------------------------------------
+
+          DNS PRIMARY:
+            Expected: {{ expected_dns_primary }}
+            Actual:   {{ dns_primary_current | default('UNSET') }}
+            Status:   {{ 'COMPLIANT ✓' if dns_primary_ok | bool else 'NON-COMPLIANT ✗' }}
+
+          DNS SECONDARY:
+            Expected: {{ expected_dns_secondary }}
+            Actual:   {{ dns_secondary_current | default('UNSET') }}
+            Status:   {{ 'COMPLIANT ✓' if dns_secondary_ok | bool else 'NON-COMPLIANT ✗' }}
+
+          --------------------------------------------------------------------------------
+          NTP CONFIGURATION CHECK
+          --------------------------------------------------------------------------------
+
+          NTP PRIMARY:
+            Expected: {{ expected_ntp_primary }}
+            Actual:   {{ ntp_primary_current | default('UNSET') }}
+            Status:   {{ 'COMPLIANT ✓' if ntp_primary_ok | bool else 'NON-COMPLIANT ✗' }}
+
+          NTP SECONDARY:
+            Expected: {{ expected_ntp_secondary }}
+            Actual:   {{ ntp_secondary_current | default('UNSET') }}
+            Status:   {{ 'COMPLIANT ✓' if ntp_secondary_ok | bool else 'NON-COMPLIANT ✗' }}
+
+          --------------------------------------------------------------------------------
+          REMEDIATION REQUIRED
+          --------------------------------------------------------------------------------
+          {% if dns_ntp_overall_compliant | bool %}
+          None - All checks passed
+          {% else %}
+          {% if not dns_primary_ok %}
+          ✗ DNS Primary: Update from "{{ dns_primary_current | default('UNSET') }}" to "{{ expected_dns_primary }}"
+          {% endif %}
+          {% if not dns_secondary_ok %}
+          ✗ DNS Secondary: Update from "{{ dns_secondary_current | default('UNSET') }}" to "{{ expected_dns_secondary }}"
+          {% endif %}
+          {% if not ntp_primary_ok %}
+          ✗ NTP Primary: Update from "{{ ntp_primary_current | default('UNSET') }}" to "{{ expected_ntp_primary }}"
+          {% endif %}
+          {% if not ntp_secondary_ok %}
+          ✗ NTP Secondary: Update from "{{ ntp_secondary_current | default('UNSET') }}" to "{{ expected_ntp_secondary }}"
+          {% endif %}
+          {% endif %}
+
+          --------------------------------------------------------------------------------
+          EXECUTION METADATA
+          --------------------------------------------------------------------------------
+          Playbook: dns-ntp-compliance-check.yml
+          Version: 1.0
+          Executed By: Ansible Automation Platform
+          Execution Environment: {{ lookup('env', 'AWX_ISOLATED_DATA_DIR') | default('standard-ee') }}
+
+          ================================================================================
+        dest: "/var/log/ansible-playbooks/dns-ntp-compliance-{{ inventory_hostname }}-{{ ansible_date_time.iso8601_basic_short }}.log"
+        mode: "0644"
+      ignore_errors: yes
