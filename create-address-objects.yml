@@ -1,6 +1,6 @@
 ---
 - name: Create address objects
-  hosts: "firewalls"
+  hosts: firewalls
   connection: local
 
   vars:
