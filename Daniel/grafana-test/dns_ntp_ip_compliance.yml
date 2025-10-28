@@ -15,7 +15,6 @@
 
   collections:
     - paloaltonetworks.panos
-    - community.grafana
 
   tasks:
     - name: Load expected values from simple extra vars
@@ -135,17 +134,26 @@
         msg: "{{ report_lines }}"
 
     # ============================================================================
-    # GRAFANA LOKI LOGGING - Send report directly to Loki
+    # GRAFANA LOKI LOGGING - Send report directly to Loki API
     # ============================================================================
-    - name: Create Loki log content and labels
-      ansible.builtin.set_fact:
+    - name: Send compliance report to Loki via API
+      ansible.builtin.uri:
+        url: "{{ loki_url }}/loki/api/v1/push"
+        method: POST
+        body_format: json
+        headers:
+          Content-Type: "application/json"
+        body:
+          streams:
+            - stream: "{{ loki_log_labels }}"
+              values:
+                - ["{{ ansible_date_time.epoch_ns }}", "{{ loki_log_message }}"]
+      vars:
         loki_log_labels:
           job: "dns_ntp_compliance"
           hostname: "{{ inventory_hostname }}"
           device_ip: "{{ device.ip_address }}"
           overall_compliant: "{{ dns_ntp_overall_compliant | bool }}"
-          dns_compliant: "{{ (dns_primary_ok and dns_secondary_ok) | bool }}"
-          ntp_compliant: "{{ (ntp_primary_ok and ntp_secondary_ok) | bool }}"
         loki_log_message: |
           DNS/NTP Compliance Check Report for {{ inventory_hostname }} ({{ device.ip_address }})
           Overall Result: {{ 'COMPLIANT' if dns_ntp_overall_compliant | bool else 'NON-COMPLIANT' }}
@@ -155,10 +163,3 @@
           ---
           NTP Primary: {{ 'COMPLIANT' if ntp_primary_ok | bool else 'NON-COMPLIANT' }} (found={{ ntp_primary_current | default('unset') }}, expected={{ expected_ntp_primary }})
           NTP Secondary: {{ 'COMPLIANT' if ntp_secondary_ok | bool else 'NON-COMPLIANT' }} (found={{ ntp_secondary_current | default('unset') }}, expected={{ expected_ntp_secondary }})
-
-    - name: Send compliance report to Loki
-      community.grafana.loki_write:
-        url: "{{ loki_url }}"
-        labels: "{{ loki_log_labels }}"
-        message: "{{ loki_log_message }}"
-      # NOTE: Ensure the 'community.grafana' collection is installed in your Execution Environment.
