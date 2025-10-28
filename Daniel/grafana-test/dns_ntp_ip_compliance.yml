@@ -147,7 +147,10 @@
           streams:
             - stream: "{{ loki_log_labels }}"
               values:
-                - ["{{ ansible_date_time.epoch_ns }}", "{{ loki_log_message }}"]
+                - [
+                    "{{ lookup('pipe', 'date +%s%N') }}",
+                    "{{ loki_log_message }}",
+                  ]
       vars:
         loki_log_labels:
           job: "dns_ntp_compliance"
