@@ -16,16 +16,16 @@
     - name: Create source address object
       paloaltonetworks.panos.panos_address_object:
         provider: "{{ device }}"
-        name: "source-server"
-        value: "192.168.120.8/32"
+        name: "source-server1"
+        value: "192.168.120.81/32"
         description: "Address object 1 from Ansible"
       
 
     - name: Create destination address object
       paloaltonetworks.panos.panos_address_object:
         provider: "{{ device }}"
-        name: "destination-server"
-        value: "192.168.80.5/32"
+        name: "destination-server1"
+        value: "192.168.80.51/32"
         description: "Address object 2 from Ansible"
 
     - name: Commit candidate configuration
