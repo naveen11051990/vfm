@@ -1,6 +1,6 @@
 ---
 - name: Create address objects
-  hosts: "PRODUCTIONFIREWALL"
+  hosts: "firewalls"
   connection: local
 
   vars:
