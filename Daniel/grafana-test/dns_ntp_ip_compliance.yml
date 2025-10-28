@@ -140,15 +140,13 @@
     # ============================================================================
     # GRAFANA LOGGING - Write to Controller Node (where Promtail monitors)
     # ============================================================================
-    - name: Compose log timestamps
+    - name: Compose log timestamps and filename
       ansible.builtin.set_fact:
         log_timestamp_compact: "{{ lookup('pipe', 'date -u +%Y%m%dT%H%M%SZ') }}"
         log_timestamp_iso: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }}"
         log_execution_date: "{{ lookup('pipe', 'date -u +%F') }}"
-
-    - name: Compose log filename
-      ansible.builtin.set_fact:
         log_filename: "dns-ntp-compliance-{{ inventory_hostname }}-{{ log_timestamp_compact }}.log"
+        log_tmp_path: "/tmp/{{ log_filename }}"
 
     - name: Create log content variable
       ansible.builtin.set_fact:
@@ -172,29 +170,34 @@
           ntp_secondary_actual={{ ntp_secondary_current | default('') }}
           ntp_secondary_ok={{ 'true' if ntp_secondary_ok | bool else 'false' }}
 
-    # CRITICAL: Use local_action to write DIRECTLY to the controller
-    # This ensures the file is written to the AWX/AAP controller node filesystem
-    # where Promtail is monitoring, NOT inside the ephemeral EE container
+    - name: Write compliance log to a temporary file in the EE
+      ansible.builtin.copy:
+        content: "{{ log_file_content }}"
+        dest: "{{ log_tmp_path }}"
+        mode: "0644"
+
     - name: Ensure log directory exists on controller
-      local_action:
-        module: ansible.builtin.file
+      ansible.builtin.file:
         path: "{{ log_dir }}"
         state: directory
         mode: "0755"
       run_once: true
       become: "{{ log_become }}"
 
-    - name: Write compliance log to controller node (for Promtail pickup)
-      local_action:
-        module: ansible.builtin.copy
-        content: "{{ log_file_content }}"
-        dest: "{{ log_dir }}/{{ log_filename }}"
-        mode: "0644"
+    - name: Fetch the log file from the EE to the Controller host
+      ansible.builtin.fetch:
+        src: "{{ log_tmp_path }}"
+        dest: "{{ log_dir }}/"
+        flat: yes
       become: "{{ log_become }}"
 
-    - name: Verify log file was created
-      local_action:
-        module: ansible.builtin.stat
+    - name: Clean up temporary log file from the EE
+      ansible.builtin.file:
+        path: "{{ log_tmp_path }}"
+        state: absent
+
+    - name: Verify log file was created on the controller
+      ansible.builtin.stat:
         path: "{{ log_dir }}/{{ log_filename }}"
       register: log_stat
       become: "{{ log_become }}"
