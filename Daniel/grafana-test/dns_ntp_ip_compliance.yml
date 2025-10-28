@@ -11,7 +11,7 @@
       password: "{{ password }}"
 
     # Logging configuration
-    log_dir: /var/log/ansible-playbooks
+    log_dir: ../../../logs
     # Where to write logs. Set -e log_host=<hostname> when running under AWX/EE.
     # Defaults to localhost (controller/execution node).
     log_host: "{{ log_host | default('localhost') }}"
