@@ -10,15 +10,12 @@
       username: "{{ username }}"
       password: "{{ password }}"
 
-    # Logging configuration
+    # Logging configuration for Grafana/Promtail integration
+    # This directory should match where Promtail is configured to monitor on the controller
     log_dir: /var/log/ansible-playbooks
 
-    # Where to write logs. Set -e log_host=<hostname> when running under AWX/EE.
-    # Defaults to localhost (controller/execution node).
-    log_host: "{{ log_host | default('localhost') }}"
+    # Set to true if log_dir requires elevated privileges (e.g., /var/log/*)
     log_become: true
-    # Optional SSH overrides for the dynamic log target
-    # log_user, log_port, log_ssh_key, log_password can be provided via extra vars
 
   collections:
     - paloaltonetworks.panos
@@ -141,7 +138,7 @@
         msg: "{{ report_lines }}"
 
     # ============================================================================
-    # GRAFANA LOGGING TASK - ADDED AT THE END
+    # GRAFANA LOGGING - Write to Controller Node (where Promtail monitors)
     # ============================================================================
     - name: Compose log timestamps
       ansible.builtin.set_fact:
@@ -157,92 +154,56 @@
       ansible.builtin.set_fact:
         log_file_content: |
           # DNS/NTP Compliance Check Report
-          host: {{ inventory_hostname }}
-          device_ip: {{ device.ip_address }}
-          timestamp: {{ log_timestamp_iso }}
-          execution_date: {{ log_execution_date }}
-          overall_compliant: {{ 'true' if dns_ntp_overall_compliant | bool else 'false' }}
-          dns_primary_expected: {{ expected_dns_primary }}
-          dns_primary_actual: {{ dns_primary_current | default('') }}
-          dns_primary_ok: {{ 'true' if dns_primary_ok | bool else 'false' }}
-          dns_secondary_expected: {{ expected_dns_secondary }}
-          dns_secondary_actual: {{ dns_secondary_current | default('') }}
-          dns_secondary_ok: {{ 'true' if dns_secondary_ok | bool else 'false' }}
-          ntp_primary_expected: {{ expected_ntp_primary }}
-          ntp_primary_actual: {{ ntp_primary_current | default('') }}
-          ntp_primary_ok: {{ 'true' if ntp_primary_ok | bool else 'false' }}
-          ntp_secondary_expected: {{ expected_ntp_secondary }}
-          ntp_secondary_actual: {{ ntp_secondary_current | default('') }}
-          ntp_secondary_ok: {{ 'true' if ntp_secondary_ok | bool else 'false' }}
+          host={{ inventory_hostname }}
+          device_ip={{ device.ip_address }}
+          timestamp={{ log_timestamp_iso }}
+          execution_date={{ log_execution_date }}
+          overall_compliant={{ 'true' if dns_ntp_overall_compliant | bool else 'false' }}
+          dns_primary_expected={{ expected_dns_primary }}
+          dns_primary_actual={{ dns_primary_current | default('') }}
+          dns_primary_ok={{ 'true' if dns_primary_ok | bool else 'false' }}
+          dns_secondary_expected={{ expected_dns_secondary }}
+          dns_secondary_actual={{ dns_secondary_current | default('') }}
+          dns_secondary_ok={{ 'true' if dns_secondary_ok | bool else 'false' }}
+          ntp_primary_expected={{ expected_ntp_primary }}
+          ntp_primary_actual={{ ntp_primary_current | default('') }}
+          ntp_primary_ok={{ 'true' if ntp_primary_ok | bool else 'false' }}
+          ntp_secondary_expected={{ expected_ntp_secondary }}
+          ntp_secondary_actual={{ ntp_secondary_current | default('') }}
+          ntp_secondary_ok={{ 'true' if ntp_secondary_ok | bool else 'false' }}
 
-    - name: Test SSH connectivity to log server
-      ansible.builtin.shell: |
-        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
-        {{ log_user | default('root') }}@{{ log_host }} 'echo "SSH connection successful"'
-      delegate_to: localhost
-      when: log_host != 'localhost'
-      register: ssh_test
-      failed_when: false
-
-    - name: Display SSH test result
-      ansible.builtin.debug:
-        msg:
-          - "SSH Test Result: {{ ssh_test.rc | default('skipped') }}"
-          - "SSH Output: {{ ssh_test.stdout | default('N/A') }}"
-          - "SSH Error: {{ ssh_test.stderr | default('N/A') }}"
-      when: log_host != 'localhost'
-
-    - name: Fail if SSH connection failed
-      ansible.builtin.fail:
-        msg: "Cannot SSH to {{ log_host }}. Please verify SSH connectivity and credentials."
-      when:
-        - log_host != 'localhost'
-        - ssh_test.rc != 0
-
-    - name: Create log directory and file on remote server via SSH
-      ansible.builtin.shell: |
-        ssh -o StrictHostKeyChecking=no {{ log_user | default('root') }}@{{ log_host }} << 'ENDSSH'
-        mkdir -p {{ log_dir }}
-        cat > {{ log_dir }}/{{ log_filename }} << 'ENDLOG'
-        {{ log_file_content }}
-        ENDLOG
-        chmod 644 {{ log_dir }}/{{ log_filename }}
-        ls -lh {{ log_dir }}/{{ log_filename }}
-        ENDSSH
-      delegate_to: localhost
-      when: log_host != 'localhost'
-      register: log_create_result
-
-    - name: Display log file creation result
-      ansible.builtin.debug:
-        msg:
-          - "Log creation return code: {{ log_create_result.rc }}"
-          - "Log creation output: {{ log_create_result.stdout }}"
-          - "Log creation error: {{ log_create_result.stderr }}"
-      when: log_host != 'localhost'
-
-    - name: Verify log file exists on remote server
-      ansible.builtin.shell: |
-        ssh -o StrictHostKeyChecking=no {{ log_user | default('root') }}@{{ log_host }} \
-        "ls -lh {{ log_dir }}/{{ log_filename }} && wc -l {{ log_dir }}/{{ log_filename }}"
-      delegate_to: localhost
-      when: log_host != 'localhost'
-      register: log_verify
-
-    - name: Display verification result
-      ansible.builtin.debug:
-        msg:
-          - "Verification: {{ log_verify.stdout }}"
-          - "Log file confirmed at: {{ log_host }}:{{ log_dir }}/{{ log_filename }}"
-      when: log_host != 'localhost'
-
-    - name: Create log file locally if log_host is localhost
-      ansible.builtin.copy:
-        dest: "{{ log_dir }}/{{ log_filename }}"
-        owner: root
-        group: root
-        mode: "0644"
-        content: "{{ log_file_content }}"
+    # CRITICAL: Use local_action to write DIRECTLY to the controller
+    # This ensures the file is written to the AWX/AAP controller node filesystem
+    # where Promtail is monitoring, NOT inside the ephemeral EE container
+    - name: Ensure log directory exists on controller
+      local_action:
+        module: ansible.builtin.file
+        path: "{{ log_dir }}"
+        state: directory
+        mode: "0755"
+      run_once: true
       become: "{{ log_become }}"
-      delegate_to: localhost
-      when: log_host == 'localhost'
+
+    - name: Write compliance log to controller node (for Promtail pickup)
+      local_action:
+        module: ansible.builtin.copy
+        content: "{{ log_file_content }}"
+        dest: "{{ log_dir }}/{{ log_filename }}"
+        mode: "0644"
+      become: "{{ log_become }}"
+
+    - name: Verify log file was created
+      local_action:
+        module: ansible.builtin.stat
+        path: "{{ log_dir }}/{{ log_filename }}"
+      register: log_stat
+      become: "{{ log_become }}"
+
+    - name: Display log file status
+      ansible.builtin.debug:
+        msg:
+          - "Log file created: {{ log_stat.stat.exists }}"
+          - "Log file path: {{ log_dir }}/{{ log_filename }}"
+          - "Log file size: {{ log_stat.stat.size | default(0) }} bytes"
+          - "Promtail should pick this up from: {{ log_dir }}"
+      when: log_stat.stat.exists
