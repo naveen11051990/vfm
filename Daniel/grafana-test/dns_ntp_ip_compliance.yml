@@ -149,6 +149,9 @@
     - name: Compose log filename
       ansible.builtin.set_fact:
         log_filename: "dns-ntp-compliance-{{ inventory_hostname }}-{{ log_timestamp_compact }}.log"
+
+    - name: Compose temporary log path
+      ansible.builtin.set_fact:
         log_tmp_path: "/tmp/{{ log_filename }}"
 
     - name: Create log content variable
