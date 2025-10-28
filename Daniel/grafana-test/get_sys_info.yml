@@ -1,0 +1,90 @@
+---
+- name: Gather system info
+  hosts: "PRODUCTIONFIREWALL"
+  connection: local
+
+  vars:
+    device:
+      ip_address: "{{ ip_address }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+
+  collections:
+    - paloaltonetworks.panos
+
+  tasks:
+    - name: Gather facts for device
+      paloaltonetworks.panos.panos_facts:
+        provider: "{{ device }}"
+
+    - name: Filter invalid OS versions
+      ansible.builtin.set_fact:
+        msgq: >-
+          {{
+            (msg | default([]))
+            | selectattr(Version, 'equalto', ['10.2.7-h3'])
+            | list
+          }}
+
+    - name: Show invalid OS
+      ansible.builtin.debug:
+        var: msgq
+    - name: Display information
+      # Changed to output only the device serial number per request
+      ansible.builtin.debug:
+        msg: "{{ ansible_facts['net_serial'] }}"
+
+    # ============================================================================
+    # GRAFANA LOGGING TASK - Writes system info results to persistent log file
+    # ============================================================================
+    - name: Write system info results to Grafana log
+      copy:
+        content: |
+          ================================================================================
+          SYSTEM INFO GATHER REPORT
+          ================================================================================
+
+          Timestamp: {{ ansible_date_time.iso8601 }}
+          Execution Date: {{ ansible_date_time.date }}
+          Execution Time: {{ ansible_date_time.time }}
+          Job ID: {{ tower_job_id | default('manual-run') }}
+
+          --------------------------------------------------------------------------------
+          DEVICE INFORMATION
+          --------------------------------------------------------------------------------
+          Firewall Host: {{ inventory_hostname }}
+          Firewall IP: {{ ip_address }}
+
+          --------------------------------------------------------------------------------
+          GATHERED SYSTEM INFORMATION
+          --------------------------------------------------------------------------------
+          Serial Number: {{ ansible_facts['net_serial'] | default('UNSET') }}
+          OS Version: {{ ansible_facts['net_version'] | default('UNSET') }}
+          Model: {{ ansible_facts['net_model'] | default('UNSET') }}
+          Hostname: {{ ansible_facts['net_hostname'] | default('UNSET') }}
+
+          --------------------------------------------------------------------------------
+          INVALID OS VERSION CHECK
+          --------------------------------------------------------------------------------
+          Invalid OS Versions Found: {{ msgq | length }}
+          {% if msgq %}
+          Details:
+          {% for item in msgq %}
+          - Version: {{ item.Version | default('N/A') }}
+          {% endfor %}
+          {% else %}
+          None - All OS versions are valid
+          {% endif %}
+
+          --------------------------------------------------------------------------------
+          EXECUTION METADATA
+          --------------------------------------------------------------------------------
+          Playbook: get-sys-info.yml
+          Version: 1.0
+          Executed By: Ansible Automation Platform
+          Execution Environment: {{ lookup('env', 'AWX_ISOLATED_DATA_DIR') | default('standard-ee') }}
+
+          ================================================================================
+        dest: "/var/log/ansible-playbooks/get-sys-info-{{ inventory_hostname }}-{{ ansible_date_time.iso8601_basic_short }}.log"
+        mode: "0644"
+      ignore_errors: yes
