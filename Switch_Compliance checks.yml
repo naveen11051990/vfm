@@ -10,6 +10,7 @@
     expected_dns_secondary: "192.168.29.3"
     expected_ntp_primary: "192.168.29.3"
     expected_ntp_secondary: "192.168.29.3"
+    compliance_report: {}
 
   collections:
     - cisco.ios
@@ -33,54 +34,17 @@
       set_fact:
         ntp_servers: "{{ running_config.stdout[0] | regex_findall('ntp\\s+server\\s+((?:\\d{1,3}\\.){3}\\d{1,3})', multiline=True) }}"
 
-    - name: Check Syslog server compliance
-      assert:
-        that:
-          - expected_syslog_ip in syslog_hosts
-        fail_msg: "Syslog NON-COMPLIANT: found {{ syslog_hosts }}, expected {{ expected_syslog_ip }}"
-        success_msg: "Syslog COMPLIANT"
-      failed_when: false
-      changed_when: false
+    - name: Build syslog compliance result
+      set_fact:
+        compliance_report: "{{ compliance_report | combine({'syslog': {(syslog_hosts | first | default('not_configured')): ('COMPLIANT' if expected_syslog_ip in syslog_hosts else 'NON-COMPLIANT')}}) }}"
 
-    - name: Check DNS primary compliance
-      assert:
-        that:
-          - dns_servers | length > 0
-          - dns_servers[0] == expected_dns_primary
-        fail_msg: "DNS primary NON-COMPLIANT: found {{ dns_servers }}, expected primary = {{ expected_dns_primary }}"
-        success_msg: "DNS primary COMPLIANT"
-      failed_when: false
-      changed_when: false
+    - name: Build DNS compliance result
+      set_fact:
+        compliance_report: "{{ compliance_report | combine({'dns': {'primary': {'ip': (dns_servers[0] | default('not_configured')), 'compliance': ('COMPLIANT' if (dns_servers | length > 0 and dns_servers[0] == expected_dns_primary) else 'NON-COMPLIANT')}, 'secondary': {'ip': (dns_servers[1] | default('not_configured')), 'compliance': ('COMPLIANT' if (dns_servers | length > 1 and dns_servers[1] == expected_dns_secondary) else 'NON-COMPLIANT')}}}) }}"
 
-    - name: Check DNS secondary compliance
-      assert:
-        that:
-          - dns_servers | length > 1
-          - dns_servers[1] == expected_dns_secondary
-        fail_msg: "DNS secondary NON-COMPLIANT or missing: found {{ dns_servers }}, expected secondary = {{ expected_dns_secondary }}"
-        success_msg: "DNS secondary COMPLIANT"
-      failed_when: false
-      changed_when: false
-
-    - name: Check NTP primary compliance
-      assert:
-        that:
-          - ntp_servers | length > 0
-          - ntp_servers[0] == expected_ntp_primary
-        fail_msg: "NTP primary NON-COMPLIANT: found {{ ntp_servers }}, expected primary = {{ expected_ntp_primary }}"
-        success_msg: "NTP primary COMPLIANT"
-      failed_when: false
-      changed_when: false
-
-    - name: Check NTP secondary compliance
-      assert:
-        that:
-          - ntp_servers | length > 1
-          - ntp_servers[1] == expected_ntp_secondary
-        fail_msg: "NTP secondary NON-COMPLIANT or missing: found {{ ntp_servers }}, expected secondary = {{ expected_ntp_secondary }}"
-        success_msg: "NTP secondary COMPLIANT"
-      failed_when: false
-      changed_when: false
+    - name: Build NTP compliance result
+      set_fact:
+        compliance_report: "{{ compliance_report | combine({'ntp': {'primary': {'ip': (ntp_servers[0] | default('not_configured')), 'compliance': ('COMPLIANT' if (ntp_servers | length > 0 and ntp_servers[0] == expected_ntp_primary) else 'NON-COMPLIANT')}, 'secondary': {'ip': (ntp_servers[1] | default('not_configured')), 'compliance': ('COMPLIANT' if (ntp_servers | length > 1 and ntp_servers[1] == expected_ntp_secondary) else 'NON-COMPLIANT')}}}) }}"
 
     - name: Gather interface configuration sections
       cisco.ios.ios_command:
@@ -92,47 +56,27 @@
       set_fact:
         interface_blocks: "{{ intf_config.stdout[0].split('\ninterface ') | select('match','^GigabitEthernet') | list }}"
 
-    - name: Assert PortFast enabled on {{ item.split('\n')[0] }}
-      vars:
-        iface_name: "{{ item.split('\n')[0] }}"
-        block_text: "{{ item }}"
-      assert:
-        that:
-          - "'spanning-tree portfast' in block_text"
-        fail_msg: "PortFast NON-COMPLIANT on {{ iface_name }}"
-        success_msg: "PortFast COMPLIANT on {{ iface_name }}"
-      loop: "{{ interface_blocks }}"
-      loop_control:
-        label: "{{ item.split('\\n')[0] }}"
-      failed_when: false
-      changed_when: false
+    - name: Initialize interfaces compliance dictionary
+      set_fact:
+        interfaces_compliance: {}
 
-    - name: Assert Port-Security enabled on {{ item.split('\n')[0] }}
+    - name: Check interface compliance
       vars:
         iface_name: "{{ item.split('\n')[0] }}"
         block_text: "{{ item }}"
-      assert:
-        that:
-          - "'switchport port-security' in block_text"
-        fail_msg: "Port-Security NON-COMPLIANT on {{ iface_name }}"
-        success_msg: "Port-Security COMPLIANT on {{ iface_name }}"
+        portfast_compliant: "{{ 'COMPLIANT' if 'spanning-tree portfast' in block_text else 'NON-COMPLIANT' }}"
+        portsec_compliant: "{{ 'COMPLIANT' if 'switchport port-security' in block_text else 'NON-COMPLIANT' }}"
+        storm_compliant: "{{ 'COMPLIANT' if 'storm-control' in block_text else 'NON-COMPLIANT' }}"
+      set_fact:
+        interfaces_compliance: "{{ interfaces_compliance | combine({iface_name: {'portfast': portfast_compliant, 'port_security': portsec_compliant, 'storm_control': storm_compliant}}) }}"
       loop: "{{ interface_blocks }}"
       loop_control:
         label: "{{ item.split('\\n')[0] }}"
-      failed_when: false
-      changed_when: false
 
-    - name: Assert Storm Control enabled on {{ item.split('\n')[0] }}
-      vars:
-        iface_name: "{{ item.split('\n')[0] }}"
-        block_text: "{{ item }}"
-      assert:
-        that:
-          - "'storm-control' in block_text"
-        fail_msg: "Storm Control NON-COMPLIANT on {{ iface_name }}"
-        success_msg: "Storm Control COMPLIANT on {{ iface_name }}"
-      loop: "{{ interface_blocks }}"
-      loop_control:
-        label: "{{ item.split('\\n')[0] }}"
-      failed_when: false
-      changed_when: false
+    - name: Add interfaces to compliance report
+      set_fact:
+        compliance_report: "{{ compliance_report | combine({'interfaces': interfaces_compliance}) }}"
+
+    - name: Display Compliance Report
+      debug:
+        msg: "{{ compliance_report | to_nice_json }}"
