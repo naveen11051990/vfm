@@ -34,17 +34,24 @@
       set_fact:
         ntp_servers: "{{ running_config.stdout[0] | regex_findall('ntp\\s+server\\s+((?:\\d{1,3}\\.){3}\\d{1,3})', multiline=True) }}"
 
-    - name: Build syslog compliance result
+    - name: Build compliance results in order
       set_fact:
-        compliance_report: "{{ compliance_report | combine({'syslog': {(syslog_hosts | first | default('not_configured')): ('COMPLIANT' if expected_syslog_ip in syslog_hosts else 'NON-COMPLIANT')}}) }}"
-
-    - name: Build DNS compliance result
-      set_fact:
-        compliance_report: "{{ compliance_report | combine({'dns': {'primary': {'ip': (dns_servers[0] | default('not_configured')), 'compliance': ('COMPLIANT' if (dns_servers | length > 0 and dns_servers[0] == expected_dns_primary) else 'NON-COMPLIANT')}, 'secondary': {'ip': (dns_servers[1] | default('not_configured')), 'compliance': ('COMPLIANT' if (dns_servers | length > 1 and dns_servers[1] == expected_dns_secondary) else 'NON-COMPLIANT')}}}) }}"
-
-    - name: Build NTP compliance result
-      set_fact:
-        compliance_report: "{{ compliance_report | combine({'ntp': {'primary': {'ip': (ntp_servers[0] | default('not_configured')), 'compliance': ('COMPLIANT' if (ntp_servers | length > 0 and ntp_servers[0] == expected_ntp_primary) else 'NON-COMPLIANT')}, 'secondary': {'ip': (ntp_servers[1] | default('not_configured')), 'compliance': ('COMPLIANT' if (ntp_servers | length > 1 and ntp_servers[1] == expected_ntp_secondary) else 'NON-COMPLIANT')}}}) }}"
+        compliance_report:
+          syslog: "{{ {(syslog_hosts | first | default('not_configured')): ('COMPLIANT' if expected_syslog_ip in syslog_hosts else 'NON-COMPLIANT')} }}"
+          dns:
+            primary:
+              ip: "{{ dns_servers[0] | default('not_configured') }}"
+              compliance: "{{ 'COMPLIANT' if (dns_servers | length > 0 and dns_servers[0] == expected_dns_primary) else 'NON-COMPLIANT' }}"
+            secondary:
+              ip: "{{ dns_servers[1] | default('not_configured') }}"
+              compliance: "{{ 'COMPLIANT' if (dns_servers | length > 1 and dns_servers[1] == expected_dns_secondary) else 'NON-COMPLIANT' }}"
+          ntp:
+            primary:
+              ip: "{{ ntp_servers[0] | default('not_configured') }}"
+              compliance: "{{ 'COMPLIANT' if (ntp_servers | length > 0 and ntp_servers[0] == expected_ntp_primary) else 'NON-COMPLIANT' }}"
+            secondary:
+              ip: "{{ ntp_servers[1] | default('not_configured') }}"
+              compliance: "{{ 'COMPLIANT' if (ntp_servers | length > 1 and ntp_servers[1] == expected_ntp_secondary) else 'NON-COMPLIANT' }}"
 
     - name: Gather interface configuration sections
       cisco.ios.ios_command:
@@ -71,7 +78,8 @@
         interfaces_compliance: "{{ interfaces_compliance | combine({iface_name: {'portfast': portfast_compliant, 'port_security': portsec_compliant, 'storm_control': storm_compliant}}) }}"
       loop: "{{ interface_blocks }}"
       loop_control:
-        label: "{{ item.split('\\n')[0] }}"
+        label: "{{ item.split('\n')[0] }}"
+      no_log: true
 
     - name: Add interfaces to compliance report
       set_fact:
@@ -79,4 +87,4 @@
 
     - name: Display Compliance Report
       debug:
-        msg: "{{ compliance_report | to_nice_json }}"
+        var: compliance_report
