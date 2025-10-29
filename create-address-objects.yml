@@ -1,6 +1,6 @@
 ---
 - name: Create address objects
-  hosts: paloaltofirewall
+  hosts: hosts
   connection: local
 
   vars:
@@ -19,7 +19,6 @@
         name: "source-server1"
         value: "192.168.120.81/32"
         description: "Address object 1 from Ansible"
-      
 
     - name: Create destination address object
       paloaltonetworks.panos.panos_address_object:
