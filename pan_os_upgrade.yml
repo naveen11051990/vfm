@@ -1,0 +1,133 @@
+---
+- name: PAN-OS Content and Staged Software Upgrade
+  hosts: "{{ hosts | default('UPGRADEFW') }}"
+  connection: local
+
+  vars:
+    device:
+      ip_address: "{{ ip_address }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+
+    # upgrade_path must be provided as extra var
+    # Example: -e upgrade_path='["10.1.14-h13","10.2.12","11.0.6"]'
+
+    reboot_between_steps: true
+    quiet_polling: true
+
+  collections:
+    - paloaltonetworks.panos
+
+  tasks:
+    # =========================================================================
+    # VALIDATION
+    # =========================================================================
+    - name: Validate upgrade_path is provided
+      assert:
+        that:
+          - upgrade_path is defined
+          - upgrade_path | length > 0
+        fail_msg: 'You must provide -e upgrade_path=''["10.1.14","11.0.0","11.1.5"]'''
+
+    # =========================================================================
+    # CONTENT UPGRADE TO LATEST
+    # =========================================================================
+    - name: Check if device is ready before content upgrade
+      paloaltonetworks.panos.panos_check:
+        provider: "{{ device }}"
+      register: ready_check
+      until: ready_check is not failed and ready_check.msg == 'Device is ready.'
+      retries: 10
+      delay: 10
+
+    - name: Download latest content update
+      paloaltonetworks.panos.panos_content:
+        provider: "{{ device }}"
+        version: "latest"
+        download: true
+        install: false
+      register: content_download
+      ignore_errors: yes
+
+    - name: Install latest content update
+      paloaltonetworks.panos.panos_content:
+        provider: "{{ device }}"
+        version: "latest"
+        download: false
+        install: true
+      when: content_download is success
+      register: content_install
+      ignore_errors: yes
+
+    - name: Wait for device readiness after content install
+      paloaltonetworks.panos.panos_check:
+        provider: "{{ device }}"
+      register: ready_after_content
+      until: ready_after_content is not failed and ready_after_content.msg == 'Device is ready.'
+      retries: 60
+      delay: 15
+      when: content_install is success
+      no_log: "{{ quiet_polling }}"
+
+    # =========================================================================
+    # STAGED OS UPGRADE
+    # =========================================================================
+    - name: Execute staged OS upgrades with reboot per step
+      block:
+        - name: Download PAN-OS {{ item }}
+          paloaltonetworks.panos.panos_software:
+            provider: "{{ device }}"
+            version: "{{ item }}"
+            download: true
+            install: false
+          register: sw_download
+          retries: 3
+          delay: 60
+          until: sw_download is not failed
+
+        - name: Install PAN-OS {{ item }}
+          paloaltonetworks.panos.panos_software:
+            provider: "{{ device }}"
+            version: "{{ item }}"
+            download: false
+            install: true
+            restart: true
+          register: sw_install
+
+        - name: Wait for device readiness after upgrade to {{ item }}
+          paloaltonetworks.panos.panos_check:
+            provider: "{{ device }}"
+          register: ready_result
+          until: ready_result is not failed and ready_result.msg == 'Device is ready.'
+          retries: 100
+          delay: 15
+          no_log: "{{ quiet_polling }}"
+
+        - name: Verify installed version is {{ item }}
+          paloaltonetworks.panos.panos_facts:
+            provider: "{{ device }}"
+            gather_subset: ["system"]
+          register: version_check
+
+        - name: Assert version {{ item }} installed successfully
+          assert:
+            that:
+              - ansible_facts['ansible_net_version'] == item
+            fail_msg: "Upgrade to {{ item }} failed. Device reports {{ ansible_facts['ansible_net_version'] }}."
+            success_msg: "Successfully upgraded to {{ item }}."
+
+      loop: "{{ upgrade_path }}"
+      loop_control:
+        label: "{{ item }}"
+
+    # =========================================================================
+    # FINAL VERIFICATION
+    # =========================================================================
+    - name: Gather final system facts
+      paloaltonetworks.panos.panos_facts:
+        provider: "{{ device }}"
+        gather_subset: ["system"]
+
+    - name: Display final version
+      debug:
+        msg: "Upgrade complete. Final PAN-OS version: {{ ansible_facts['ansible_net_version'] }}"
