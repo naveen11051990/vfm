@@ -52,9 +52,22 @@
         cmd: "request content upgrade download latest"
       register: content_download
 
-    - name: Wait for content download to complete (2 minutes)
-      pause:
-        minutes: 2
+    - name: Extract job ID for content download
+      set_fact:
+        content_download_jobid: "{{ content_download.stdout_xml | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}"
+
+    - name: Wait for content download job to complete
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<show><jobs><id>{{ content_download_jobid }}</id></jobs></show>"
+        cmd_is_xml: true
+      register: content_download_result
+      until: content_download_result.stdout_xml is search('<status>FIN</status>')
+      retries: 300
+      delay: 10
+      failed_when: content_download_result.stdout_xml is search('<result>FAIL</result>')
+      when: content_download_jobid | length > 0
+      no_log: "{{ quiet_polling }}"
 
     - name: Install latest content update
       paloaltonetworks.panos.panos_op:
@@ -62,9 +75,22 @@
         cmd: "request content upgrade install version latest"
       register: content_install
 
-    - name: Wait for content install to complete (2 minutes)
-      pause:
-        minutes: 2
+    - name: Extract job ID for content install
+      set_fact:
+        content_install_jobid: "{{ content_install.stdout_xml | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}"
+
+    - name: Wait for content install job to complete
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<show><jobs><id>{{ content_install_jobid }}</id></jobs></show>"
+        cmd_is_xml: true
+      register: content_install_result
+      until: content_install_result.stdout_xml is search('<status>FIN</status>')
+      retries: 100
+      delay: 5
+      failed_when: content_install_result.stdout_xml is search('<result>FAIL</result>')
+      when: content_install_jobid | length > 0
+      no_log: "{{ quiet_polling }}"
 
     - name: Wait for device readiness after content install
       paloaltonetworks.panos.panos_check:

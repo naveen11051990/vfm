@@ -10,13 +10,36 @@
   delay: 60
   until: sw_download is not failed
 
-- name: Install PAN-OS {{ version_item }} and reboot
+- name: Install PAN-OS {{ version_item }} (no restart)
   paloaltonetworks.panos.panos_software:
     provider: "{{ device }}"
     version: "{{ version_item }}"
     download: false
     install: true
-    restart: true
+    restart: false
+
+- name: Restart device to apply version {{ version_item }}
+  paloaltonetworks.panos.panos_op:
+    provider: "{{ device }}"
+    cmd: "request restart system"
+  async: 45
+  poll: 0
+
+- name: Wait for device to stop responding (reboot start) {{ version_item }}
+  ansible.builtin.wait_for:
+    host: "{{ device.ip_address }}"
+    port: 443
+    state: stopped
+    timeout: 300
+  delegate_to: localhost
+
+- name: Wait for device to start responding (reboot complete) {{ version_item }}
+  ansible.builtin.wait_for:
+    host: "{{ device.ip_address }}"
+    port: 443
+    state: started
+    timeout: 900
+  delegate_to: localhost
 
 - name: Wait for device readiness after upgrade to {{ version_item }}
   paloaltonetworks.panos.panos_check:
