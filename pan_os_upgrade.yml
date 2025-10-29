@@ -78,53 +78,13 @@
     # =========================================================================
     # STAGED OS UPGRADE
     # =========================================================================
-    - name: Execute staged OS upgrades with reboot per step
-      block:
-        - name: Download PAN-OS {{ item }}
-          paloaltonetworks.panos.panos_software:
-            provider: "{{ device }}"
-            version: "{{ item }}"
-            download: true
-            install: false
-          register: sw_download
-          retries: 3
-          delay: 60
-          until: sw_download is not failed
-
-        - name: Install PAN-OS {{ item }}
-          paloaltonetworks.panos.panos_software:
-            provider: "{{ device }}"
-            version: "{{ item }}"
-            download: false
-            install: true
-            restart: true
-          register: sw_install
-
-        - name: Wait for device readiness after upgrade to {{ item }}
-          paloaltonetworks.panos.panos_check:
-            provider: "{{ device }}"
-          register: ready_result
-          until: ready_result is not failed and ready_result.msg == 'Device is ready.'
-          retries: 100
-          delay: 15
-          no_log: "{{ quiet_polling }}"
-
-        - name: Verify installed version is {{ item }}
-          paloaltonetworks.panos.panos_facts:
-            provider: "{{ device }}"
-            gather_subset: ["system"]
-          register: version_check
-
-        - name: Assert version {{ item }} installed successfully
-          assert:
-            that:
-              - ansible_facts['ansible_net_version'] == item
-            fail_msg: "Upgrade to {{ item }} failed. Device reports {{ ansible_facts['ansible_net_version'] }}."
-            success_msg: "Successfully upgraded to {{ item }}."
-
+    - name: Execute staged OS upgrade for {{ item }}
+      include_tasks: tasks/upgrade_step_v2.yml
       loop: "{{ upgrade_path }}"
       loop_control:
         label: "{{ item }}"
+      vars:
+        version_item: "{{ item }}"
 
     # =========================================================================
     # FINAL VERIFICATION
