@@ -1,6 +1,6 @@
 ---
 - name: Create address objects
-  hosts: firewalls
+  hosts: paloaltoFWgroup
   connection: local
 
   vars:
