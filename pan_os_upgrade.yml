@@ -1,6 +1,6 @@
 ---
 - name: PAN-OS Content and Staged Software Upgrade
-  hosts: "{{ hosts | default('UPGRADEFW') }}"
+  hosts: "{{ hosts | default('PA-FW') }}"
   connection: local
 
   vars:
