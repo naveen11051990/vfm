@@ -48,7 +48,7 @@
   until: ready_result is not failed and ready_result.msg == 'Device is ready.'
   retries: 100
   delay: 15
-  no_log: "{{ quiet_polling }}"
+  no_log: true
 
 - name: Verify installed version is {{ version_item }}
   paloaltonetworks.panos.panos_facts:
