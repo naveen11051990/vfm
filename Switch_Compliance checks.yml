@@ -39,19 +39,11 @@
         compliance_report:
           syslog: "{{ {(syslog_hosts | first | default('not_configured')): ('COMPLIANT' if expected_syslog_ip in syslog_hosts else 'NON-COMPLIANT')} }}"
           dns:
-            primary:
-              ip: "{{ dns_servers[0] | default('not_configured') }}"
-              compliance: "{{ 'COMPLIANT' if (dns_servers | length > 0 and dns_servers[0] == expected_dns_primary) else 'NON-COMPLIANT' }}"
-            secondary:
-              ip: "{{ dns_servers[1] | default('not_configured') }}"
-              compliance: "{{ 'COMPLIANT' if (dns_servers | length > 1 and dns_servers[1] == expected_dns_secondary) else 'NON-COMPLIANT' }}"
+            primary: "{{ {(dns_servers[0] | default('not_configured')): ('COMPLIANT' if (dns_servers | length > 0 and dns_servers[0] == expected_dns_primary) else 'NON-COMPLIANT')} }}"
+            secondary: "{{ {(dns_servers[1] | default('not_configured')): ('COMPLIANT' if (dns_servers | length > 1 and dns_servers[1] == expected_dns_secondary) else 'NON-COMPLIANT')} }}"
           ntp:
-            primary:
-              ip: "{{ ntp_servers[0] | default('not_configured') }}"
-              compliance: "{{ 'COMPLIANT' if (ntp_servers | length > 0 and ntp_servers[0] == expected_ntp_primary) else 'NON-COMPLIANT' }}"
-            secondary:
-              ip: "{{ ntp_servers[1] | default('not_configured') }}"
-              compliance: "{{ 'COMPLIANT' if (ntp_servers | length > 1 and ntp_servers[1] == expected_ntp_secondary) else 'NON-COMPLIANT' }}"
+            primary: "{{ {(ntp_servers[0] | default('not_configured')): ('COMPLIANT' if (ntp_servers | length > 0 and ntp_servers[0] == expected_ntp_primary) else 'NON-COMPLIANT')} }}"
+            secondary: "{{ {(ntp_servers[1] | default('not_configured')): ('COMPLIANT' if (ntp_servers | length > 1 and ntp_servers[1] == expected_ntp_secondary) else 'NON-COMPLIANT')} }}"
 
     - name: Gather interface configuration sections
       cisco.ios.ios_command:
