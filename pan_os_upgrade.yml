@@ -40,24 +40,31 @@
       retries: 10
       delay: 10
 
-    - name: Download latest content update
-      paloaltonetworks.panos.panos_content:
+    - name: Refresh content update index
+      paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
-        version: "latest"
-        download: true
-        install: false
+        cmd: "request content upgrade check"
+      register: content_check
+
+    - name: Download latest content update
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "request content upgrade download latest"
       register: content_download
-      ignore_errors: yes
+
+    - name: Wait for content download to complete (2 minutes)
+      pause:
+        minutes: 2
 
     - name: Install latest content update
-      paloaltonetworks.panos.panos_content:
+      paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
-        version: "latest"
-        download: false
-        install: true
-      when: content_download is success
+        cmd: "request content upgrade install version latest"
       register: content_install
-      ignore_errors: yes
+
+    - name: Wait for content install to complete (2 minutes)
+      pause:
+        minutes: 2
 
     - name: Wait for device readiness after content install
       paloaltonetworks.panos.panos_check:
@@ -66,7 +73,6 @@
       until: ready_after_content is not failed and ready_after_content.msg == 'Device is ready.'
       retries: 60
       delay: 15
-      when: content_install is success
       no_log: "{{ quiet_polling }}"
 
     # =========================================================================
