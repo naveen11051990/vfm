@@ -1,0 +1,13 @@
+---
+- name: Hello World Failing Playbook
+  hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: Print a hello message
+      ansible.builtin.debug:
+        msg: "Hello World! This playbook is designed to fail on the next task."
+
+    - name: This task will deliberately fail
+      ansible.builtin.fail:
+        msg: "This is a deliberate failure to test dashboard tracking."
