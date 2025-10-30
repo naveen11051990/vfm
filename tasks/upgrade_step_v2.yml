@@ -59,6 +59,6 @@
 - name: Assert version {{ version_item }} installed successfully
   assert:
     that:
-      - ansible_facts['ansible_net_version'] == version_item
-    fail_msg: "Upgrade to {{ version_item }} failed. Device reports {{ ansible_facts['ansible_net_version'] }}."
+      - version_check.ansible_facts.ansible_net_version == version_item
+    fail_msg: "Upgrade to {{ version_item }} failed. Device reports {{ version_check.ansible_facts.ansible_net_version }}."
     success_msg: "Successfully upgraded to {{ version_item }}."
