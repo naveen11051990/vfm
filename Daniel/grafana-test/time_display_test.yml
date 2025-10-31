@@ -1,0 +1,19 @@
+---
+- name: Test Playbook for Grafana Duration (90 Seconds)
+  hosts: all
+  gather_facts: no
+
+  tasks:
+    - name: 1. Start the 90-second waiting period
+      # The 'wait_for' module pauses execution for a specified amount of time.
+      ansible.builtin.wait_for:
+        # Time in seconds to wait before continuing.
+        timeout: 90
+        # State ensures that we wait for the timeout to expire.
+        state: started
+      delegate_to: localhost
+      run_once: true # Ensure the waiting only happens once, not on every host
+
+    - name: 2. Print success message and complete
+      ansible.builtin.debug:
+        msg: "Hello! The 90-second wait is complete. Job finished successfully."
