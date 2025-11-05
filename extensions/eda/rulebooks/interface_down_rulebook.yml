@@ -8,12 +8,11 @@
   rules:
     - name: interface_down_rule
       condition:
-        event.payload.interface_status == "changed state to administratively down"
-        # OR, if the field may contain other text around that phrase:
-        # event.payload.interface_status is search("administratively down", ignorecase=true)
+        event.payload.message is search("changed state to administratively down", ignorecase=true)
       action:
         run_job_template:
           name: "Remediate_Switch_Port_Down"
           extra_vars:
             interface_name: "{{ event.payload.interface_name }}"
             target_switch: "{{ event.payload.switch_name }}"
+
