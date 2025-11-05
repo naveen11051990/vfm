@@ -12,6 +12,7 @@
     backup_filename: "{{ backup_filename | default('panos-config-backup.xml') }}"
     backup_retrieve_dir: "{{ backup_retrieve_dir | default(playbook_dir) }}"
     backup_local_path: "{{ backup_retrieve_dir | default(playbook_dir) }}/{{ backup_filename }}"
+    commit_restored_config: "{{ commit_restored_config | default(true) }}"
 
     reboot_between_steps: true
     quiet_polling: true
@@ -148,6 +149,12 @@
         password: "{{ device.password }}"
         file: "{{ config_import.filename | default(backup_export.filename | default(backup_filename)) }}"
         commit: false
+
+    - name: Commit restored configuration
+      paloaltonetworks.panos.panos_commit_firewall:
+        provider: "{{ device }}"
+      when: commit_restored_config | bool
+      register: commit_restore
 
     - name: Wait for device readiness after restoring configuration
       paloaltonetworks.panos.panos_check:
