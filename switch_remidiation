@@ -1,6 +1,6 @@
 ---
 - name: Remediate switch interface down
-  hosts: switches            # your inventory group for Cisco switches
+  hosts: 192.168.29.164            # your inventory group for Cisco switches
   gather_facts: no
   connection: network_cli     # adjust if using e.g. ios, iosxr, nxos
   vars:
