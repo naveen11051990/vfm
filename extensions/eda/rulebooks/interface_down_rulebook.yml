@@ -1,21 +1,19 @@
----
 - name: Switch Interface Down Remediation Rulebook
   hosts: 192.168.29.164
   sources:
     - ansible.eda.webhook:
-        # or your chosen event source (like kafka, event stream)
         host: 0.0.0.0
         port: 5000
 
   rules:
     - name: interface_down_rule
       condition:
-        # Adjust these field names based on your Fluent Bit payload
-        event.payload.interface_status == "down" and
-        event.payload.event_type == "interface_change"
+        event.payload.interface_status == "changed state to administratively down"
+        # OR, if the field may contain other text around that phrase:
+        # event.payload.interface_status is search("administratively down", ignorecase=true)
       action:
         run_job_template:
-          name: "Remediate_Switch_Port_Down"    # job template in AAP pointing to remediation playbook
+          name: "Remediate_Switch_Port_Down"
           extra_vars:
             interface_name: "{{ event.payload.interface_name }}"
             target_switch: "{{ event.payload.switch_name }}"
