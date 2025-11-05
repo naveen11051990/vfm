@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AAP 2.6 Quest — Planning & Installation Mastery (Light)</title>
+    <style>
+        :root {
+            /* Light theme palette */
+            --bg: #f7fafc;
+            /* page background */
+            --card: #ffffff;
+            /* card surface */
+            --text: #0f172a;
+            /* primary text */
+            --muted: #475569;
+            /* secondary text */
+            --accent: #14b8a6;
+            /* teal */
+            --accent2: #38bdf8;
+            /* sky */
+            --good: #16a34a;
+            /* green */
+            --bad: #dc2626;
+            /* red */
+            --warning: #d97706;
+            /* amber */
+            --border: #e2e8f0;
+            /* light border */
+            --border-strong: #cbd5e1;
+            /* medium border */
+            --shadow: 0 10px 24px rgba(15, 23, 42, .06);
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Ubuntu, Arial, sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(1200px 600px at 10% -10%, #e6f6ff, transparent),
+                radial-gradient(900px 500px at 90% 20%, #e7fff9, transparent),
+                var(--bg);
+        }
+
+        .wrap {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 24px
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 12px
+        }
+
+        .logo {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            background: conic-gradient(from 180deg, var(--accent), var(--accent2), #8b5cf6, var(--accent));
+            box-shadow: 0 0 12px #22d3ee55;
+        }
+
+        h1 {
+            font-size: 28px;
+            margin: 0
+        }
+
+        .card {
+            background: linear-gradient(135deg, rgba(20, 184, 166, 0.06), rgba(56, 189, 248, 0.06));
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .muted {
+            color: var(--muted)
+        }
+
+        .grid {
+            display: grid;
+            gap: 14px
+        }
+
+        .btn {
+            border: 1px solid var(--border-strong);
+            padding: 12px 14px;
+            border-radius: 12px;
+            background: #f8fafc;
+            color: var(--text);
+            cursor: pointer;
+            font-weight: 600;
+            transition: .15s;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            border-color: #94a3b8
+        }
+
+        .btn[disabled] {
+            opacity: .6;
+            cursor: not-allowed
+        }
+
+        .btn.primary {
+            background: linear-gradient(180deg, #22d3ee, #14b8a6);
+            border-color: #22d3ee;
+            color: white;
+            box-shadow: 0 8px 18px rgba(34, 211, 238, .35);
+        }
+
+        .btn.outline {
+            background: transparent
+        }
+
+        .choices {
+            display: grid;
+            gap: 10px
+        }
+
+        .choice {
+            border: 1px solid var(--border-strong);
+            border-radius: 12px;
+            padding: 12px 14px;
+            background: #ffffff;
+            cursor: pointer;
+            transition: .12s;
+        }
+
+        .choice:hover {
+            border-color: #93c5fd;
+            box-shadow: 0 3px 10px rgba(2, 132, 199, .10)
+        }
+
+        .choice.correct {
+            border-color: var(--good);
+            background: #ecfdf5
+        }
+
+        .choice.wrong {
+            border-color: var(--bad);
+            background: #fef2f2
+        }
+
+        .row {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            align-items: center
+        }
+
+        .pill {
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--border-strong);
+            color: #0f172a;
+            background: #f1f5f9;
+            font-size: 12px;
+        }
+
+        .bar {
+            height: 10px;
+            background: #f1f5f9;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            overflow: hidden
+        }
+
+        .bar>i {
+            display: block;
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            width: 0
+        }
+
+        .scene {
+            position: relative;
+            isolation: isolate
+        }
+
+        .rocket {
+            position: absolute;
+            right: -6px;
+            top: -22px;
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            transform: rotate(-8deg);
+            background: linear-gradient(180deg, var(--accent2), var(--accent));
+            box-shadow: 0 0 14px #22d3ee88;
+        }
+
+        .stars {
+            position: absolute;
+            inset: 0;
+            pointer-events: none
+        }
+
+        .stars i {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: #60a5fa;
+            border-radius: 2px;
+            opacity: .6;
+            animation: tw 3s linear infinite
+        }
+
+        @keyframes tw {
+            from {
+                transform: translateX(0)
+            }
+
+            to {
+                transform: translateX(-14px)
+            }
+        }
+
+        .story {
+            font-weight: 700;
+            color: #075985
+        }
+
+        .explain {
+            border-left: 3px solid #10b981;
+            background: #ecfdf5;
+            padding: 10px 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            color: #065f46;
+        }
+
+        .badge {
+            padding: 6px 8px;
+            border-radius: 10px;
+            border: 1px solid #7dd3fc;
+            background: #ecfeff;
+            color: #0e7490;
+            font-size: 12px
+        }
+
+        .result {
+            display: grid;
+            gap: 12px
+        }
+
+        .table {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            background: white
+        }
+
+        .table header,
+        .table .rowline {
+            display: grid;
+            grid-template-columns: 48px 1fr 160px 1fr;
+            gap: 10px
+        }
+
+        .table header {
+            background: #f1f5f9;
+            padding: 10px 12px;
+            color: #334155;
+            font-weight: 600
+        }
+
+        .table .rowline {
+            padding: 10px 12px;
+            border-top: 1px solid var(--border)
+        }
+
+        .hidden {
+            display: none
+        }
+
+        .small {
+            font-size: 12px
+        }
+
+        .level {
+            font-weight: 700
+        }
+
+        .confetti {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            overflow: hidden
+        }
+
+        .confetti i {
+            position: absolute;
+            width: 8px;
+            height: 12px;
+            background: linear-gradient(180deg, var(--accent2), var(--accent));
+            animation: fall 1.8s linear forwards
+        }
+
+        @keyframes fall {
+            to {
+                transform: translateY(100vh) rotate(240deg);
+                opacity: 0
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <div class="header">
+            <div class="logo"></div>
+            <div>
+                <h1>AAP 2.6 Quest — Planning & Installation Mastery</h1>
+                <div class="muted small">A storyline quiz that ramps from easy → expert. Score XP, unlock sectors, and
+                    learn by failing safely.</div>
+            </div>
+        </div>
+
+        <div id="screen-start" class="card scene">
+            <div class="stars" id="starfield"></div>
+            <div class="rocket"></div>
+            <div class="grid" style="gap:14px">
+                <div class="story">Mission Brief:</div>
+                <div class="muted">You're the automation pilot for a new AAP deployment. Clear five sectors (Basics,
+                    Components, Mesh & Redis, Deployments, Inventory & Security, Networking & Ops). Each right answer
+                    boosts your ship. Wrong answers show quick fixes.</div>
+                <div class="row">
+                    <span class="pill">50+ questions</span>
+                    <span class="pill">Explanations on mistakes</span>
+                    <span class="pill">Progressive difficulty</span>
+                    <span class="pill">Pure HTML/CSS/JS</span>
+                </div>
+                <div class="row">
+                    <button class="btn primary" id="btn-start">Start the Quest</button>
+                    <button class="btn outline" id="btn-how">How it works</button>
+                    <button class="btn outline" id="btn-tests">Run Self‑Tests</button>
+                </div>
+                <div id="how" class="hidden small muted">
+                    • Answer to earn XP. • Each sector is a level. • Get streaks for bonus XP. • Review your wrong
+                    answers at the end.
+                </div>
+                <div id="tests" class="hidden small" style="margin-top:8px"></div>
+            </div>
+        </div>
+
+        <div id="screen-quiz" class="card hidden">
+            <div class="row" style="justify-content:space-between">
+                <div class="row">
+                    <span class="pill">Sector: <span id="sector-name" class="level">Basics</span></span>
+                    <span class="pill">Q <span id="qno">1</span>/<span id="qtotal">0</span></span>
+                    <span class="pill">Streak <span id="streak">0</span>🔥</span>
+                </div>
+                <div class="row">
+                    <span class="badge">XP <span id="xp">0</span></span>
+                </div>
+            </div>
+            <div class="bar" style="margin:10px 0 16px"><i id="progress"></i></div>
+
+            <div id="qtext" style="font-size:20px;font-weight:700;margin-bottom:10px"></div>
+            <div class="row small muted" style="margin:-6px 0 10px">
+                <span class="pill" id="topic"></span>
+                <span class="pill" id="difficulty"></span>
+            </div>
+            <div id="choices" class="choices"></div>
+            <div id="explain" class="explain hidden"></div>
+
+            <div class="row" style="justify-content:space-between;margin-top:12px">
+                <button class="btn outline" id="btn-skip">Skip (-0 XP)</button>
+                <button class="btn" id="btn-next" disabled>Next ▶</button>
+            </div>
+        </div>
+
+        <div id="screen-result" class="card hidden">
+            <h2 style="margin-top:0">🎉 Mission Complete</h2>
+            <div class="row">
+                <span class="badge">Total XP: <span id="rxp">0</span></span>
+                <span class="pill">Correct: <span id="rc">0</span></span>
+                <span class="pill">Wrong: <span id="rw">0</span></span>
+                <span class="pill">Max Streak: <span id="rms">0</span></span>
+            </div>
+            <div class="bar" style="margin:10px 0 16px"><i id="rprog" style="width:0"></i></div>
+            <div class="result">
+                <div class="small muted">Review Zone — your incorrect answers with quick explanations:</div>
+                <div class="table" id="review">
+                    <header>
+                        <div>#</div>
+                        <div>Question</div>
+                        <div>Your Answer</div>
+                        <div>Why / Correct</div>
+                    </header>
+                    <!-- rows injected here -->
+                </div>
+                <div class="row" style="margin-top:8px">
+                    <button class="btn primary" id="btn-retry">Play Again</button>
+                    <button class="btn outline" id="btn-export">Export results (JSON)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="confetti" id="confetti"></div>
+
+    <script>
+        // --- tiny starfield for vibe ---
+        const starfield = document.getElementById('starfield');
+        for (let i = 0; i < 80; i++) { const s = document.createElement('i'); s.style.left = Math.random() * 100 + '%'; s.style.top = Math.random() * 100 + '%'; s.style.animationDelay = (Math.random() * 3) + 's'; starfield.appendChild(s) }
+
+        // --- Data: 50+ questions (unchanged) ---
+        const QUESTIONS = [
+            { q: "What does AAP stand for?", options: ["Advanced Application Proxy", "Ansible Automation Platform", "Automated Access Panel", "Ansible Admin Portal"], answer: 1, explain: "AAP = Red Hat Ansible Automation Platform.", topic: "Core", difficulty: "Easy", sector: "Basics" },
+            { q: "Primary role of Platform Gateway?", options: ["Run playbooks", "AuthN/AuthZ & single entry", "Store collections", "Load-balance DB"], answer: 1, explain: "Gateway provides centralized authentication/authorization and UI entry.", topic: "Gateway", difficulty: "Easy", sector: "Basics" },
+            { q: "Enterprise framework to define/operate/scale automation?", options: ["Automation Controller", "Automation Hub", "EDA Controller", "Mesh"], answer: 0, explain: "Automation Controller is the core orchestration layer.", topic: "Controller", difficulty: "Easy", sector: "Basics" },
+            { q: "Certified content lives in:", options: ["Automation Hub", "Galaxy only", "PostgreSQL", "Navigator"], answer: 0, explain: "Automation Hub hosts Red Hat certified collections.", topic: "Hub", difficulty: "Easy", sector: "Basics" },
+            { q: "Private Automation Hub purpose:", options: ["Execute jobs", "Disconnected/on‑prem content sync", "SSO proxy", "Metrics only"], answer: 1, explain: "PAH syncs and serves collections/EE images in disconnected or on‑prem.", topic: "Private Hub", difficulty: "Easy", sector: "Basics" },
+            { q: "Backend DB for AAP:", options: ["MySQL", "SQLite", "PostgreSQL", "MongoDB"], answer: 2, explain: "AAP uses PostgreSQL for persistent data.", topic: "PostgreSQL", difficulty: "Easy", sector: "Basics" },
+            { q: "Execution happens inside:", options: ["Ansible venvs", "Execution Environments", "Docker Compose", "Navigator"], answer: 1, explain: "Execution Environments are container images for running automation.", topic: "EE", difficulty: "Easy", sector: "Basics" },
+            { q: "Community content site:", options: ["Galaxy", "Navigator", "Insights", "Mesh"], answer: 0, explain: "Ansible Galaxy provides community roles/collections.", topic: "Galaxy", difficulty: "Easy", sector: "Basics" },
+            { q: "TUI/CLI for content and running locally:", options: ["Navigator", "Tower CLI", "Podman", "Skopeo"], answer: 0, explain: "Automation Content Navigator is the TUI/CLI into the platform.", topic: "Navigator", difficulty: "Easy", sector: "Basics" },
+
+            { q: "Event‑Driven Ansible controller does what?", options: ["Stores collections", "Automates based on events via rulebooks", "Provides SSO", "Runs DB backups"], answer: 1, explain: "EDA connects event sources to rulebooks for automated actions.", topic: "EDA", difficulty: "Easy", sector: "Components" },
+            { q: "Automation Mesh provides:", options: ["UI widgets", "Distributed execution & routing", "DB sharding", "Theme engine"], answer: 1, explain: "Mesh is the P2P overlay for distributing work and scaling execution.", topic: "Mesh", difficulty: "Medium", sector: "Components" },
+            { q: "Redis in AAP is used for:", options: ["Persistent data", "Caching & queueing", "Metrics storage", "Package repo"], answer: 1, explain: "Redis handles cache and lightweight message brokering.", topic: "Redis", difficulty: "Medium", sector: "Components" },
+            { q: "Clustered Redis requires how many primaries?", options: ["1", "2", "3", "6"], answer: 2, explain: "Three primaries with replicas for HA.", topic: "Redis", difficulty: "Medium", sector: "Components" },
+            { q: "Centralized Redis is shared by:", options: ["Controller & Hub", "Gateway & EDA", "EE & Hub", "All components"], answer: 1, explain: "Centralized Redis is shared between Platform Gateway and EDA in 2.6.", topic: "Redis", difficulty: "Medium", sector: "Components" },
+            { q: "Controller uses shared Redis?", options: ["Yes", "No"], answer: 1, explain: "Controller has its own Redis instance in 2.6.", topic: "Controller", difficulty: "Medium", sector: "Components" },
+            { q: "High‑availability Automation Hub means:", options: ["Active‑passive", "Active‑active with LB", "Cold standby", "Single node"], answer: 1, explain: "Multiple nodes concurrently serve with load balancing.", topic: "Hub", difficulty: "Medium", sector: "Components" },
+
+            { q: "Containerized install runs on RHEL using:", options: ["Docker", "Podman", "CRI‑O", "K8s only"], answer: 1, explain: "Containerized installer uses Podman.", topic: "Install", difficulty: "Medium", sector: "Deployments" },
+            { q: "Operator install targets:", options: ["OpenShift", "Bare metal only", "VMware only", "Windows"], answer: 0, explain: "AAP Operator deploys on Red Hat OpenShift.", topic: "Install", difficulty: "Medium", sector: "Deployments" },
+            { q: "RPM installer installs via:", options: ["tar only", "rpm packages on RHEL", "helm charts", "flatpaks"], answer: 1, explain: "RPM method uses RHEL RPMs on hosts.", topic: "Install", difficulty: "Medium", sector: "Deployments" },
+            { q: "Tested topologies guidance:", options: ["Use any layout", "Prefer published reference architectures", "Only single‑node", "Controller+Hub same node"], answer: 1, explain: "Red Hat tests and recommends specific topologies for reliability.", topic: "Topologies", difficulty: "Medium", sector: "Deployments" },
+            { q: "Redis HA compatible deployment VMs required:", options: ["3", "4", "6", "8"], answer: 2, explain: "Note calls out 6 VMs for a Redis HA compatible deployment.", topic: "Redis", difficulty: "Medium", sector: "Deployments" },
+            { q: "Prereq across nodes before install:", options: ["Disable SELinux", "NTP client configured", "Turn off firewalld", "Install MySQL"], answer: 1, explain: "Time sync via NTP is required.", topic: "Prereqs", difficulty: "Medium", sector: "Deployments" },
+            { q: "Root access may be via:", options: ["Only root login", "sudo / privilege escalation", "passwordless root only", "Not required"], answer: 1, explain: "Root access can be obtained via sudo or other escalation.", topic: "Prereqs", difficulty: "Medium", sector: "Deployments" },
+            { q: "Online install RPM command enables repo and installs:", options: ["dnf install aap", "dnf install ansible-automation-platform-installer", "yum groupinstall", "curl | sh"], answer: 1, explain: "Install the AAP installer package from the AAP 2.6 repo.", topic: "Install", difficulty: "Medium", sector: "Deployments" },
+            { q: "Offline bundle contains:", options: ["RHEL repos", "All AAP deps except RHEL repos", "Only docs", "Only controller"], answer: 1, explain: "Bundle includes dependencies; still need access to RHEL repos.", topic: "Install", difficulty: "Medium", sector: "Deployments" },
+
+            { q: "Inventory formats supported (common):", options: ["Only INI", "INI and YAML", "Only YAML", "JSON only"], answer: 1, explain: "AAP installer supports INI and YAML among others.", topic: "Inventory", difficulty: "Medium", sector: "Inventory" },
+            { q: "Default location for RPM installer inventory:", options: ["/etc/aap", "/opt/ansible-automation-platform/installer", "/var/lib/aap", "~/aap"], answer: 1, explain: "RPM places files under /opt/.../installer.", topic: "Inventory", difficulty: "Medium", sector: "Inventory" },
+            { q: "Do not colocate which pair on same node?", options: ["Gateway & EDA", "Controller & Hub", "EE & Mesh", "Gateway & Controller"], answer: 1, explain: "Controller and Automation Hub should not be on the same node.", topic: "Guidelines", difficulty: "Medium", sector: "Inventory" },
+            { q: "External DB guidance:", options: ["AAP configures it", "You create/maintain it", "Unsupported", "Must be MySQL"], answer: 1, explain: "External PostgreSQL must be created and maintained by you.", topic: "DB", difficulty: "Hard", sector: "Inventory" },
+            { q: "Event‑Driven Ansible controller can be on same host as controller?", options: ["Yes", "No"], answer: 1, explain: "EDA must be on a separate server.", topic: "EDA", difficulty: "Medium", sector: "Inventory" },
+            { q: "Using FQDNs in inventory: avoid:", options: ["dash -", "underscore _", "numbers", "dots ."], answer: 1, explain: "FQDN must not contain underscore; Skopeo will not process it.", topic: "Inventory", difficulty: "Hard", sector: "Inventory" },
+            { q: "Avoid using which host in clustered inventories?", options: ["loopback", "localhost", "node1", "FQDN"], answer: 1, explain: "Do not use localhost; use reachable hostnames/IPs.", topic: "Inventory", difficulty: "Medium", sector: "Inventory" },
+            { q: "Deprovision a node by setting:", options: ["state=absent", "node_state=deprovision", "remove=true", "enabled=false"], answer: 1, explain: "Append node_state=deprovision to host or instance group.", topic: "Deprovision", difficulty: "Medium", sector: "Inventory" },
+            { q: "All‑vars section name:", options: ["[vars]", "[all]", "[all:vars]", "[global]"], answer: 2, explain: "Installer variables typically live under [all:vars].", topic: "Inventory", difficulty: "Medium", sector: "Inventory" },
+            { q: "INI variable typing reliability:", options: ["Strongly typed", "May be strings; use filters", "Always booleans", "JSON typed"], answer: 1, explain: "Do not rely on INI types; cast in tasks or prefer YAML inventory.", topic: "Inventory", difficulty: "Hard", sector: "Inventory" },
+            { q: "Escaping special characters in INI values:", options: ["Single quotes", "Double quotes", "Both (double‑escape)", "Backticks"], answer: 2, explain: "Double‑escape values containing # { } etc.", topic: "Inventory", difficulty: "Hard", sector: "Inventory" },
+            { q: "Vault: encrypt individual vars with:", options: ["ansible‑vault encrypt_string", "ansible‑vault encrypt‑var", "vaultify", "ansible‑secret"], answer: 0, explain: "encrypt_string secures single variables.", topic: "Security", difficulty: "Medium", sector: "Inventory" },
+            { q: "Vault file install flag:", options: ["--vault", "--use-vault", "--ask-vault-pass", "--vault-password"], answer: 2, explain: "Pass --ask-vault-pass with setup.sh to read encrypted file.", topic: "Security", difficulty: "Medium", sector: "Inventory" },
+
+            { q: "Controller ↔ Execution nodes mesh port:", options: ["22", "443", "27199 Receptor", "5432"], answer: 2, explain: "Receptor default listener port is 27199; comms are bidirectional once up.", topic: "Mesh/Ports", difficulty: "Hard", sector: "Networking" },
+            { q: "PostgreSQL default port:", options: ["5432", "6379", "8443", "27199"], answer: 0, explain: "PostgreSQL listens on 5432.", topic: "Ports", difficulty: "Easy", sector: "Networking" },
+            { q: "Redis default port:", options: ["8443", "6379", "27199", "22"], answer: 1, explain: "Redis uses TCP 6379.", topic: "Ports", difficulty: "Easy", sector: "Networking" },
+            { q: "Gateway service HTTPS often on:", options: ["80", "443", "8443", "27199"], answer: 2, explain: "Gateway commonly serves on 8443 for component links/ingress.", topic: "Gateway", difficulty: "Medium", sector: "Networking" },
+            { q: "Installer management to nodes uses:", options: ["RDP", "SSH 22", "WinRM", "MQTT"], answer: 1, explain: "Installer connects over SSH 22.", topic: "Ports", difficulty: "Easy", sector: "Networking" },
+            { q: "EE image pulls require allowing outbound to:", options: ["Only registry.redhat.io IPs", "quay CDN hostnames (cdn*.quay.io)", "Any host", "Only sso.redhat.com"], answer: 1, explain: "As of 2025 include cdn04/05/06.quay.io hostnames; allow 80/443 outbound.", topic: "Images", difficulty: "Hard", sector: "Networking" },
+            { q: "Mesh connections are:", options: ["Uni‑directional", "Bi‑directional once established", "Controller→Exec only", "Exec→Controller only"], answer: 1, explain: "Receptor connections communicate both ways post‑establishment.", topic: "Mesh", difficulty: "Hard", sector: "Networking" },
+            { q: "OpenShift API port used when container groups run jobs:", options: ["6443", "8443", "443", "5672"], answer: 0, explain: "OCP API typically on 6443.", topic: "OCP", difficulty: "Hard", sector: "Networking" },
+
+            { q: "Bundle vs non‑bundle tarball main difference:", options: ["Bundle has EE only", "Bundle includes dependencies", "No difference", "Bundle lacks installer"], answer: 1, explain: "Bundle includes required packages/deps (except RHEL repos).", topic: "Install", difficulty: "Medium", sector: "Deployments" },
+            { q: "Where does dnf place RPM installer files?", options: ["/usr/share/aap", "/opt/ansible-automation-platform/installer", "/var/aap", "~/aap"], answer: 1, explain: "Installer files land under /opt/.../installer.", topic: "Install", difficulty: "Medium", sector: "Deployments" },
+            { q: "Gateway activity stream API path:", options: ["/api/hub/v3/events", "/api/gateway/v1/activitystream/", "/api/controller/v2/audit", "/api/eda/v1/events"], answer: 1, explain: "Platform Gateway exposes activity stream at that path.", topic: "Gateway", difficulty: "Hard", sector: "Components" },
+            { q: "Hub & Controller database guidance:", options: ["May share DB name", "Must use different DB names", "Use SQLite", "Use MySQL"], answer: 1, explain: "If using same PostgreSQL instance, use different database names.", topic: "DB", difficulty: "Hard", sector: "Inventory" },
+            { q: "During clustered upgrades, removing nodes requires:", options: ["Omit from inventory only", "Deprovision via installer", "Stop services only", "Not supported"], answer: 1, explain: "Use installer deprovision step, not just omitting.", topic: "Cluster", difficulty: "Hard", sector: "Inventory" },
+            { q: "Mesh hop nodes characteristic:", options: ["CPU heavy", "Minimal CPU/mem", "Require GPUs", "Only on OCP"], answer: 1, explain: "Hop nodes are lightweight and can be vertically scaled.", topic: "Mesh", difficulty: "Medium", sector: "Components" },
+            { q: "Gateway→components connection purpose:", options: ["Direct DB writes", "Service link & UI routing", "Telemetry only", "No connection"], answer: 1, explain: "Gateway links UI/auth to components.", topic: "Gateway", difficulty: "Medium", sector: "Components" },
+            { q: "Which not recommended for hostnames in inventory?", options: ["IP", "FQDN", "localhost ansible_connection=local", "Shortname"], answer: 2, explain: "Installers for hub/controller do not accept localhost for clustered installs.", topic: "Inventory", difficulty: "Hard", sector: "Inventory" },
+            { q: "EDA ingress default for event stream traffic:", options: ["27199", "8443", "6379", "22"], answer: 1, explain: "EDA receives event stream traffic on 8443 via Gateway.", topic: "EDA", difficulty: "Hard", sector: "Networking" },
+            { q: "Which components must be deployed so all features are available without later action?", options: ["Only controller", "Controller+Hub+Gateway+EDA+Mesh+EE+DB", "Controller+DB", "Hub only"], answer: 1, explain: "Guide lists full set of components to deploy for full capability.", topic: "Scope", difficulty: "Hard", sector: "Components" },
+            { q: "What does the activity stream capture?", options: ["Only login attempts", "Changes to gateway resources with metadata", "Job logs", "DB schema"], answer: 1, explain: "Time, user, action, and change details for gateway resources.", topic: "Gateway", difficulty: "Hard", sector: "Components" },
+            { q: "Which statement about controller DB replication?", options: ["Controller configures it", "Controller works with external replication you provide", "Not supported", "Mandatory"], answer: 1, explain: "Controller does not configure replication; it can use your replicated DB.", topic: "DB", difficulty: "Hard", sector: "Inventory" },
+            { q: "Which port pair should be allowed for image pulls?", options: ["80/443", "22/443", "8080/9090", "25/110"], answer: 0, explain: "Allow outbound 80/443 to quay CDNs and registry.redhat.io as per note.", topic: "Images", difficulty: "Medium", sector: "Networking" },
+            { q: "Mesh receptor listener control:", options: ["Always open", "Can force with receptor_listener=True", "Never changeable", "UDP only"], answer: 1, explain: "You can force listener; otherwise installer opens only where needed.", topic: "Mesh", difficulty: "Hard", sector: "Networking" },
+            { q: "Correct group for EDA in inventory:", options: ["[automationedacontroller]", "[eventdriven]", "[eda]", "[automation-eda]"], answer: 0, explain: "Example inventory uses [automationedacontroller].", topic: "Inventory", difficulty: "Medium", sector: "Inventory" },
+            { q: "Registry credentials variables:", options: ["registry_user / registry_pass", "registry_username / registry_password", "docker_user / docker_pass", "quay_user / quay_pass"], answer: 1, explain: "Inventory shows registry_username and registry_password.", topic: "Inventory", difficulty: "Medium", sector: "Inventory" },
+            { q: "Gateway DB vars prefix:", options: ["gateway_pg_*", "automationgateway_pg_*", "plat_pg_*", "gw_db_*"], answer: 1, explain: "automationgateway_pg_host/database/username/password.", topic: "Inventory", difficulty: "Hard", sector: "Inventory" },
+            { q: "Mesh ingress HTTPS used for:", options: ["Exec nodes to OCP route", "Hub to DB", "Gateway to Redis", "Controller to Hub"], answer: 0, explain: "If using mesh ingress, exec nodes need outbound HTTPS to the OCP route URL.", topic: "Mesh", difficulty: "Hard", sector: "Networking" },
+            { q: "Insights/console endpoints are required for:", options: ["Account/Inventory uploads", "Only UI themes", "Only Mesh", "Only Navigator"], answer: 0, explain: "For account services and inventory/connector uploads.", topic: "Insights", difficulty: "Hard", sector: "Networking" },
+        ];
+
+        // --- Game state ---
+        const order = QUESTIONS.map((q, i) => ({ i, q }))
+            .sort((a, b) => diffRank(a.q.difficulty) - diffRank(b.q.difficulty))
+            .map(x => x.i);
+        const total = order.length;
+        let pos = 0, xp = 0, streak = 0, maxStreak = 0;
+        const wrong = [];
+
+        // --- UI refs ---
+        const qs = {
+            start: document.getElementById('screen-start'),
+            quiz: document.getElementById('screen-quiz'),
+            result: document.getElementById('screen-result'),
+            how: document.getElementById('how'),
+            qtext: document.getElementById('qtext'),
+            choices: document.getElementById('choices'),
+            explain: document.getElementById('explain'),
+            qno: document.getElementById('qno'),
+            qtotal: document.getElementById('qtotal'),
+            progress: document.getElementById('progress'),
+            sector: document.getElementById('sector-name'),
+            topic: document.getElementById('topic'),
+            difficulty: document.getElementById('difficulty'),
+            streak: document.getElementById('streak'),
+            xp: document.getElementById('xp'),
+            btnNext: document.getElementById('btn-next'),
+            btnSkip: document.getElementById('btn-skip'),
+            rxp: document.getElementById('rxp'), rc: document.getElementById('rc'), rw: document.getElementById('rw'), rms: document.getElementById('rms'),
+            rprog: document.getElementById('rprog'), review: document.getElementById('review'),
+            btnRetry: document.getElementById('btn-retry'), btnExport: document.getElementById('btn-export'),
+            tests: document.getElementById('tests'), btnTests: document.getElementById('btn-tests')
+        };
+
+        document.getElementById('btn-start').onclick = () => { qs.start.classList.add('hidden'); qs.quiz.classList.remove('hidden'); qs.qtotal.textContent = total; render() }
+        document.getElementById('btn-how').onclick = () => qs.how.classList.toggle('hidden')
+        qs.btnTests.onclick = runTests;
+
+        function render() {
+            const q = QUESTIONS[order[pos]];
+            qs.qno.textContent = pos + 1;
+            qs.sector.textContent = q.sector;
+            qs.qtext.textContent = q.q;
+            qs.topic.textContent = q.topic; qs.difficulty.textContent = q.difficulty;
+            qs.choices.innerHTML = '';
+            qs.btnNext.disabled = true; qs.explain.classList.add('hidden');
+            qs.progress.style.width = (((pos) / total) * 100).toFixed(1) + '%';
+            for (let i = 0; i < q.options.length; i++) {
+                const b = document.createElement('button');
+                b.className = 'choice'; b.textContent = q.options[i];
+                b.onclick = function () { answer(i, b, q) };
+                qs.choices.appendChild(b);
+            }
+        }
+
+        function answer(i, btn, q) {
+            Array.from(qs.choices.children).forEach(function (c) { c.disabled = true });
+            const correct = i === q.answer;
+            if (correct) {
+                streak++; maxStreak = Math.max(maxStreak, streak);
+                const bonus = Math.max(0, streak - 1) * 2; // streak bonus
+                xp += 10 + bonus + diffBonus(q.difficulty);
+                btn.classList.add('correct');
+                dropConfetti();
+            } else {
+                Array.from(qs.choices.children)[q.answer].classList.add('correct');
+                btn.classList.add('wrong');
+                streak = 0;
+                wrong.push({ q: q.q, your: q.options[i], why: q.explain });
+                qs.explain.textContent = q.explain; qs.explain.classList.remove('hidden');
+            }
+            qs.streak.textContent = String(streak); qs.xp.textContent = String(xp);
+            qs.btnNext.disabled = false;
+        }
+
+        qs.btnNext.onclick = function () { if (pos + 1 < total) { pos++; render() } else { finish() } };
+        qs.btnSkip.onclick = function () { streak = 0; if (pos + 1 < total) { pos++; render() } else { finish() } };
+
+        function finish() {
+            qs.quiz.classList.add('hidden'); qs.result.classList.remove('hidden');
+            qs.rxp.textContent = String(xp); qs.rc.textContent = String(total - wrong.length); qs.rw.textContent = String(wrong.length); qs.rms.textContent = String(maxStreak);
+            qs.rprog.style.width = (((total - wrong.length) / total) * 100).toFixed(1) + '%';
+            while (qs.review.children.length > 1) qs.review.removeChild(qs.review.lastChild);
+            wrong.forEach(function (w, idx) {
+                const r = document.createElement('div'); r.className = 'rowline';
+                r.innerHTML = '<div>' + (idx + 1) + '</div><div>' + escapeHTML(w.q) + '</div><div>' + escapeHTML(w.your) + '</div><div class="small">' + escapeHTML(w.why) + '</div>';
+                qs.review.appendChild(r);
+            })
+        }
+
+        qs.btnRetry.onclick = function () { window.location.reload() };
+        qs.btnExport.onclick = function () {
+            const blob = new Blob([JSON.stringify({ xp: xp, correct: total - wrong.length, wrong: wrong, maxStreak: maxStreak }, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'aap-quiz-results.json'; a.click(); URL.revokeObjectURL(a.href);
+        }
+
+        function diffRank(d) { return d === 'Easy' ? 1 : d === 'Medium' ? 2 : 3 }
+        function diffBonus(d) { return d === 'Easy' ? 0 : d === 'Medium' ? 3 : 6 }
+        function escapeHTML(s) { return s.replace(/[&<>"']/g, function (m) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m] }) }
+
+        function dropConfetti() {
+            const c = document.getElementById('confetti');
+            for (let i = 0; i < 14; i++) { const e = document.createElement('i'); e.style.left = Math.random() * 100 + '%'; e.style.top = '-10px'; e.style.animationDelay = (Math.random() * 0.3) + 's'; e.style.transform = 'rotate(' + (Math.random() * 360) + 'deg)'; c.appendChild(e); setTimeout(function () { e.remove() }, 1800) }
+        }
+
+        // --- Self-tests (basic runtime checks) ---
+        function runTests() {
+            const cases = [];
+            cases.push({ name: 'Have at least 50 questions', pass: QUESTIONS.length >= 50, want: '>=50', got: String(QUESTIONS.length) });
+            cases.push({ name: 'Order preserves all questions', pass: new Set(order).size === QUESTIONS.length, want: 'unique indices', got: String((new Set(order)).size) });
+            cases.push({ name: 'Difficulty ranking', pass: diffRank('Easy') < diffRank('Medium') && diffRank('Medium') < diffRank('Hard'), want: 'Easy<Medium<Hard', got: diffRank('Easy') + ',' + diffRank('Medium') + ',' + diffRank('Hard') });
+            cases.push({ name: 'Bonus increases with difficulty', pass: diffBonus('Easy') < diffBonus('Medium') && diffBonus('Medium') < diffBonus('Hard'), want: '0<3<6', got: diffBonus('Easy') + ',' + diffBonus('Medium') + ',' + diffBonus('Hard') });
+            cases.push({ name: 'Networking port question present', pass: QUESTIONS.some(q => /27199/.test(q.q) || /5432/.test(q.q) || /6379/.test(q.q)), want: 'ports covered', got: 'ok' });
+
+            const out = ['<div class="card" style="margin-top:8px"><div class="small">Self‑Tests:</div>'];
+            let all = true; cases.forEach(function (t, i) { all = all && t.pass; out.push('<div class="row" style="align-items:center"><span class="pill" style="border-color:' + (t.pass ? '#22c55e' : '#ef4444') + '">' + (t.pass ? 'PASS' : 'FAIL') + '</span><span class="small" style="color:#0f172a">' + (i + 1) + '. ' + t.name + '</span><span class="small muted"> want: ' + t.want + ' · got: ' + t.got + '</span></div>') });
+            out.push('</div>');
+            qs.tests.innerHTML = out.join('');
+            qs.tests.classList.remove('hidden');
+        }
+    </script>
+</body>
+
+</html>
