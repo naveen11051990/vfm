@@ -1,6 +1,6 @@
 ---
 - name: Deploy Azure S2S VPN and configure Palo Alto firewall
-  hosts: localhost
+  hosts: 192.168.29.143
   connection: local
   gather_facts: no
   collections:
