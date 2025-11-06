@@ -1,0 +1,234 @@
+---
+- name: Deploy Azure S2S VPN and configure Palo Alto firewall
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  collections:
+    - azure.azcollection
+    - paloaltonetworks.panos
+
+  vars:
+    # Azure variables
+    azure_region: "eastus"
+    azure_resource_group: "RG-VPN"
+    vnet_name: "VN-Hub"
+    vnet_address_space: "10.1.0.0/16"
+    gateway_subnet_prefix: "10.1.255.0/27"
+    vpn_gateway_name: "GW-VPN"
+    vpn_gateway_sku: "VpnGw2"
+    local_gateway_name: "LNG-OnPrem"
+    onprem_public_ip: "203.0.113.45"        # Replace with on-prem public IP (firewall)
+    onprem_prefixes:
+      - "192.168.10.0/24"
+    shared_key: "StrongPSK123!"
+    # Palo Alto variables
+    firewall_mgmt_ip: "198.51.100.10"
+    firewall_username: "admin"
+    firewall_password: "Pa$$w0rd"
+    interface_out: "ethernet1/1"
+    tunnel_interface: "tunnel.1"
+    zone_trust: "trust"
+    zone_vpn: "vpn-azure"
+    virtual_router_name: "default"
+
+  tasks:
+
+    - name: Create resource group
+      azure.azcollection.azure_rm_resourcegroup:
+        name: "{{ azure_resource_group }}"
+        location: "{{ azure_region }}"
+
+    - name: Create virtual network
+      azure.azcollection.azure_rm_virtualnetwork:
+        resource_group: "{{ azure_resource_group }}"
+        name: "{{ vnet_name }}"
+        address_prefixes:
+          - "{{ vnet_address_space }}"
+        dns_servers: []
+        subnets:
+          - name: "GatewaySubnet"
+            address_prefix: "{{ gateway_subnet_prefix }}"
+
+    - name: Create public IP for VPN gateway
+      azure.azcollection.azure_rm_publicipaddress:
+        resource_group: "{{ azure_resource_group }}"
+        name: "{{ vpn_gateway_name }}-pip"
+        allocation_method: Static
+        sku: Standard
+      register: vpn_pip
+
+    - name: Create VPN gateway
+      azure.azcollection.azure_rm_virtualnetworkgateway:
+        resource_group: "{{ azure_resource_group }}"
+        name: "{{ vpn_gateway_name }}"
+        location: "{{ azure_region }}"
+        sku: "{{ vpn_gateway_sku }}"
+        gateway_type: Vpn
+        vpn_type: RouteBased
+        enable_bgp: false
+        ip_configurations:
+          - name: "vnetGatewayConfig"
+            public_ip_address: "{{ vpn_pip.id }}"
+            subnet: "/subscriptions/{{ vpn_pip.subscription }}/resourceGroups/{{ azure_resource_group }}/providers/Microsoft.Network/virtualNetworks/{{ vnet_name }}/subnets/GatewaySubnet"
+      register: gateway_info
+
+    - name: Create Local Network Gateway (on-premises)
+      azure.azcollection.azure_rm_localnetworkgateway:
+        resource_group: "{{ azure_resource_group }}"
+        name: "{{ local_gateway_name }}"
+        location: "{{ azure_region }}"
+        gateway_ip_address: "{{ onprem_public_ip }}"
+        address_prefixes: "{{ onprem_prefixes }}"
+      register: local_gw
+
+    - name: Create VPN connection
+      azure.azcollection.azure_rm_virtualnetworkgatewayconnection:
+        resource_group: "{{ azure_resource_group }}"
+        name: "Conn-OnPrem-Azure"
+        location: "{{ azure_region }}"
+        virtual_network_gateway1: "{{ vpn_gateway_name }}"
+        local_network_gateway2: "{{ local_gateway_name }}"
+        shared_key: "{{ shared_key }}"
+        connection_type: IPsec
+      register: vpn_connection
+
+    - name: Wait for the VPN gateway to get public IP
+      azure.azcollection.azure_rm_publicipaddress_info:
+        resource_group: "{{ azure_resource_group }}"
+        name: "{{ vpn_gateway_name }}-pip"
+      register: vpn_pip_info
+      until: vpn_pip_info.ansible_facts.azure_publicipaddresses[0].ip_address is defined
+      retries: 10
+      delay: 30
+
+    - name: Set fact: azure_peer_ip
+      set_fact:
+        azure_peer_ip: "{{ vpn_pip_info.ansible_facts.azure_publicipaddresses[0].ip_address }}"
+
+    - name: Set fact: azure_prefixes
+      set_fact:
+        azure_prefixes: "{{ vnet_address_space }}"
+
+    # ——— Now configure the Palo Alto firewall using captured variables ———
+
+    - name: Configure tunnel interface on Palo Alto
+      paloaltonetworks.panos.panos_tunnel:
+        provider:
+          ip_address: "{{ firewall_mgmt_ip }}"
+          username: "{{ firewall_username }}"
+          password: "{{ firewall_password }}"
+        if_name: "{{ tunnel_interface }}"
+        zone_name: "{{ zone_vpn }}"
+        state: present
+
+    - name: Create IKE Crypto Profile on Palo Alto
+      paloaltonetworks.panos.panos_ike_crypto_profile:
+        provider:
+          ip_address: "{{ firewall_mgmt_ip }}"
+          username: "{{ firewall_username }}"
+          password: "{{ firewall_password }}"
+        name: "IKE_Azure_Profile"
+        encryption: aes256-cbc
+        authentication: sha256
+        dh_group: group2
+        lifetime: seconds 28800
+        state: present
+
+    - name: Create IPSec Crypto Profile on Palo Alto
+      paloaltonetworks.panos.panos_ipsec_profile:
+        provider:
+          ip_address: "{{ firewall_mgmt_ip }}"
+          username: "{{ firewall_username }}"
+          password: "{{ firewall_password }}"
+        name: "IPSec_Azure_Profile"
+        esp_encryption: aes256-cbc
+        esp_authentication: sha1
+        lifetime: seconds 3600
+        state: present
+
+    - name: Create IKE Gateway on Palo Alto
+      paloaltonetworks.panos.panos_ike_gateway:
+        provider:
+          ip_address: "{{ firewall_mgmt_ip }}"
+          username: "{{ firewall_username }}"
+          password: "{{ firewall_password }}"
+        name: "IKE_Azure_GW"
+        interface: "{{ interface_out }}"
+        peer_address: "{{ azure_peer_ip }}"
+        version: ikev2
+        pre_shared_key: "{{ shared_key }}"
+        ike_crypto_profile: "IKE_Azure_Profile"
+        state: present
+
+    - name: Create IPSec Tunnel on Palo Alto
+      paloaltonetworks.panos.panos_ipsec_tunnel:
+        provider:
+          ip_address: "{{ firewall_mgmt_ip }}"
+          username: "{{ firewall_username }}"
+          password: "{{ firewall_password }}"
+        name: "IPSec_Azure_Tunnel"
+        tunnel_interface: "{{ tunnel_interface }}"
+        ike_gateway: "IKE_Azure_GW"
+        ipsec_profile: "IPSec_Azure_Profile"
+        auto_key: yes
+        proxy_id:
+          - local: "{{ onprem_prefixes[0] }}"
+            remote: "{{ azure_prefixes }}"
+        state: present
+
+    - name: Configure static route for Azure prefix
+      paloaltonetworks.panos.panos_static_route:
+        provider:
+          ip_address: "{{ firewall_mgmt_ip }}"
+          username: "{{ firewall_username }}"
+          password: "{{ firewall_password }}"
+        virtual_router: "{{ virtual_router_name }}"
+        name: "Route_to_Azure"
+        destination: "{{ azure_prefixes }}"
+        interface: "{{ tunnel_interface }}"
+        nexthop_type: ip-address
+        nexthop: "0.0.0.0"
+        comment: "Route to Azure via tunnel"
+        state: present
+
+    - name: Configure security policy Trust→VPN
+      paloaltonetworks.panos.panos_security_rule:
+        provider:
+          ip_address: "{{ firewall_mgmt_ip }}"
+          username: "{{ firewall_username }}"
+          password: "{{ firewall_password }}"
+        rule_name: "Allow_Trust_to_Azure"
+        description: "Allow traffic from on-prem to Azure"
+        from_zone: "{{ zone_trust }}"
+        to_zone: "{{ zone_vpn }}"
+        source: "{{ onprem_prefixes }}"
+        destination: "{{ azure_prefixes }}"
+        application: any
+        service: any
+        action: allow
+        state: present
+
+    - name: Configure security policy VPN→Trust
+      paloaltonetworks.panos.panos_security_rule:
+        provider:
+          ip_address: "{{ firewall_mgmt_ip }}"
+          username: "{{ firewall_username }}"
+          password: "{{ firewall_password }}"
+        rule_name: "Allow_Azure_to_Trust"
+        description: "Allow traffic from Azure to on-prem"
+        from_zone: "{{ zone_vpn }}"
+        to_zone: "{{ zone_trust }}"
+        source: "{{ azure_prefixes }}"
+        destination: "{{ onprem_prefixes }}"
+        application: any
+        service: any
+        action: allow
+        state: present
+
+    - name: Commit configuration on Palo Alto
+      paloaltonetworks.panos.panos_commit:
+        provider:
+          ip_address: "{{ firewall_mgmt_ip }}"
+          username: "{{ firewall_username }}"
+          password: "{{ firewall_password }}"
+        msg: "Configured S2S VPN to Azure"
