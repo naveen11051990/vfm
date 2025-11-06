@@ -224,3 +224,6 @@ inventories/
 *.tmp.*
 .ansible/
 .vscode/
+
+openspec/
+memory/
