@@ -3,18 +3,16 @@
   hosts: "panorama_group"
   connection: local
   gather_facts: false
-  vars:
-    device:
-      ip_address: "{{ panorama_ip }}"
-      username: "{{ username }}"
-      password: "{{ password }}"
-      device_group: "{{ device_group }}"
   collections:
     - paloaltonetworks.panos
   tasks:
     - name: Create / add security rule
       paloaltonetworks.panos.panos_security_rule:
-        provider: "{{ device }}"
+        provider:
+          ip_address: "{{ panorama_ip }}"
+          username: "{{ username }}"
+          password: "{{ password }}"
+        device_group: "{{ device_group }}"
         rule_name: "Rule_from_AAP_Allow_HTTP_Example6"
         description: "Allow HTTP traffic from internal to external3"
         source_zone:
