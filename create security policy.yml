@@ -52,7 +52,8 @@
           ip_address: "{{ panorama_ip }}"
           username: "{{ username }}"
           password: "{{ password }}"
-        device_group: "{{ device_group }}"
+        style: "device group"
+        name: "{{ device_group }}"
       register: commit_push
 
     - name: Debug commit results
