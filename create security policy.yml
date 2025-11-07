@@ -1,33 +1,29 @@
 ---
 - name: Create a security policy rule on Palo Alto firewall
-  hosts: "firewalls"
+  hosts: firewalls
   connection: local
   gather_facts: false
-
   vars:
     device:
       ip_address: "{{ ansible_host }}"
       username: "{{ username }}"
       password: "{{ password }}"
-      # if using Panorama, you might specify:
       panorama_ip: "{{ hostvars['VFM-BLR-PANORAMA'].ansible_host }}"
       device_group: "PA-VM"
-
   collections:
     - paloaltonetworks.panos
-
   tasks:
     - name: Create / add security rule
       paloaltonetworks.panos.panos_security_rule:
         provider: "{{ device }}"
-        rule_name: "Rule_from_AAP_Allow_HTTP_Example5"
+        rule_name: "Rule_from_AAP_Allow_HTTP_Example6"
         description: "Allow HTTP traffic from internal to external3"
         source_zone:
           - "Inside"
         destination_zone:
           - "Outside"
         source_ip:
-          - "10.0.3.0/24"
+          - "10.0.4.0/24"
         destination_ip:
           - "any"
         source_user:
@@ -39,7 +35,7 @@
         action: "allow"
         log_start: false
         log_end: true
-        commit: true    # commit immediately after creating rule
+        commit: true
       register: rule_create
 
     - name: Debug result
