@@ -1,6 +1,6 @@
 ---
 - name: Create a security policy rule on Palo Alto firewall
-  hosts: firewalls
+  hosts: "firewalls"
   connection: local
   gather_facts: false
   vars:
