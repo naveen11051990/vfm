@@ -6,9 +6,12 @@
 
   vars:
     device:
-      ip_address: "{{ ip_address }}"
+      ip_address: "{{ ansible_host }}"
       username: "{{ username }}"
       password: "{{ password }}"
+      # if using Panorama, you might specify:
+      panorama_ip: "{{ hostvars['VFM-BLR-PANORAMA'].ansible_host }}"
+      device_group: "PA-VM"
 
   collections:
     - paloaltonetworks.panos
