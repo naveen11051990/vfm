@@ -5,11 +5,10 @@
   gather_facts: false
   vars:
     device:
-      ip_address: "{{ ip_address }}"
+      ip_address: "{{ panorama_ip }}"
       username: "{{ username }}"
       password: "{{ password }}"
-      panorama_ip: "{{ hostvars['VFM-BLR-PANORAMA'].ip_address }}"
-      device_group: "PA-VM"
+      device_group: "{{ device_group }}"
   collections:
     - paloaltonetworks.panos
   tasks:
