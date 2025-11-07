@@ -32,9 +32,31 @@
         action: "allow"
         log_start: false
         log_end: true
-        commit: true
       register: rule_create
 
     - name: Debug result
       ansible.builtin.debug:
         var: rule_create
+
+    - name: Commit changes to Panorama
+      paloaltonetworks.panos.panos_commit_panorama:
+        provider:
+          ip_address: "{{ panorama_ip }}"
+          username: "{{ username }}"
+          password: "{{ password }}"
+      register: panorama_commit
+
+    - name: Push changes to device group
+      paloaltonetworks.panos.panos_commit_push:
+        provider:
+          ip_address: "{{ panorama_ip }}"
+          username: "{{ username }}"
+          password: "{{ password }}"
+        device_group: "{{ device_group }}"
+      register: commit_push
+
+    - name: Debug commit results
+      ansible.builtin.debug:
+        msg:
+          - "Panorama commit: {{ panorama_commit }}"
+          - "Push to device group: {{ commit_push }}"
