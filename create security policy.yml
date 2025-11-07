@@ -5,10 +5,10 @@
   gather_facts: false
   vars:
     device:
-      ip_address: "{{ ansible_host }}"
+      ip_address: "{{ ip_address }}"
       username: "{{ username }}"
       password: "{{ password }}"
-      panorama_ip: "{{ hostvars['VFM-BLR-PANORAMA'].ansible_host }}"
+      panorama_ip: "{{ hostvars['VFM-BLR-PANORAMA'].ip_address }}"
       device_group: "PA-VM"
   collections:
     - paloaltonetworks.panos
