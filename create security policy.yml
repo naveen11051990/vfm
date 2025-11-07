@@ -16,9 +16,9 @@
         rule_name: "Rule_from_AAP_Allow_HTTP_Example6"
         description: "Allow HTTP traffic from internal to external3"
         source_zone:
-          - "Inside"
+          - "Trust"
         destination_zone:
-          - "Outside"
+          - "Untrust"
         source_ip:
           - "10.0.4.0/24"
         destination_ip:
