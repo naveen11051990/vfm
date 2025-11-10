@@ -9,7 +9,7 @@
     - name: Primary ISP Interface Down
       condition:
         all:
-          - event.payload.router == "VFMSWITCH"         # adjust if your hostname differs
+          - event.payload.router == "192.168.29.164"         # adjust if your hostname differs
           - event.payload.interface == "GigabitEthernet2/0/1"
           - event.payload.status == "down"
       action:
