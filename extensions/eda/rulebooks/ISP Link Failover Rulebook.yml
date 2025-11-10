@@ -1,1 +1,24 @@
+---
+- name: ISP Link Failover Rulebook
+  hosts: localhost
+  sources:
+    - ansible.eda.webhook:
+        host: 0.0.0.0
+        port: 5001
+  rules:
+    - name: Primary ISP Interface Down
+      condition:
+        all:
+          - event.payload.router == "VFMSWITCH"         # adjust if your hostname differs
+          - event.payload.interface == "GigabitEthernet2/0/1"
+          - event.payload.status == "down"
+      action:
+        run_job_template:
+          name: ISP_Failover_Job
+          extra_vars:
+            router: "{{ event.payload.router }}"
+            primary_iface: "GigabitEthernet2/0/1"
+            backup_iface:  "GigabitEthernet2/0/2"
+            primary_next_hop: "10.0.12.2"             # adjust to your actual next-hop if different
+            backup_next_hop:  "10.0.13.2"             # adjust to your actual backup next-hop
 
