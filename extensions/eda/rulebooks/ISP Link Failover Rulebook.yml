@@ -19,6 +19,6 @@
             router: "{{ event.payload.router }}"
             primary_iface: "GigabitEthernet2/0/1"
             backup_iface:  "GigabitEthernet2/0/2"
-            primary_next_hop: "10.0.12.2"             # adjust to your actual next-hop if different
-            backup_next_hop:  "10.0.13.2"             # adjust to your actual backup next-hop
+            primary_next_hop: "106.51.64.1"             # adjust to your actual next-hop if different
+            backup_next_hop:  "125.99.242.1"             # adjust to your actual backup next-hop
 
