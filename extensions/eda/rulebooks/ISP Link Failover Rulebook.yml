@@ -10,8 +10,8 @@
       condition:
         all:
           - event.payload.results.host == "192.168.29.164"
-          - event.payload.results._raw is search("GigabitEthernet")
-          - event.payload.results._raw is search("changed state to administratively down")
+          - event.payload.results._raw is regex("GigabitEthernet\\d+/\\d+/\\d+")
+          - event.payload.results.changed_state_iface == "changed state to administratively down"
       action:
         run_job_template:
           name: ISP_Failover_Job
