@@ -9,16 +9,16 @@
     - name: Primary ISP Interface Down
       condition:
         all:
-          - event.payload.router == "192.168.29.164"         # adjust if your hostname differs
-          - event.payload.interface == "GigabitEthernet2/0/1"
+          - event.payload.host == "192.168.29.164"         # adjust if your hostname differs
+          - event.payload.interface == "GigabitEthernet2/0/2"
           - event.payload.status == "down"
       action:
         run_job_template:
           name: ISP_Failover_Job
           extra_vars:
-            router: "{{ event.payload.router }}"
-            primary_iface: "GigabitEthernet2/0/1"
-            backup_iface:  "GigabitEthernet2/0/2"
+            router: "{{ event.payload.host }}"
+            primary_iface: "GigabitEthernet2/0/2"
+            backup_iface:  "GigabitEthernet2/0/3"
             primary_next_hop: "106.51.64.1"             # adjust to your actual next-hop if different
             backup_next_hop:  "125.99.242.1"             # adjust to your actual backup next-hop
 
