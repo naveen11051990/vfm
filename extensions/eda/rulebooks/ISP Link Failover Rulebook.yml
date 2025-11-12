@@ -2,23 +2,23 @@
 - name: ISP Link Failover Rulebook
   hosts: localhost
   sources:
-    - ansible.eda.pg_listener:
-        dsn: "host=localhost port=5432 dbname=automationedacontroller user=automationedacontroller password=redhat"
-        event_stream_name: "EDA - Splunk V1"
+    - ansible.eda.generic:
+        payload:
+          - "{{ events }}"
   rules:
     - name: Primary ISP Interface Down from Splunk
       condition:
         all:
-          - event.body.results.host == "192.168.29.164"
-          - event.body.results._raw is search("GigabitEthernet")
-          - event.body.results._raw is search("changed state to administratively down")
+          - event.results.host == "192.168.29.164"
+          - event.results._raw is search("GigabitEthernet")
+          - event.results._raw is search("changed state to administratively down")
       action:
         run_job_template:
           name: ISP_Failover_Job
           organization: Default
           job_args:
             extra_vars:
-              router: "{{ event.body.results.host }}"
+              router: "{{ event.results.host }}"
               primary_iface: "GigabitEthernet2/0/2"
               backup_iface: "GigabitEthernet2/0/3"
               primary_next_hop: "106.51.64.1"
