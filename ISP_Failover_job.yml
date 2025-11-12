@@ -6,11 +6,10 @@
   become: yes
   vars:
     primary_iface: "{{ primary_iface }}"
-    backup_iface:  "{{ backup_iface }}"
+    backup_iface: "{{ backup_iface }}"
     primary_next_hop: "{{ primary_next_hop }}"
-    backup_next_hop:  "{{ backup_next_hop }}"
+    backup_next_hop: "{{ backup_next_hop }}"
   tasks:
-
     - name: Remove old default route via primary
       ios_config:
         lines:
@@ -23,17 +22,17 @@
           - ip route 0.0.0.0 0.0.0.0 {{ backup_next_hop }}
         save_when: modified
 
-    - name: Send notification back to Splunk (optional)
-      uri:
-        url: "http://192.168.29.130:8088/services/collector"   # or your Splunk HEC endpoint
-        method: POST
-        headers:
-          Authorization: "Splunk YOUR_HEC_TOKEN"
-          Content-Type: "application/json"
-        body_format: json
-        body:
-          event: "ISP failover triggered"
-          router: "{{ router }}"
-          primary_iface: "{{ primary_iface }}"
-          backup_iface: "{{ backup_iface }}"
-        validate_certs: no
+    # - name: Send notification back to Splunk (optional)
+    #   uri:
+    #     url: "http://192.168.29.130:8088/services/collector"   # or your Splunk HEC endpoint
+    #     method: POST
+    #     headers:
+    #       Authorization: "Splunk YOUR_HEC_TOKEN"
+    #       Content-Type: "application/json"
+    #     body_format: json
+    #     body:
+    #       event: "ISP failover triggered"
+    #       router: "{{ router }}"
+    #       primary_iface: "{{ primary_iface }}"
+    #       backup_iface: "{{ backup_iface }}"
+    #     validate_certs: no
