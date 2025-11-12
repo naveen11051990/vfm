@@ -9,16 +9,16 @@
     - name: Primary ISP Interface Down from Splunk
       condition:
         all:
-          - event.results.host == "192.168.29.164"
-          - event.results._raw is search("GigabitEthernet")
-          - event.results._raw is search("changed state to administratively down")
+          - event.payload.results.host == "192.168.29.164"
+          - event.payload.results._raw is search("GigabitEthernet")
+          - event.payload.results._raw is search("changed state to administratively down")
       action:
         run_job_template:
           name: ISP_Failover_Job
           organization: Default
           job_args:
             extra_vars:
-              router: "{{ event.results.host }}"
+              router: "{{ event.payload.results.host }}"
               primary_iface: "GigabitEthernet2/0/2"
               backup_iface: "GigabitEthernet2/0/3"
               primary_next_hop: "106.51.64.1"
