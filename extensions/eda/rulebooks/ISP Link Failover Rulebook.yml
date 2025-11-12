@@ -19,7 +19,7 @@
           job_args:
             extra_vars:
               router: "{{ event.payload.results.host }}"
-              primary_iface: "GigabitEthernet2/0/1"
-              backup_iface: "GigabitEthernet2/0/2"
+              primary_iface: "GigabitEthernet2/0/2"
+              backup_iface: "GigabitEthernet2/0/3"
               primary_next_hop: "106.51.64.1"
               backup_next_hop: "125.99.242.1"
