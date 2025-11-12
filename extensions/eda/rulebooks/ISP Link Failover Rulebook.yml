@@ -7,11 +7,7 @@
           - "{{ events }}"
   rules:
     - name: Primary ISP Interface Down from Splunk
-      condition:
-        all:
-          - event.payload.results.host == "192.168.29.164"
-          - event.payload.results._raw is regex("GigabitEthernet\\d+/\\d+/\\d+")
-          - event.payload.results.changed_state_iface == "changed state to administratively down"
+      condition: event.payload.results.host == "192.168.29.164"
       action:
         run_job_template:
           name: ISP_Failover_Job
