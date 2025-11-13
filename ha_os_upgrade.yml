@@ -48,8 +48,7 @@
     - name: Build HA guardrail paths
       ansible.builtin.set_fact:
         ha_group_id: "{{ ha_runtime.ha_group_id }}"
-        ha_preempt_xpath: '{{ "/config/devices/entry[@name=''localhost.localdomain'']/deviceconfig/high-availability/group/entry[@name=''" ~ ha_runtime.ha_group_id ~ "'']/election-option/preemptive" }}'
-        ha_sync_xpath: "/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/enabled"
+        ha_election_xpath: '{{ "/config/devices/entry[@name=''localhost.localdomain'']/deviceconfig/high-availability/group/entry[@name=''" ~ ha_runtime.ha_group_id ~ "'']/election-option" }}'
 
     - name: Consolidate HA topology view
       run_once: true
@@ -163,15 +162,14 @@
         - name: Disable preemption locally
           paloaltonetworks.panos.panos_config_element:
             provider: "{{ device }}"
-            xpath: "{{ ha_preempt_xpath }}"
+            xpath: "{{ ha_election_xpath }}"
             element: "<preemptive>no</preemptive>"
-            edit: true
-        - name: Disable config sync locally
-          paloaltonetworks.panos.panos_config_element:
+            edit: false
+        - name: Disable config sync using panos_ha
+          paloaltonetworks.panos.panos_ha:
             provider: "{{ device }}"
-            xpath: "{{ ha_sync_xpath }}"
-            element: "<enabled>no</enabled>"
-            edit: true
+            ha_config_sync: false
+            ha_group_id: "{{ ha_group_id }}"
         - name: Commit HA guardrail changes
           paloaltonetworks.panos.panos_commit_firewall:
             provider: "{{ device }}"
@@ -221,15 +219,14 @@
         - name: Re-enable preemption locally
           paloaltonetworks.panos.panos_config_element:
             provider: "{{ device }}"
-            xpath: "{{ ha_preempt_xpath }}"
+            xpath: "{{ ha_election_xpath }}"
             element: "<preemptive>yes</preemptive>"
-            edit: true
-        - name: Re-enable config sync locally
-          paloaltonetworks.panos.panos_config_element:
+            edit: false
+        - name: Re-enable config sync using panos_ha
+          paloaltonetworks.panos.panos_ha:
             provider: "{{ device }}"
-            xpath: "{{ ha_sync_xpath }}"
-            element: "<enabled>yes</enabled>"
-            edit: true
+            ha_config_sync: true
+            ha_group_id: "{{ ha_group_id }}"
         - name: Commit HA settings restoration
           paloaltonetworks.panos.panos_commit_firewall:
             provider: "{{ device }}"
