@@ -1,0 +1,36 @@
+---
+- name: PAN-OS Configuration Backup
+  hosts: "{{ hosts | default('UPGRADE122') }}"
+  connection: local
+
+  vars:
+    device:
+      ip_address: "{{ ip_address }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+
+    backup_directory: "{{ playbook_dir }}/backups"
+    backup_filename: "{{ backup_directory }}/{{ inventory_hostname | default('UPGRADE122') }}-running-config.xml"
+
+  collections:
+    - paloaltonetworks.panos
+
+  tasks:
+    - name: Ensure device is ready before backup
+      paloaltonetworks.panos.panos_check:
+        provider: "{{ device }}"
+      register: readiness
+      until: readiness is not failed and readiness.msg == 'Device is ready.'
+      retries: 10
+      delay: 10
+
+    - name: Backup running configuration
+      paloaltonetworks.panos.panos_export:
+        provider: "{{ device }}"
+        category: configuration
+        filename: "{{ backup_filename }}"
+        create_directory: true
+
+    - name: Report backup location
+      debug:
+        msg: "Configuration backup saved to {{ backup_filename }}"
