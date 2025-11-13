@@ -25,7 +25,7 @@
         that:
           - upgrade_path is defined
           - upgrade_path | length > 0
-        fail_msg: "You must provide -e upgrade_path='[\"10.2.3\",\"10.2.4\"]'"
+        fail_msg: 'You must provide -e upgrade_path=''["10.2.3","10.2.4"]'''
       run_once: true
 
     - name: Gather HA and system facts
@@ -48,8 +48,8 @@
     - name: Build HA guardrail paths
       ansible.builtin.set_fact:
         ha_group_id: "{{ ha_runtime.ha_group_id }}"
-        ha_preempt_xpath: "{{ \"/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/group/entry[@name='\" ~ ha_runtime.ha_group_id ~ \"']/election-option\" }}"
-        ha_sync_xpath: "{{ \"/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/group/entry[@name='\" ~ ha_runtime.ha_group_id ~ \"']/configuration-synchronization\" }}"
+        ha_preempt_xpath: '{{ "/config/devices/entry[@name=''localhost.localdomain'']/deviceconfig/high-availability/group/entry[@name=''" ~ ha_runtime.ha_group_id ~ "'']" }}'
+        ha_sync_xpath: '{{ "/config/devices/entry[@name=''localhost.localdomain'']/deviceconfig/high-availability" }}'
 
     - name: Consolidate HA topology view
       run_once: true
@@ -165,7 +165,7 @@
             provider: "{{ device }}"
             cmd: set
             xpath: "{{ ha_preempt_xpath }}"
-            element: "<preemptive>no</preemptive>"
+            element: "<election-option><preemptive>no</preemptive></election-option>"
         - name: Disable config sync locally
           paloaltonetworks.panos.panos_type_cmd:
             provider: "{{ device }}"
@@ -223,7 +223,7 @@
             provider: "{{ device }}"
             cmd: set
             xpath: "{{ ha_preempt_xpath }}"
-            element: "<preemptive>yes</preemptive>"
+            element: "<election-option><preemptive>yes</preemptive></election-option>"
         - name: Re-enable config sync locally
           paloaltonetworks.panos.panos_type_cmd:
             provider: "{{ device }}"
