@@ -9,7 +9,7 @@
       username: "{{ username }}"
       password: "{{ password }}"
 
-    backup_directory: "./backups"
+    backup_directory: "{{ playbook_dir }}/backups"
     backup_filename: "{{ backup_directory }}/{{ inventory_hostname | default('pa-fw') }}-running-config.xml"
 
     # upgrade_path must be provided as extra var
