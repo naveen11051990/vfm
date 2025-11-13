@@ -13,9 +13,6 @@
     backup_directory: "{{ lookup('env', 'PANOS_BACKUP_DIR') | default('/runner/backups', true) }}"
     backup_filename: "{{ backup_directory }}/{{ inventory_hostname | default('pa-fw') }}-running-config.xml"
 
-    disable_preempt_xpath: "/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/election-settings"
-    disable_sync_xpath: "/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/general"
-
     reboot_between_steps: true
     quiet_polling: true
 
@@ -46,6 +43,13 @@
           ha_enabled: "{{ (ha_facts.ansible_facts.ansible_net_ha_enabled | default(false)) | bool }}"
           ha_mode: "{{ (ha_facts.ansible_facts.ansible_net_ha_localmode | default('unknown')) | lower }}"
           ha_initial_role: "{{ (ha_facts.ansible_facts.ansible_net_ha_localstate | default('unknown')) | lower }}"
+          ha_group_id: "{{ ha_facts.ansible_facts.ansible_net_ha_group_id | default('1') }}"
+
+    - name: Build HA guardrail paths
+      ansible.builtin.set_fact:
+        ha_group_id: "{{ ha_runtime.ha_group_id }}"
+        ha_preempt_xpath: "{{ \"/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/group/entry[@name='\" ~ ha_runtime.ha_group_id ~ \"']/election-option\" }}"
+        ha_sync_xpath: "{{ \"/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/group/entry[@name='\" ~ ha_runtime.ha_group_id ~ \"']/configuration-synchronization\" }}"
 
     - name: Consolidate HA topology view
       run_once: true
@@ -160,14 +164,14 @@
           paloaltonetworks.panos.panos_type_cmd:
             provider: "{{ device }}"
             cmd: set
-            xpath: "{{ disable_preempt_xpath }}"
+            xpath: "{{ ha_preempt_xpath }}"
             element: "<preemptive>no</preemptive>"
         - name: Disable config sync locally
           paloaltonetworks.panos.panos_type_cmd:
             provider: "{{ device }}"
             cmd: set
-            xpath: "{{ disable_sync_xpath }}"
-            element: "<enable-config-sync>no</enable-config-sync>"
+            xpath: "{{ ha_sync_xpath }}"
+            element: "<enabled>no</enabled>"
         - name: Commit HA guardrail changes
           paloaltonetworks.panos.panos_commit_firewall:
             provider: "{{ device }}"
@@ -218,14 +222,14 @@
           paloaltonetworks.panos.panos_type_cmd:
             provider: "{{ device }}"
             cmd: set
-            xpath: "{{ disable_preempt_xpath }}"
+            xpath: "{{ ha_preempt_xpath }}"
             element: "<preemptive>yes</preemptive>"
         - name: Re-enable config sync locally
           paloaltonetworks.panos.panos_type_cmd:
             provider: "{{ device }}"
             cmd: set
-            xpath: "{{ disable_sync_xpath }}"
-            element: "<enable-config-sync>yes</enable-config-sync>"
+            xpath: "{{ ha_sync_xpath }}"
+            element: "<enabled>yes</enabled>"
         - name: Commit HA settings restoration
           paloaltonetworks.panos.panos_commit_firewall:
             provider: "{{ device }}"
