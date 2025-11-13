@@ -155,6 +155,7 @@
     - name: Disable config sync
       paloaltonetworks.panos.panos_ha:
         provider: "{{ device }}"
+        state: merged
         ha_config_sync: false
 
     - name: Upgrade staged PAN-OS versions on initial passive firewall
@@ -199,6 +200,7 @@
     - name: Re-enable config sync
       paloaltonetworks.panos.panos_ha:
         provider: "{{ device }}"
+        state: merged
         ha_config_sync: true
 
     - name: Force running-config sync from initial active back to peer
