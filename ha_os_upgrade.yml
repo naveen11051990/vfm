@@ -45,11 +45,6 @@
           ha_initial_role: "{{ (ha_facts.ansible_facts.ansible_net_ha_localstate | default('unknown')) | lower }}"
           ha_group_id: "{{ ha_facts.ansible_facts.ansible_net_ha_group_id | default('1') }}"
 
-    - name: Build HA guardrail paths
-      ansible.builtin.set_fact:
-        ha_group_id: "{{ ha_runtime.ha_group_id }}"
-        ha_election_xpath: '{{ "/config/devices/entry[@name=''localhost.localdomain'']/deviceconfig/high-availability/group/entry[@name=''" ~ ha_runtime.ha_group_id ~ "'']/election-option" }}'
-
     - name: Consolidate HA topology view
       run_once: true
       delegate_to: localhost
@@ -157,23 +152,10 @@
         filename: "{{ backup_filename }}"
         create_directory: true
 
-    - name: Disable preemption and config sync
-      block:
-        - name: Disable preemption locally
-          paloaltonetworks.panos.panos_config_element:
-            provider: "{{ device }}"
-            xpath: "{{ ha_election_xpath }}"
-            element: "<preemptive>no</preemptive>"
-            edit: false
-        - name: Disable config sync using panos_ha
-          paloaltonetworks.panos.panos_ha:
-            provider: "{{ device }}"
-            ha_config_sync: false
-            ha_group_id: "{{ ha_group_id }}"
-        - name: Commit HA guardrail changes
-          paloaltonetworks.panos.panos_commit_firewall:
-            provider: "{{ device }}"
-            description: "Disable preempt + config sync during HA upgrade"
+    - name: Disable config sync
+      paloaltonetworks.panos.panos_ha:
+        provider: "{{ device }}"
+        ha_config_sync: false
 
     - name: Upgrade staged PAN-OS versions on initial passive firewall
       ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
@@ -214,23 +196,10 @@
         cmd: "request high-availability state functional"
       when: is_initial_active
 
-    - name: Re-enable preemption and config sync
-      block:
-        - name: Re-enable preemption locally
-          paloaltonetworks.panos.panos_config_element:
-            provider: "{{ device }}"
-            xpath: "{{ ha_election_xpath }}"
-            element: "<preemptive>yes</preemptive>"
-            edit: false
-        - name: Re-enable config sync using panos_ha
-          paloaltonetworks.panos.panos_ha:
-            provider: "{{ device }}"
-            ha_config_sync: true
-            ha_group_id: "{{ ha_group_id }}"
-        - name: Commit HA settings restoration
-          paloaltonetworks.panos.panos_commit_firewall:
-            provider: "{{ device }}"
-            description: "Re-enable preempt + config sync after HA upgrade"
+    - name: Re-enable config sync
+      paloaltonetworks.panos.panos_ha:
+        provider: "{{ device }}"
+        ha_config_sync: true
 
     - name: Force running-config sync from initial active back to peer
       paloaltonetworks.panos.panos_op:
