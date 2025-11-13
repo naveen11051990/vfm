@@ -9,7 +9,7 @@
       username: "{{ username }}"
       password: "{{ password }}"
 
-    backup_directory: "{{ playbook_dir }}/backups"
+    backup_directory: "{{ lookup('env', 'PANOS_BACKUP_DIR') | default('/runner/backups', true) }}"
     backup_filename: "{{ backup_directory }}/{{ inventory_hostname | default('UPGRADE122') }}-running-config.xml"
 
   collections:
