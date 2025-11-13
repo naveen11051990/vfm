@@ -161,21 +161,21 @@
     - name: Disable preemption and config sync
       block:
         - name: Disable preemption locally
-          paloaltonetworks.panos.panos_type_cmd:
+          paloaltonetworks.panos.panos_config_element:
             provider: "{{ device }}"
-            cmd: edit
             xpath: "{{ ha_preempt_xpath }}"
             element: "<preemptive>no</preemptive>"
+            edit: true
         - name: Disable config sync locally
-          paloaltonetworks.panos.panos_type_cmd:
+          paloaltonetworks.panos.panos_config_element:
             provider: "{{ device }}"
-            cmd: edit
             xpath: "{{ ha_sync_xpath }}"
             element: "<enabled>no</enabled>"
+            edit: true
         - name: Commit HA guardrail changes
           paloaltonetworks.panos.panos_commit_firewall:
             provider: "{{ device }}"
-            description: "Disable preempt + config sync prior to HA upgrade"
+            description: "Disable preempt + config sync during HA upgrade"
 
     - name: Upgrade staged PAN-OS versions on initial passive firewall
       ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
@@ -219,17 +219,17 @@
     - name: Re-enable preemption and config sync
       block:
         - name: Re-enable preemption locally
-          paloaltonetworks.panos.panos_type_cmd:
+          paloaltonetworks.panos.panos_config_element:
             provider: "{{ device }}"
-            cmd: edit
             xpath: "{{ ha_preempt_xpath }}"
             element: "<preemptive>yes</preemptive>"
+            edit: true
         - name: Re-enable config sync locally
-          paloaltonetworks.panos.panos_type_cmd:
+          paloaltonetworks.panos.panos_config_element:
             provider: "{{ device }}"
-            cmd: edit
             xpath: "{{ ha_sync_xpath }}"
             element: "<enabled>yes</enabled>"
+            edit: true
         - name: Commit HA settings restoration
           paloaltonetworks.panos.panos_commit_firewall:
             provider: "{{ device }}"
