@@ -11,13 +11,19 @@
         event.payload.results.host == "192.168.29.164" and
         event.payload.results.changed_state_iface == "changed state to administratively down"
       action:
-        run_job_template:
-          name: ISP_Failover_Job
-          organization: Default
-          job_args:
-            extra_vars:
-              router: "{{ event.payload.results.host }}"
-              primary_iface: "GigabitEthernet2/0/2"
-              backup_iface: "GigabitEthernet2/0/3"
-              primary_next_hop: "106.51.64.1"
-              backup_next_hop: "125.99.242.1"
+        # Original controller-run action preserved below for future reference.
+        # Uncomment and adapt when you want the rule to launch the controller job template again.
+        # run_job_template:
+        #  name: ISP_Failover_Job
+        #  organization: Default
+        #  job_args:
+        #    extra_vars:
+        #      router: "{{ event.payload.results.host }}"
+        #      primary_iface: "GigabitEthernet2/0/2"
+        #      backup_iface: "GigabitEthernet2/0/3"
+        #      primary_next_hop: "106.51.64.1"
+        #      backup_next_hop: "125.99.242.1"
+
+        run_playbook:
+          name: demo_eda_trigger.yml
+          # Demo playbook intentionally prints a static message and does not reference any incoming extra_vars.

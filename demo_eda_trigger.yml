@@ -1,0 +1,8 @@
+---
+- name: Demo EDA trigger playbook
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Print hello message
+      ansible.builtin.debug:
+        msg: "Hello from demo_eda_trigger.yml"
