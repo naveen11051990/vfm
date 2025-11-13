@@ -48,8 +48,8 @@
     - name: Build HA guardrail paths
       ansible.builtin.set_fact:
         ha_group_id: "{{ ha_runtime.ha_group_id }}"
-        ha_preempt_xpath: '{{ "/config/devices/entry[@name=''localhost.localdomain'']/deviceconfig/high-availability/group/entry[@name=''" ~ ha_runtime.ha_group_id ~ "'']" }}'
-        ha_sync_xpath: '{{ "/config/devices/entry[@name=''localhost.localdomain'']/deviceconfig/high-availability" }}'
+        ha_preempt_xpath: '{{ "/config/devices/entry[@name=''localhost.localdomain'']/deviceconfig/high-availability/group/entry[@name=''" ~ ha_runtime.ha_group_id ~ "'']/election-option/preemptive" }}'
+        ha_sync_xpath: "/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/enabled"
 
     - name: Consolidate HA topology view
       run_once: true
@@ -163,13 +163,13 @@
         - name: Disable preemption locally
           paloaltonetworks.panos.panos_type_cmd:
             provider: "{{ device }}"
-            cmd: set
+            cmd: edit
             xpath: "{{ ha_preempt_xpath }}"
-            element: "<election-option><preemptive>no</preemptive></election-option>"
+            element: "<preemptive>no</preemptive>"
         - name: Disable config sync locally
           paloaltonetworks.panos.panos_type_cmd:
             provider: "{{ device }}"
-            cmd: set
+            cmd: edit
             xpath: "{{ ha_sync_xpath }}"
             element: "<enabled>no</enabled>"
         - name: Commit HA guardrail changes
@@ -221,13 +221,13 @@
         - name: Re-enable preemption locally
           paloaltonetworks.panos.panos_type_cmd:
             provider: "{{ device }}"
-            cmd: set
+            cmd: edit
             xpath: "{{ ha_preempt_xpath }}"
-            element: "<election-option><preemptive>yes</preemptive></election-option>"
+            element: "<preemptive>yes</preemptive>"
         - name: Re-enable config sync locally
           paloaltonetworks.panos.panos_type_cmd:
             provider: "{{ device }}"
-            cmd: set
+            cmd: edit
             xpath: "{{ ha_sync_xpath }}"
             element: "<enabled>yes</enabled>"
         - name: Commit HA settings restoration
