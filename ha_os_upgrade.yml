@@ -193,17 +193,11 @@
         create_directory: true
 
     - name: Disable config sync
-      paloaltonetworks.panos.panos_ha:
+      paloaltonetworks.panos.panos_type_cmd:
         provider: "{{ device }}"
-        state: present
-        ha_enabled: "{{ ha_runtime.ha_enabled }}"
-        ha_mode: "{{ ha_runtime.ha_mode }}"
-        ha_group_id: "{{ ha_runtime.ha_group_id | int }}"
-        ha_config_sync: false
-        ha1_ip_address: "{{ ha1_ip_address }}"
-        ha1_netmask: "{{ ha1_netmask }}"
-        ha1_port: "{{ ha1_port }}"
-        ha_peer_ip: "{{ ha_peer_ip }}"
+        cmd: set
+        xpath: "/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/group/configuration-synchronization"
+        element: "<enabled>no</enabled>"
 
     - name: Commit HA change (config sync disabled)
       paloaltonetworks.panos.panos_commit_firewall:
@@ -322,17 +316,11 @@
             cmd: "request high-availability state functional"
 
     - name: Re-enable config sync
-      paloaltonetworks.panos.panos_ha:
+      paloaltonetworks.panos.panos_type_cmd:
         provider: "{{ device }}"
-        state: present
-        ha_enabled: "{{ ha_runtime.ha_enabled }}"
-        ha_mode: "{{ ha_runtime.ha_mode }}"
-        ha_group_id: "{{ ha_runtime.ha_group_id | int }}"
-        ha_config_sync: true
-        ha1_ip_address: "{{ ha1_ip_address }}"
-        ha1_netmask: "{{ ha1_netmask }}"
-        ha1_port: "{{ ha1_port }}"
-        ha_peer_ip: "{{ ha_peer_ip }}"
+        cmd: set
+        xpath: "/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/group/configuration-synchronization"
+        element: "<enabled>yes</enabled>"
 
     - name: Commit HA change (config sync enabled)
       paloaltonetworks.panos.panos_commit_firewall:
@@ -346,10 +334,11 @@
       when: inventory_hostname == hostvars['localhost'].ha_active_host
 
     - name: Wait for original active role to return
-      paloaltonetworks.panos.panos_active_in_ha:
+      paloaltonetworks.panos.panos_facts:
         provider: "{{ device }}"
-      register: final_role_check
-      until: final_role_check.response.active | default(false)
+        gather_subset: ["ha"]
+      register: final_active_state
+      until: (final_active_state.ansible_facts.ansible_net_ha_localstate | lower) == 'active'
       retries: 40
       delay: 30
       when: is_initial_active
