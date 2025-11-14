@@ -109,20 +109,14 @@
               - "Original passive firewall: {{ passive_host }} ({{ hostvars[passive_host].ip_address }})"
 
         - name: Disable config sync on both peers
-          paloaltonetworks.panos.panos_ha:
+          paloaltonetworks.panos.panos_type_cmd:
             provider:
               ip_address: "{{ hostvars[item].ip_address }}"
               username: "{{ hostvars[item].username }}"
               password: "{{ hostvars[item].password }}"
-            state: present
-            ha_enabled: "{{ hostvars[item].ha_runtime.ha_enabled }}"
-            ha_mode: "{{ hostvars[item].ha_runtime.ha_mode }}"
-            ha_group_id: "{{ hostvars[item].ha_runtime.ha_group_id | int }}"
-            ha_config_sync: false
-            ha1_ip_address: "{{ hostvars[item].ha1_ip_address }}"
-            ha1_netmask: "{{ hostvars[item].ha1_netmask }}"
-            ha1_port: "{{ hostvars[item].ha1_port }}"
-            ha_peer_ip: "{{ hostvars[item].ha_peer_ip }}"
+            cmd: set
+            xpath: "/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/group/configuration-synchronization"
+            element: "<enabled>no</enabled>"
           loop: "{{ [active_host, passive_host] }}"
 
         - name: Commit config sync disable on both peers
@@ -191,20 +185,14 @@
             cmd: "request high-availability state functional"
 
         - name: Re-enable config sync on both peers
-          paloaltonetworks.panos.panos_ha:
+          paloaltonetworks.panos.panos_type_cmd:
             provider:
               ip_address: "{{ hostvars[item].ip_address }}"
               username: "{{ hostvars[item].username }}"
               password: "{{ hostvars[item].password }}"
-            state: present
-            ha_enabled: "{{ hostvars[item].ha_runtime.ha_enabled }}"
-            ha_mode: "{{ hostvars[item].ha_runtime.ha_mode }}"
-            ha_group_id: "{{ hostvars[item].ha_runtime.ha_group_id | int }}"
-            ha_config_sync: true
-            ha1_ip_address: "{{ hostvars[item].ha1_ip_address }}"
-            ha1_netmask: "{{ hostvars[item].ha1_netmask }}"
-            ha1_port: "{{ hostvars[item].ha1_port }}"
-            ha_peer_ip: "{{ hostvars[item].ha_peer_ip }}"
+            cmd: set
+            xpath: "/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/group/configuration-synchronization"
+            element: "<enabled>yes</enabled>"
           loop: "{{ [active_host, passive_host] }}"
 
         - name: Commit config sync enable on both peers
