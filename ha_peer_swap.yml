@@ -26,10 +26,6 @@
         gather_subset: ["config"]
       register: ha_cfg
 
-    - name: Show raw HA config facts (debug)
-      ansible.builtin.debug:
-        var: ha_cfg
-
     - name: Record HA snapshot for {{ inventory_hostname }}
       ansible.builtin.set_fact:
         ha_runtime:
@@ -87,14 +83,13 @@
               initial passive: {{ (ha_view | selectattr('ha_initial_role', 'equalto', 'passive')
                                               | map(attribute='inventory_hostname') | list) }}
 
-        - name: Derive active/passive hostnames (if applicable)
+        - name: Derive HA active/passive hostnames and flags
           ansible.builtin.set_fact:
             ha_active_host: "{{ (ha_view | selectattr('ha_initial_role', 'equalto', 'active') | map(attribute='inventory_hostname') | list | first | default('')) }}"
             ha_passive_host: "{{ (ha_view | selectattr('ha_initial_role', 'equalto', 'passive') | map(attribute='inventory_hostname') | list | first | default('')) }}"
-
-        - name: Flag whether this is an active/passive pair
-          ansible.builtin.set_fact:
-            ha_is_ap: "{{ ha_active_host | length > 0 and ha_passive_host | length > 0 }}"
+            ha_is_ap: >-
+              {{ (ha_view | selectattr('ha_initial_role', 'equalto', 'active') | list | length) == 1
+                 and (ha_view | selectattr('ha_initial_role', 'equalto', 'passive') | list | length) == 1 }}
 
         - name: Notify when HA is not active/passive
           ansible.builtin.debug:
