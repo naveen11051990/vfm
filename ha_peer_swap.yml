@@ -1,0 +1,260 @@
+---
+- name: PAN-OS HA Peer Swap Test
+  hosts: "{{ hosts | default('PA-HA') }}"
+  connection: local
+  gather_facts: false
+
+  vars:
+    device:
+      ip_address: "{{ ip_address }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+
+  collections:
+    - paloaltonetworks.panos
+
+  tasks:
+    - name: Gather HA and system facts
+      paloaltonetworks.panos.panos_facts:
+        provider: "{{ device }}"
+        gather_subset: ["system", "ha"]
+      register: ha_facts
+
+    - name: Gather full HA configuration (running config)
+      paloaltonetworks.panos.panos_facts:
+        provider: "{{ device }}"
+        gather_subset: ["config"]
+      register: ha_cfg
+
+    - name: Record HA snapshot for {{ inventory_hostname }}
+      ansible.builtin.set_fact:
+        ha_runtime:
+          inventory_hostname: "{{ inventory_hostname }}"
+          hostname: "{{ ha_facts.ansible_facts.ansible_net_hostname }}"
+          serial: "{{ ha_facts.ansible_facts.ansible_net_serialnum | default('unknown') }}"
+          ha_enabled: "{{ (ha_facts.ansible_facts.ansible_net_ha_enabled | default(false)) | bool }}"
+          ha_mode: "{{ (ha_facts.ansible_facts.ansible_net_ha_localmode | default('unknown')) | lower }}"
+          ha_initial_role: "{{ (ha_facts.ansible_facts.ansible_net_ha_localstate | default('unknown')) | lower }}"
+          ha_group_id: "{{ ha_facts.ansible_facts.ansible_net_ha_group_id | default('1') }}"
+
+    - name: Discover HA interface wiring from running config
+      ansible.builtin.set_fact:
+        ha1_ip_address: >-
+          {{ ha_cfg.ansible_facts.ansible_net_config
+             | regex_search('(?s)<interface>.*?<ha1>.*?<ip-address>([^<]+)</ip-address>', '\1')
+             | first | default('') }}
+        ha1_netmask: >-
+          {{ ha_cfg.ansible_facts.ansible_net_config
+             | regex_search('(?s)<interface>.*?<ha1>.*?<netmask>([^<]+)</netmask>', '\1')
+             | first | default('') }}
+        ha1_port: >-
+          {{ ha_cfg.ansible_facts.ansible_net_config
+             | regex_search('(?s)<interface>.*?<ha1>.*?<port>([^<]+)</port>', '\1')
+             | first | default('') }}
+        ha2_port: >-
+          {{ ha_cfg.ansible_facts.ansible_net_config
+             | regex_search('(?s)<interface>.*?<ha2>.*?<port>([^<]+)</port>', '\1')
+             | first | default('') }}
+        ha_peer_ip: >-
+          {{ ha_cfg.ansible_facts.ansible_net_config
+             | regex_search('(?s)<group>.*?<entry[^>]*>.*?<peer-ip>([^<]+)</peer-ip>', '\1')
+             | first | default('') }}
+
+    - name: Validate discovered HA wiring
+      ansible.builtin.assert:
+        that:
+          - ha1_ip_address | length > 0
+          - ha1_netmask | length > 0
+          - ha1_port | length > 0
+          - ha2_port | length > 0
+          - ha_peer_ip | length > 0
+        fail_msg: >-
+          Failed to auto-discover HA1/HA2/peer wiring from running config.
+          Verify high-availability is configured under deviceconfig on each firewall.
+
+    - name: Consolidate HA topology view and determine mode
+      run_once: true
+      delegate_to: localhost
+      delegate_facts: true
+      vars:
+        ha_view: "{{ ansible_play_hosts_all | map('extract', hostvars, 'ha_runtime') | list }}"
+      block:
+        - name: Summarize HA pair mode and roles
+          ansible.builtin.debug:
+            msg: >-
+              HA pair mode(s): {{ ha_view | map(attribute='ha_mode') | unique }},
+              initial active: {{ (ha_view | selectattr('ha_initial_role', 'equalto', 'active')
+                                             | map(attribute='inventory_hostname') | list) }},
+              initial passive: {{ (ha_view | selectattr('ha_initial_role', 'equalto', 'passive')
+                                              | map(attribute='inventory_hostname') | list) }}
+
+        - name: Derive active/passive hostnames (if applicable)
+          ansible.builtin.set_fact:
+            ha_active_host: "{{ (ha_view | selectattr('ha_initial_role', 'equalto', 'active') | map(attribute='inventory_hostname') | list | first | default('')) }}"
+            ha_passive_host: "{{ (ha_view | selectattr('ha_initial_role', 'equalto', 'passive') | map(attribute='inventory_hostname') | list | first | default('')) }}"
+
+        - name: Flag whether this is an active/passive pair
+          ansible.builtin.set_fact:
+            ha_is_ap: "{{ ha_active_host | length > 0 and ha_passive_host | length > 0 }}"
+
+        - name: Notify when HA is not active/passive
+          ansible.builtin.debug:
+            msg: "HA is not active/passive; no swap will be performed."
+          when: not ha_is_ap
+
+    - name: Orchestrate passive-first swap (active/passive only)
+      run_once: true
+      when: hostvars['localhost'].ha_is_ap | default(false)
+      vars:
+        passive_host: "{{ hostvars['localhost'].ha_passive_host }}"
+        active_host: "{{ hostvars['localhost'].ha_active_host }}"
+      block:
+        - name: Print original active and passive firewalls
+          ansible.builtin.debug:
+            msg:
+              - "Original active firewall: {{ active_host }} ({{ hostvars[active_host].ip_address }})"
+              - "Original passive firewall: {{ passive_host }} ({{ hostvars[passive_host].ip_address }})"
+
+        - name: Disable config sync on both peers
+          paloaltonetworks.panos.panos_ha:
+            provider:
+              ip_address: "{{ hostvars[item].ip_address }}"
+              username: "{{ hostvars[item].username }}"
+              password: "{{ hostvars[item].password }}"
+            state: present
+            ha_enabled: "{{ hostvars[item].ha_runtime.ha_enabled }}"
+            ha_mode: "{{ hostvars[item].ha_runtime.ha_mode }}"
+            ha_group_id: "{{ hostvars[item].ha_runtime.ha_group_id | int }}"
+            ha_config_sync: false
+            ha1_ip_address: "{{ hostvars[item].ha1_ip_address }}"
+            ha1_netmask: "{{ hostvars[item].ha1_netmask }}"
+            ha1_port: "{{ hostvars[item].ha1_port }}"
+            ha_peer_ip: "{{ hostvars[item].ha_peer_ip }}"
+            ha2_port: "{{ hostvars[item].ha2_port }}"
+          loop: "{{ [active_host, passive_host] }}"
+
+        - name: Commit config sync disable on both peers
+          paloaltonetworks.panos.panos_commit_firewall:
+            provider:
+              ip_address: "{{ hostvars[item].ip_address }}"
+              username: "{{ hostvars[item].username }}"
+              password: "{{ hostvars[item].password }}"
+            description: "Disable HA config sync for HA peer swap test"
+          loop: "{{ [active_host, passive_host] }}"
+
+        - name: Suspend original active firewall
+          paloaltonetworks.panos.panos_op:
+            provider:
+              ip_address: "{{ hostvars[active_host].ip_address }}"
+              username: "{{ hostvars[active_host].username }}"
+              password: "{{ hostvars[active_host].password }}"
+            cmd: "request high-availability state suspend"
+
+        - name: Wait until original passive becomes active
+          paloaltonetworks.panos.panos_facts:
+            provider:
+              ip_address: "{{ hostvars[passive_host].ip_address }}"
+              username: "{{ hostvars[passive_host].username }}"
+              password: "{{ hostvars[passive_host].password }}"
+            gather_subset: ["ha"]
+          register: passive_ha_after_failover
+          until: (passive_ha_after_failover.ansible_facts.ansible_net_ha_localstate | lower) == 'active'
+          retries: 40
+          delay: 15
+
+        - name: Wait for new active (original passive) to be ready
+          paloaltonetworks.panos.panos_check:
+            provider:
+              ip_address: "{{ hostvars[passive_host].ip_address }}"
+              username: "{{ hostvars[passive_host].username }}"
+              password: "{{ hostvars[passive_host].password }}"
+          register: passive_ready_as_active
+          until: passive_ready_as_active is not failed and passive_ready_as_active.msg == 'Device is ready.'
+          retries: 60
+          delay: 15
+
+        - name: Refresh HA roles after failover
+          paloaltonetworks.panos.panos_facts:
+            provider:
+              ip_address: "{{ hostvars[item].ip_address }}"
+              username: "{{ hostvars[item].username }}"
+              password: "{{ hostvars[item].password }}"
+            gather_subset: ["ha"]
+          loop: "{{ [active_host, passive_host] }}"
+          register: ha_after_swap
+
+        - name: Print roles after failover
+          ansible.builtin.debug:
+            msg:
+              - "Post-failover HA states:"
+              - "{{ active_host }} ({{ hostvars[active_host].ip_address }}): {{ (ha_after_swap.results[0].ansible_facts.ansible_net_ha_localstate | lower) }}"
+              - "{{ passive_host }} ({{ hostvars[passive_host].ip_address }}): {{ (ha_after_swap.results[1].ansible_facts.ansible_net_ha_localstate | lower) }}"
+
+        - name: Return original active firewall to functional state
+          paloaltonetworks.panos.panos_op:
+            provider:
+              ip_address: "{{ hostvars[active_host].ip_address }}"
+              username: "{{ hostvars[active_host].username }}"
+              password: "{{ hostvars[active_host].password }}"
+            cmd: "request high-availability state functional"
+
+        - name: Re-enable config sync on both peers
+          paloaltonetworks.panos.panos_ha:
+            provider:
+              ip_address: "{{ hostvars[item].ip_address }}"
+              username: "{{ hostvars[item].username }}"
+              password: "{{ hostvars[item].password }}"
+            state: present
+            ha_enabled: "{{ hostvars[item].ha_runtime.ha_enabled }}"
+            ha_mode: "{{ hostvars[item].ha_runtime.ha_mode }}"
+            ha_group_id: "{{ hostvars[item].ha_runtime.ha_group_id | int }}"
+            ha_config_sync: true
+            ha1_ip_address: "{{ hostvars[item].ha1_ip_address }}"
+            ha1_netmask: "{{ hostvars[item].ha1_netmask }}"
+            ha1_port: "{{ hostvars[item].ha1_port }}"
+            ha_peer_ip: "{{ hostvars[item].ha_peer_ip }}"
+            ha2_port: "{{ hostvars[item].ha2_port }}"
+          loop: "{{ [active_host, passive_host] }}"
+
+        - name: Commit config sync enable on both peers
+          paloaltonetworks.panos.panos_commit_firewall:
+            provider:
+              ip_address: "{{ hostvars[item].ip_address }}"
+              username: "{{ hostvars[item].username }}"
+              password: "{{ hostvars[item].password }}"
+            description: "Re-enable HA config sync after HA peer swap test"
+          loop: "{{ [active_host, passive_host] }}"
+
+        - name: Wait for original roles to be restored
+          block:
+            - name: Wait for original active to become active again
+              paloaltonetworks.panos.panos_facts:
+                provider:
+                  ip_address: "{{ hostvars[active_host].ip_address }}"
+                  username: "{{ hostvars[active_host].username }}"
+                  password: "{{ hostvars[active_host].password }}"
+                gather_subset: ["ha"]
+              register: final_active_state
+              until: (final_active_state.ansible_facts.ansible_net_ha_localstate | lower) == 'active'
+              retries: 40
+              delay: 30
+
+            - name: Wait for original passive to become passive again
+              paloaltonetworks.panos.panos_facts:
+                provider:
+                  ip_address: "{{ hostvars[passive_host].ip_address }}"
+                  username: "{{ hostvars[passive_host].username }}"
+                  password: "{{ hostvars[passive_host].password }}"
+                gather_subset: ["ha"]
+              register: final_passive_state
+              until: (final_passive_state.ansible_facts.ansible_net_ha_localstate | lower) == 'passive'
+              retries: 40
+              delay: 30
+
+        - name: Report final HA order after swap test
+          ansible.builtin.debug:
+            msg:
+              - "HA peer swap test complete."
+              - "Original active ({{ active_host }}) is active again."
+              - "Original passive ({{ passive_host }}) is passive again."
+

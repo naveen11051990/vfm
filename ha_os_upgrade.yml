@@ -34,6 +34,12 @@
         gather_subset: ["system", "ha"]
       register: ha_facts
 
+    - name: Gather full HA configuration (running config)
+      paloaltonetworks.panos.panos_facts:
+        provider: "{{ device }}"
+        gather_subset: ["config"]
+      register: ha_cfg
+
     - name: Record HA snapshot for {{ inventory_hostname }}
       ansible.builtin.set_fact:
         ha_runtime:
@@ -45,12 +51,40 @@
           ha_initial_role: "{{ (ha_facts.ansible_facts.ansible_net_ha_localstate | default('unknown')) | lower }}"
           ha_group_id: "{{ ha_facts.ansible_facts.ansible_net_ha_group_id | default('1') }}"
 
-    - name: Validate required HA interface vars when using panos_ha
+    - name: Discover HA interface wiring from running config
+      ansible.builtin.set_fact:
+        ha1_ip_address: >-
+          {{ ha_cfg.ansible_facts.ansible_net_config
+             | regex_search('(?s)<interface>.*?<ha1>.*?<ip-address>([^<]+)</ip-address>', '\1')
+             | first | default('') }}
+        ha1_netmask: >-
+          {{ ha_cfg.ansible_facts.ansible_net_config
+             | regex_search('(?s)<interface>.*?<ha1>.*?<netmask>([^<]+)</netmask>', '\1')
+             | first | default('') }}
+        ha1_port: >-
+          {{ ha_cfg.ansible_facts.ansible_net_config
+             | regex_search('(?s)<interface>.*?<ha1>.*?<port>([^<]+)</port>', '\1')
+             | first | default('') }}
+        ha2_port: >-
+          {{ ha_cfg.ansible_facts.ansible_net_config
+             | regex_search('(?s)<interface>.*?<ha2>.*?<port>([^<]+)</port>', '\1')
+             | first | default('') }}
+        ha_peer_ip: >-
+          {{ ha_cfg.ansible_facts.ansible_net_config
+             | regex_search('(?s)<group>.*?<entry[^>]*>.*?<peer-ip>([^<]+)</peer-ip>', '\1')
+             | first | default('') }}
+
+    - name: Validate discovered HA wiring
       ansible.builtin.assert:
         that:
-          - hostvars[inventory_hostname].ha2_port is defined
-          - hostvars[inventory_hostname].ha2_port | length > 0
-        fail_msg: "panos_ha requires the existing HA2 interface to be specified. Define 'ha2_port' for each peer (e.g., ha2 or ethernet1/3)."
+          - ha1_ip_address | length > 0
+          - ha1_netmask | length > 0
+          - ha1_port | length > 0
+          - ha2_port | length > 0
+          - ha_peer_ip | length > 0
+        fail_msg: >-
+          Failed to auto-discover HA1/HA2/peer wiring from running config.
+          Verify high-availability is configured under deviceconfig on each firewall.
 
     - name: Consolidate HA topology view
       run_once: true
@@ -167,7 +201,30 @@
         ha_mode: "{{ ha_runtime.ha_mode }}"
         ha_group_id: "{{ ha_runtime.ha_group_id | int }}"
         ha_config_sync: false
-        ha2_port: "{{ hostvars[inventory_hostname].ha2_port }}"
+        ha1_ip_address: "{{ ha1_ip_address }}"
+        ha1_netmask: "{{ ha1_netmask }}"
+        ha1_port: "{{ ha1_port }}"
+        ha_peer_ip: "{{ ha_peer_ip }}"
+        ha2_port: "{{ ha2_port }}"
+
+    - name: Commit HA change (config sync disabled)
+      paloaltonetworks.panos.panos_commit_firewall:
+        provider: "{{ device }}"
+        description: "Disable HA config sync before OS upgrade"
+
+    - name: Re-collect HA facts after disabling config sync
+      paloaltonetworks.panos.panos_facts:
+        provider: "{{ device }}"
+        gather_subset: ["ha"]
+      register: ha_post_disable
+
+    - name: Verify HA state after disabling config sync
+      ansible.builtin.assert:
+        that:
+          - ha_post_disable.ansible_facts.ansible_net_ha_enabled | bool
+          - (ha_post_disable.ansible_facts.ansible_net_ha_localmode | lower) == 'active-passive'
+          - ha_post_disable.ansible_facts.ansible_net_ha_localstate | lower in ['active', 'passive']
+        fail_msg: "Unexpected HA state after disabling config sync; check HA configuration on device."
 
     - name: Orchestrate passive-first upgrade sequence (controller-driven)
       run_once: true
@@ -208,16 +265,30 @@
               password: "{{ hostvars[active_host].password }}"
             cmd: "request high-availability state suspend"
 
-        - name: Wait until upgraded passive becomes active
-          paloaltonetworks.panos.panos_active_in_ha:
-            provider:
-              ip_address: "{{ hostvars[passive_host].ip_address }}"
-              username: "{{ hostvars[passive_host].username }}"
-              password: "{{ hostvars[passive_host].password }}"
-          register: passive_now_active
-          until: passive_now_active.response.active | default(false)
-          retries: 40
-          delay: 15
+        - name: Wait until upgraded passive becomes active and ready
+          block:
+            - name: Check HA role on upgraded passive
+              paloaltonetworks.panos.panos_facts:
+                provider:
+                  ip_address: "{{ hostvars[passive_host].ip_address }}"
+                  username: "{{ hostvars[passive_host].username }}"
+                  password: "{{ hostvars[passive_host].password }}"
+                gather_subset: ["ha"]
+              register: passive_ha_after_failover
+              until: (passive_ha_after_failover.ansible_facts.ansible_net_ha_localstate | lower) == 'active'
+              retries: 40
+              delay: 15
+
+            - name: Wait for upgraded passive (now active) readiness
+              paloaltonetworks.panos.panos_check:
+                provider:
+                  ip_address: "{{ hostvars[passive_host].ip_address }}"
+                  username: "{{ hostvars[passive_host].username }}"
+                  password: "{{ hostvars[passive_host].password }}"
+              register: passive_ready_as_active
+              until: passive_ready_as_active is not failed and passive_ready_as_active.msg == 'Device is ready.'
+              retries: 60
+              delay: 15
 
         - name: Wait for any running commit to finish on original active
           paloaltonetworks.panos.panos_op:
@@ -260,7 +331,16 @@
         ha_mode: "{{ ha_runtime.ha_mode }}"
         ha_group_id: "{{ ha_runtime.ha_group_id | int }}"
         ha_config_sync: true
-        ha2_port: "{{ hostvars[inventory_hostname].ha2_port }}"
+        ha1_ip_address: "{{ ha1_ip_address }}"
+        ha1_netmask: "{{ ha1_netmask }}"
+        ha1_port: "{{ ha1_port }}"
+        ha_peer_ip: "{{ ha_peer_ip }}"
+        ha2_port: "{{ ha2_port }}"
+
+    - name: Commit HA change (config sync enabled)
+      paloaltonetworks.panos.panos_commit_firewall:
+        provider: "{{ device }}"
+        description: "Re-enable HA config sync after OS upgrade"
 
     - name: Force running-config sync from initial active back to peer
       paloaltonetworks.panos.panos_op:
