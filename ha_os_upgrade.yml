@@ -65,10 +65,6 @@
           {{ ha_cfg.ansible_facts.ansible_net_config
              | regex_search('(?s)<interface>.*?<ha1>.*?<port>([^<]+)</port>', '\1')
              | default('') }}
-        ha2_port: >-
-          {{ ha_cfg.ansible_facts.ansible_net_config
-             | regex_search('(?s)<interface>.*?<ha2>.*?<port>([^<]+)</port>', '\1')
-             | default('') }}
         ha_peer_ip: >-
           {{ ha_cfg.ansible_facts.ansible_net_config
              | regex_search('(?s)<group>.*?<entry[^>]*>.*?<peer-ip>([^<]+)</peer-ip>', '\1')
@@ -80,7 +76,6 @@
           - ha1_ip_address | length > 0
           - ha1_netmask | length > 0
           - ha1_port | length > 0
-          - ha2_port | length > 0
           - ha_peer_ip | length > 0
         fail_msg: >-
           Failed to auto-discover HA1/HA2/peer wiring from running config.
@@ -205,7 +200,6 @@
         ha1_netmask: "{{ ha1_netmask }}"
         ha1_port: "{{ ha1_port }}"
         ha_peer_ip: "{{ ha_peer_ip }}"
-        ha2_port: "{{ ha2_port }}"
 
     - name: Commit HA change (config sync disabled)
       paloaltonetworks.panos.panos_commit_firewall:
@@ -335,7 +329,6 @@
         ha1_netmask: "{{ ha1_netmask }}"
         ha1_port: "{{ ha1_port }}"
         ha_peer_ip: "{{ ha_peer_ip }}"
-        ha2_port: "{{ ha2_port }}"
 
     - name: Commit HA change (config sync enabled)
       paloaltonetworks.panos.panos_commit_firewall:
