@@ -157,7 +157,6 @@
         provider: "{{ device }}"
         state: present
         ha_config_sync: false
-        ha2_port: ""
 
     - name: Upgrade staged PAN-OS versions on initial passive firewall
       ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
@@ -203,7 +202,6 @@
         provider: "{{ device }}"
         state: present
         ha_config_sync: true
-        ha2_port: ""
 
     - name: Force running-config sync from initial active back to peer
       paloaltonetworks.panos.panos_op:
