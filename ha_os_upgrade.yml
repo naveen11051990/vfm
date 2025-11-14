@@ -169,44 +169,88 @@
         ha_config_sync: false
         ha2_port: "{{ hostvars[inventory_hostname].ha2_port }}"
 
-    - name: Upgrade staged PAN-OS versions on initial passive firewall
-      ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
-      loop: "{{ upgrade_path }}"
-      loop_control:
-        label: "{{ item }}"
+    - name: Orchestrate passive-first upgrade sequence (controller-driven)
+      run_once: true
       vars:
-        version_item: "{{ item }}"
-      when: is_initial_passive
+        passive_host: "{{ hostvars['localhost'].ha_passive_host }}"
+        active_host: "{{ hostvars['localhost'].ha_active_host }}"
+      block:
+        - name: Wait for any running commit to finish on passive
+          paloaltonetworks.panos.panos_op:
+            provider:
+              ip_address: "{{ hostvars[passive_host].ip_address }}"
+              username: "{{ hostvars[passive_host].username }}"
+              password: "{{ hostvars[passive_host].password }}"
+            cmd: "<show><jobs><all></all></jobs></show>"
+            cmd_is_xml: true
+          register: passive_jobs
+          until: passive_jobs.stdout_xml is not search('<type>Commit</type>.*?<status>(PEND|ACT|RUN|ACTIVE)</status>')
+          retries: 120
+          delay: 5
 
-    - name: Suspend initial active firewall to trigger failover
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "request high-availability state suspend"
-      when: is_initial_active
+        - name: Upgrade passive firewall first
+          ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
+          loop: "{{ upgrade_path }}"
+          loop_control:
+            label: "{{ item }}"
+          vars:
+            version_item: "{{ item }}"
+            device:
+              ip_address: "{{ hostvars[passive_host].ip_address }}"
+              username: "{{ hostvars[passive_host].username }}"
+              password: "{{ hostvars[passive_host].password }}"
 
-    - name: Wait for passive peer to assume active role
-      paloaltonetworks.panos.panos_active_in_ha:
-        provider: "{{ device }}"
-      register: passive_now_active
-      until: passive_now_active.response.active | default(false)
-      retries: 40
-      delay: 15
-      when: inventory_hostname == hostvars['localhost'].ha_passive_host
+        - name: Suspend original active to trigger failover
+          paloaltonetworks.panos.panos_op:
+            provider:
+              ip_address: "{{ hostvars[active_host].ip_address }}"
+              username: "{{ hostvars[active_host].username }}"
+              password: "{{ hostvars[active_host].password }}"
+            cmd: "request high-availability state suspend"
 
-    - name: Upgrade staged PAN-OS versions on originally active firewall
-      ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
-      loop: "{{ upgrade_path }}"
-      loop_control:
-        label: "{{ item }}"
-      vars:
-        version_item: "{{ item }}"
-      when: is_initial_active
+        - name: Wait until upgraded passive becomes active
+          paloaltonetworks.panos.panos_active_in_ha:
+            provider:
+              ip_address: "{{ hostvars[passive_host].ip_address }}"
+              username: "{{ hostvars[passive_host].username }}"
+              password: "{{ hostvars[passive_host].password }}"
+          register: passive_now_active
+          until: passive_now_active.response.active | default(false)
+          retries: 40
+          delay: 15
 
-    - name: Bring suspended firewall back to functional state
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "request high-availability state functional"
-      when: is_initial_active
+        - name: Wait for any running commit to finish on original active
+          paloaltonetworks.panos.panos_op:
+            provider:
+              ip_address: "{{ hostvars[active_host].ip_address }}"
+              username: "{{ hostvars[active_host].username }}"
+              password: "{{ hostvars[active_host].password }}"
+            cmd: "<show><jobs><all></all></jobs></show>"
+            cmd_is_xml: true
+          register: active_jobs
+          until: active_jobs.stdout_xml is not search('<type>Commit</type>.*?<status>(PEND|ACT|RUN|ACTIVE)</status>')
+          retries: 120
+          delay: 5
+
+        - name: Upgrade originally active firewall
+          ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
+          loop: "{{ upgrade_path }}"
+          loop_control:
+            label: "{{ item }}"
+          vars:
+            version_item: "{{ item }}"
+            device:
+              ip_address: "{{ hostvars[active_host].ip_address }}"
+              username: "{{ hostvars[active_host].username }}"
+              password: "{{ hostvars[active_host].password }}"
+
+        - name: Return suspended firewall to functional state
+          paloaltonetworks.panos.panos_op:
+            provider:
+              ip_address: "{{ hostvars[active_host].ip_address }}"
+              username: "{{ hostvars[active_host].username }}"
+              password: "{{ hostvars[active_host].password }}"
+            cmd: "request high-availability state functional"
 
     - name: Re-enable config sync
       paloaltonetworks.panos.panos_ha:
