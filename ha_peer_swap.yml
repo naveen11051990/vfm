@@ -91,11 +91,6 @@
               {{ (ha_view | selectattr('ha_initial_role', 'equalto', 'active') | list | length) == 1
                  and (ha_view | selectattr('ha_initial_role', 'equalto', 'passive') | list | length) == 1 }}
 
-        - name: Notify when HA is not active/passive
-          ansible.builtin.debug:
-            msg: "HA is not active/passive; no swap will be performed."
-          when: not ha_is_ap
-
     - name: Orchestrate passive-first swap (active/passive only)
       run_once: true
       when: hostvars['localhost'].ha_is_ap | default(false)
