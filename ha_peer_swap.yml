@@ -26,6 +26,10 @@
         gather_subset: ["config"]
       register: ha_cfg
 
+    - name: Show raw HA config facts (debug)
+      ansible.builtin.debug:
+        var: ha_cfg
+
     - name: Record HA snapshot for {{ inventory_hostname }}
       ansible.builtin.set_fact:
         ha_runtime:
