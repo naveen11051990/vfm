@@ -57,7 +57,7 @@
              | default('') }}
         ha_peer_ip: >-
           {{ ha_cfg.ansible_facts.ansible_net_config
-             | regex_search('(?s)<group>.*?<entry[^>]*>.*?<peer-ip>([^<]+)</peer-ip>', '\1')
+             | regex_search('(?s)<high-availability>.*?<group>.*?<peer-ip>([^<]+)</peer-ip>', '\1')
              | default('') }}
 
     - name: Validate discovered HA wiring
