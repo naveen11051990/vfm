@@ -42,23 +42,23 @@
         ha1_ip_address: >-
           {{ ha_cfg.ansible_facts.ansible_net_config
              | regex_search('(?s)<interface>.*?<ha1>.*?<ip-address>([^<]+)</ip-address>', '\1')
-             | first | default('') }}
+             | default('') }}
         ha1_netmask: >-
           {{ ha_cfg.ansible_facts.ansible_net_config
              | regex_search('(?s)<interface>.*?<ha1>.*?<netmask>([^<]+)</netmask>', '\1')
-             | first | default('') }}
+             | default('') }}
         ha1_port: >-
           {{ ha_cfg.ansible_facts.ansible_net_config
              | regex_search('(?s)<interface>.*?<ha1>.*?<port>([^<]+)</port>', '\1')
-             | first | default('') }}
+             | default('') }}
         ha2_port: >-
           {{ ha_cfg.ansible_facts.ansible_net_config
              | regex_search('(?s)<interface>.*?<ha2>.*?<port>([^<]+)</port>', '\1')
-             | first | default('') }}
+             | default('') }}
         ha_peer_ip: >-
           {{ ha_cfg.ansible_facts.ansible_net_config
              | regex_search('(?s)<group>.*?<entry[^>]*>.*?<peer-ip>([^<]+)</peer-ip>', '\1')
-             | first | default('') }}
+             | default('') }}
 
     - name: Validate discovered HA wiring
       ansible.builtin.assert:
@@ -257,4 +257,3 @@
               - "HA peer swap test complete."
               - "Original active ({{ active_host }}) is active again."
               - "Original passive ({{ passive_host }}) is passive again."
-
