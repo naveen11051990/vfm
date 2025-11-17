@@ -21,6 +21,12 @@
         gathered_filter: "*"  # fetch all rules :contentReference[oaicite:0]{index=0}
       register: sec_rules
 
+
+    - name: Debug first gathered security rule
+      ansible.builtin.debug:
+        msg: "{{ sec_rules.gathered[0] }}"
+
+
     - name: Filter rules missing description
       ansible.builtin.set_fact:
         rules_missing_description: >-
