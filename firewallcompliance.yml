@@ -27,13 +27,14 @@
           {{
             (sec_rules.gathered | default([]))
             | selectattr('description', 'equalto', None)
+            | selectattr('audit_comment', 'equalto', None)
             | list
           }}
 
     - name: Print rules without description
       ansible.builtin.debug:
         msg: |
-          The following security rules are missing a description:
+          The following security rules are missing a description and audit comment:
           {% for rule in rules_missing_description %}
             - {{ rule.rule_name | default(rule.name) }}
           {% else %}
