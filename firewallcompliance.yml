@@ -14,23 +14,23 @@
     - paloaltonetworks.panos
 
   tasks:
-    - name: Gather all security rules
-      paloaltonetworks.panos.panos_security_rule:
+    - name: Gather all security rules (with facts)
+      paloaltonetworks.panos.panos_security_rule_facts:
         provider: "{{ device }}"
-        gathered_filter: "*"
-        state: gathered
-      register: sec_rules
+      register: sec_rules_facts
 
     - name: Filter rules missing description or audit_comment
       ansible.builtin.set_fact:
         rules_missing_meta: >-
           {{
-            sec_rules.gathered
-            | selectattr('description', 'equalto', '')
+            sec_rules_facts.rules
+            | selectattr('spec', 'defined')
+            | selectattr('spec.description', 'equalto', None)
             | list
             | union(
-                sec_rules.gathered
-                | selectattr('audit_comment', 'equalto', '')
+                sec_rules_facts.rules
+                | selectattr('spec', 'defined')
+                | selectattr('spec.audit_comment', 'not defined')
                 | list
               )
           }}
@@ -40,6 +40,5 @@
         msg: |
           The following security rules are missing description or audit_comment:
           {% for rule in rules_missing_meta %}
-            - {{ rule.rule_name }}
+            - {{ rule.name }}
           {% endfor %}
-
