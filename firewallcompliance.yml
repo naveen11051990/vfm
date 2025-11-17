@@ -1,1 +1,45 @@
+---
+- name: Find security rules without description or audit comment
+  hosts: "{{ hosts | default('PRODUCTIONFIREWALL') }}"
+  connection: local
+  gather_facts: no
+
+  vars:
+    device:
+      ip_address: "{{ ip_address }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+
+  collections:
+    - paloaltonetworks.panos
+
+  tasks:
+    - name: Gather all security rules
+      paloaltonetworks.panos.panos_security_rule:
+        provider: "{{ device }}"
+        gathered_filter: "*"
+        state: gathered
+      register: sec_rules
+
+    - name: Filter rules missing description or audit_comment
+      ansible.builtin.set_fact:
+        rules_missing_meta: >-
+          {{
+            sec_rules.gathered
+            | selectattr('description', 'equalto', '')
+            | list
+            | union(
+                sec_rules.gathered
+                | selectattr('audit_comment', 'equalto', '')
+                | list
+              )
+          }}
+
+    - name: Print rules without description or audit comment
+      ansible.builtin.debug:
+        msg: |
+          The following security rules are missing description or audit_comment:
+          {% for rule in rules_missing_meta %}
+            - {{ rule.rule_name }}
+          {% endfor %}
 
