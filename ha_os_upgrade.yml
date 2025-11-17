@@ -333,6 +333,70 @@
         cmd: "request high-availability sync-to-remote running-config"
       when: inventory_hostname == hostvars['localhost'].ha_active_host
 
+    - name: Ensure original active regains active role if needed
+      run_once: true
+      vars:
+        original_active: "{{ hostvars['localhost'].ha_active_host }}"
+        original_passive: "{{ hostvars['localhost'].ha_passive_host }}"
+      block:
+        - name: Check current HA roles after upgrades
+          paloaltonetworks.panos.panos_facts:
+            provider:
+              ip_address: "{{ hostvars[item].ip_address }}"
+              username: "{{ hostvars[item].username }}"
+              password: "{{ hostvars[item].password }}"
+            gather_subset: ["ha"]
+          loop: "{{ [original_active, original_passive] }}"
+          register: final_ha_view
+
+        - name: Derive current active host after upgrades
+          ansible.builtin.set_fact:
+            current_active_host: >-
+              {{ (final_ha_view.results
+                    | selectattr('ansible_facts.ansible_net_ha_localstate', 'defined')
+                    | selectattr('ansible_facts.ansible_net_ha_localstate', 'equalto', 'active')
+                    | map(attribute='item') | list | first | default('')) }}
+
+        - name: Suspend current active to fail back to original active
+          paloaltonetworks.panos.panos_op:
+            provider:
+              ip_address: "{{ hostvars[current_active_host].ip_address }}"
+              username: "{{ hostvars[current_active_host].username }}"
+              password: "{{ hostvars[current_active_host].password }}"
+            cmd: "request high-availability state suspend"
+          when:
+            - current_active_host is defined
+            - current_active_host | length > 0
+            - current_active_host != original_active
+
+        - name: Wait for original active to become active again after failback
+          paloaltonetworks.panos.panos_facts:
+            provider:
+              ip_address: "{{ hostvars[original_active].ip_address }}"
+              username: "{{ hostvars[original_active].username }}"
+              password: "{{ hostvars[original_active].password }}"
+            gather_subset: ["ha"]
+          register: final_active_after_failback
+          until: (final_active_after_failback.ansible_facts.ansible_net_ha_localstate | lower) == 'active'
+          retries: 40
+          delay: 30
+          when:
+            - current_active_host is defined
+            - current_active_host | length > 0
+            - current_active_host != original_active
+
+        - name: Return suspended firewall to functional state after failback
+          paloaltonetworks.panos.panos_op:
+            provider:
+              ip_address: "{{ hostvars[current_active_host].ip_address }}"
+              username: "{{ hostvars[current_active_host].username }}"
+              password: "{{ hostvars[current_active_host].password }}"
+            cmd: "request high-availability state functional"
+          when:
+            - current_active_host is defined
+            - current_active_host | length > 0
+            - current_active_host != original_active
+
     - name: Wait for original active role to return
       paloaltonetworks.panos.panos_facts:
         provider: "{{ device }}"
