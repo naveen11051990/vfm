@@ -45,11 +45,24 @@
             | list
           }}
 
+
     - name: Print rules without description
       ansible.builtin.debug:
         msg: |
           The following security rules are missing a description and audit comment:
           {% for rule in rules_missing_description %}
+            - {{ rule.rule_name | default(rule.name) }}
+          {% else %}
+            (None found)
+          {% endfor %}
+
+
+
+    - name: Report insecure any-any rules
+      ansible.builtin.debug:
+        msg: |
+          Insecure any-any rules (source=any, dest=any, service=any):
+          {% for rule in any_any_insecure_rules %}
             - {{ rule.rule_name | default(rule.name) }}
           {% else %}
             (None found)
