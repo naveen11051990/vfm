@@ -228,3 +228,4 @@ inventories/
 openspec/
 memory/
 .github/
+inventory.ini

@@ -1,0 +1,41 @@
+---
+- name: Patch Windows Server 2019 hosts
+  hosts: windows
+  gather_facts: false
+  collections:
+    - ansible.windows
+  vars:
+    update_categories:
+      - CriticalUpdates
+      - SecurityUpdates
+      - UpdateRollups
+    update_log_path: 'C:\Windows\Temp\ansible-windows-update.log'
+    reboot_timeout_seconds: 3600
+
+  tasks:
+    - name: Download Windows Server 2019 updates
+      win_updates:
+        state: downloaded
+        category_names: "{{ update_categories }}"
+        log_path: "{{ update_log_path }}"
+
+    - name: Install downloaded Windows Server 2019 updates
+      win_updates:
+        state: installed
+        category_names: "{{ update_categories }}"
+        log_path: "{{ update_log_path }}"
+        reboot: false
+      register: install_result
+
+    - name: Fail when update installation reports errors
+      ansible.builtin.fail:
+        msg: |
+          win_updates reported {{ install_result.failed_update_count }} failed update(s). Review Windows Update logs on the host before rerunning this play.
+      when: install_result.failed_update_count | default(0) | int > 0
+
+    - name: Reboot hosts when required by Windows Update
+      win_reboot:
+        reboot_timeout: "{{ reboot_timeout_seconds }}"
+        post_reboot_delay: 60
+        test_command: '"$env:COMPUTERNAME"'
+      when: install_result.reboot_required | default(false)
