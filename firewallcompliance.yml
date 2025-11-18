@@ -51,7 +51,7 @@
           {{
             (sec_rules.gathered | default([]))
             | selectattr('source_user', 'defined')
-            | selectattr('source_user', 'reject', ['any'])
+            | rejectattr('source_user', 'equalto', ['any'])
             | list
           }}
 
