@@ -33,7 +33,6 @@
           {{
             (sec_rules.gathered | default([]))
             | selectattr('description', 'equalto', None)
-            | selectattr('audit_comment', 'equalto', None)
             | list
           }}
 
