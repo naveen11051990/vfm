@@ -22,9 +22,18 @@
       register: sec_rules
 
 
-    - name: Debug first gathered security rule
-      ansible.builtin.debug:
-        msg: "{{ sec_rules.gathered[0] }}"
+    - name: Filter any-any insecure rules (source=any, dest=any, service=any)
+      ansible.builtin.set_fact:
+        any_any_insecure_rules: >-
+          {{
+            (sec_rules.gathered | default([]))
+            | selectattr('source_ip', 'equalto', ['any'])
+            | selectattr('destination_ip', 'equalto', ['any'])
+            | selectattr('service', 'equalto', ['any'])
+            | selectattr('source_zone', 'equalto', ['any'])
+            | selectattr('destination_zone', 'equalto', ['any'])
+            | list
+          }}
 
 
     - name: Filter rules missing description
