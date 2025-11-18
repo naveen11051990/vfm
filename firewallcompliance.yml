@@ -45,6 +45,17 @@
             | list
           }}
 
+    - name: Filter rules that use specific source_user (i.e. not 'any')
+      ansible.builtin.set_fact:
+        user_based_rules: >-
+          {{
+            (sec_rules.gathered | default([]))
+            | selectattr('source_user', 'defined')
+            | selectattr('source_user', 'reject', ['any'])
+            | list
+          }}
+
+
 
     - name: Print rules without description
       ansible.builtin.debug:
@@ -66,4 +77,15 @@
             - {{ rule.rule_name | default(rule.name) }}
           {% else %}
             (None found)
+          {% endfor %}
+
+
+    - name: Print rules that are user-based
+      ansible.builtin.debug:
+        msg: |
+          The following security rules are using source_user (User-ID):
+          {% for rule in user_based_rules %}
+            - {{ rule.rule_name | default(rule.name) }} → source_user: {{ rule.source_user }}
+          {% else %}
+            (No user-based security rules found)
           {% endfor %}
