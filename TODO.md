@@ -4,7 +4,7 @@
 
 ### Short-Circuit Fail
 
-- [ ] if an upgrade version provided in upgrade path is the same as or lower than the current installed version, the playbook must immediately stop and report about the same
+- [ ] if an upgrade version provided in upgrade path is the same as or lower than the current installed version, the playbook must immediately stop and report about the same (see `plans/feature_short_circuit_fail_plan.md`)
 
 ### Failure - Revert
 

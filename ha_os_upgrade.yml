@@ -46,6 +46,7 @@
           inventory_hostname: "{{ inventory_hostname }}"
           hostname: "{{ ha_facts.ansible_facts.ansible_net_hostname }}"
           serial: "{{ ha_facts.ansible_facts.ansible_net_serialnum | default('unknown') }}"
+          sw_version: "{{ ha_facts.ansible_facts.ansible_net_version | default('unknown') }}"
           ha_enabled: "{{ (ha_facts.ansible_facts.ansible_net_ha_enabled | default(false)) | bool }}"
           ha_mode: "{{ (ha_facts.ansible_facts.ansible_net_ha_localmode | default('unknown')) | lower }}"
           ha_initial_role: "{{ (ha_facts.ansible_facts.ansible_net_ha_localstate | default('unknown')) | lower }}"
@@ -106,6 +107,22 @@
             ha_topology: "{{ ha_view }}"
             ha_active_host: "{{ (ha_view | selectattr('ha_initial_role', 'equalto', 'active') | first).inventory_hostname }}"
             ha_passive_host: "{{ (ha_view | selectattr('ha_initial_role', 'equalto', 'passive') | first).inventory_hostname }}"
+
+    - name: Short-circuit when upgrade path does not advance PAN-OS
+      run_once: true
+      vars:
+        ha_topology_view: "{{ hostvars['localhost'].ha_topology | default([]) }}"
+      ansible.builtin.assert:
+        that:
+          - "(upgrade_path | select('version', item.sw_version | default('0.0.0'), '<=') | list | length) == 0"
+        fail_msg: >-
+          Short-circuiting upgrade: host {{ item.hostname | default(item.inventory_hostname) }} ({{ item.inventory_hostname }})
+          already runs PAN-OS {{ item.sw_version | default('unknown') }}, and requested upgrade_path entries
+          {{ upgrade_path | select('version', item.sw_version | default('0.0.0'), '<=') | list }} are not higher. Remove or
+          replace the lower-or-equal versions before rerunning the playbook.
+      loop: "{{ ha_topology_view }}"
+      loop_control:
+        label: "{{ item.inventory_hostname }}"
 
     - name: Mark initial HA role flags
       ansible.builtin.set_fact:
