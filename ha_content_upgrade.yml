@@ -42,22 +42,22 @@
       ansible.builtin.set_fact:
         ha1_ip_address: >-
           {{ (ha_cfg.ansible_facts.ansible_net_config
-              | regex_search('(?s)<interface>.*?<ha1>.*?<ip-address>([^<]+)</ip-address>', '\\1')
+              | regex_search('(?s)<interface>.*?<ha1>.*?<ip-address>([^<]+)</ip-address>', '\1')
               | default([]))
              | first | default('') }}
         ha1_netmask: >-
           {{ (ha_cfg.ansible_facts.ansible_net_config
-              | regex_search('(?s)<interface>.*?<ha1>.*?<netmask>([^<]+)</netmask>', '\\1')
+              | regex_search('(?s)<interface>.*?<ha1>.*?<netmask>([^<]+)</netmask>', '\1')
               | default([]))
              | first | default('') }}
         ha1_port: >-
           {{ (ha_cfg.ansible_facts.ansible_net_config
-              | regex_search('(?s)<interface>.*?<ha1>.*?<port>([^<]+)</port>', '\\1')
+              | regex_search('(?s)<interface>.*?<ha1>.*?<port>([^<]+)</port>', '\1')
               | default([]))
              | first | default('') }}
         ha_peer_ip: >-
           {{ (ha_cfg.ansible_facts.ansible_net_config
-              | regex_search('(?s)<high-availability>.*?<group>.*?<peer-ip>([^<]+)</peer-ip>', '\\1')
+              | regex_search('(?s)<high-availability>.*?<group>.*?<peer-ip>([^<]+)</peer-ip>', '\1')
               | default([]))
              | first | default('') }}
 
