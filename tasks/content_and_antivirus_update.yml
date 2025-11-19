@@ -131,8 +131,27 @@
   paloaltonetworks.panos.panos_facts:
     provider: "{{ device }}"
     gather_subset: ["system"]
+    gather_facts: true
   register: antivirus_version_facts
 
 - name: Cache antivirus version fact
   ansible.builtin.set_fact:
     ha_antivirus_version: "{{ antivirus_version_facts.ansible_facts.ansible_net_antivirus_version | default('unknown') }}"
+
+- name: Fallback to CLI antivirus version when fact is unknown
+  paloaltonetworks.panos.panos_op:
+    provider: "{{ device }}"
+    cmd: "show system info"
+    cmd_is_xml: true
+  register: antivirus_cli_info
+  when: ha_antivirus_version == 'unknown'
+
+- name: Update antivirus version from CLI output when available
+  ansible.builtin.set_fact:
+    ha_antivirus_version: >-
+      {{ antivirus_cli_info.stdout_xml | default('')
+         | regex_search('<antivirus-version>([^<]+)</antivirus-version>', '\\1')
+         | first | default('unknown') }}
+  when:
+    - ha_antivirus_version == 'unknown'
+    - antivirus_cli_info is defined
