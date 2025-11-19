@@ -11,28 +11,28 @@
     provider: "{{ device }}"
     cmd: "request content upgrade check"
 
-- name: Download latest content update
-  paloaltonetworks.panos.panos_op:
-    provider: "{{ device }}"
-    cmd: "request content upgrade download latest"
-  register: content_download
+# - name: Download latest content update
+#   paloaltonetworks.panos.panos_op:
+#     provider: "{{ device }}"
+#     cmd: "request content upgrade download latest"
+#   register: content_download
 
-- name: Extract job ID for content download
-  ansible.builtin.set_fact:
-    content_download_jobid: "{{ content_download.stdout_xml | default('') | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}"
+# - name: Extract job ID for content download
+#   ansible.builtin.set_fact:
+#     content_download_jobid: "{{ content_download.stdout_xml | default('') | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}"
 
-- name: Wait for content download job to complete
-  paloaltonetworks.panos.panos_op:
-    provider: "{{ device }}"
-    cmd: "<show><jobs><id>{{ content_download_jobid }}</id></jobs></show>"
-    cmd_is_xml: true
-  register: content_download_result
-  until: content_download_result.stdout_xml is search('<status>FIN</status>')
-  retries: 300
-  delay: 10
-  failed_when: content_download_result.stdout_xml is search('<result>FAIL</result>')
-  when: content_download_jobid | length > 0
-  no_log: true
+# - name: Wait for content download job to complete
+#   paloaltonetworks.panos.panos_op:
+#     provider: "{{ device }}"
+#     cmd: "<show><jobs><id>{{ content_download_jobid }}</id></jobs></show>"
+#     cmd_is_xml: true
+#   register: content_download_result
+#   until: content_download_result.stdout_xml is search('<status>FIN</status>')
+#   retries: 300
+#   delay: 10
+#   failed_when: content_download_result.stdout_xml is search('<result>FAIL</result>')
+#   when: content_download_jobid | length > 0
+#   no_log: true
 
 # - name: Install latest content update
 #   paloaltonetworks.panos.panos_op:
@@ -76,28 +76,28 @@
     provider: "{{ device }}"
     cmd: "request anti-virus upgrade check"
 
-- name: Download latest antivirus update
-  paloaltonetworks.panos.panos_op:
-    provider: "{{ device }}"
-    cmd: "request anti-virus upgrade download latest"
-  register: antivirus_download
+# - name: Download latest antivirus update
+#   paloaltonetworks.panos.panos_op:
+#     provider: "{{ device }}"
+#     cmd: "request anti-virus upgrade download latest"
+#   register: antivirus_download
 
-- name: Extract job ID for antivirus download
-  ansible.builtin.set_fact:
-    antivirus_download_jobid: "{{ antivirus_download.stdout_xml | default('') | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}"
+# - name: Extract job ID for antivirus download
+#   ansible.builtin.set_fact:
+#     antivirus_download_jobid: "{{ antivirus_download.stdout_xml | default('') | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}"
 
-- name: Wait for antivirus download job to complete
-  paloaltonetworks.panos.panos_op:
-    provider: "{{ device }}"
-    cmd: "<show><jobs><id>{{ antivirus_download_jobid }}</id></jobs></show>"
-    cmd_is_xml: true
-  register: antivirus_download_result
-  until: antivirus_download_result.stdout_xml is search('<status>FIN</status>')
-  retries: 300
-  delay: 10
-  failed_when: antivirus_download_result.stdout_xml is search('<result>FAIL</result>')
-  when: antivirus_download_jobid | length > 0
-  no_log: true
+# - name: Wait for antivirus download job to complete
+#   paloaltonetworks.panos.panos_op:
+#     provider: "{{ device }}"
+#     cmd: "<show><jobs><id>{{ antivirus_download_jobid }}</id></jobs></show>"
+#     cmd_is_xml: true
+#   register: antivirus_download_result
+#   until: antivirus_download_result.stdout_xml is search('<status>FIN</status>')
+#   retries: 300
+#   delay: 10
+#   failed_when: antivirus_download_result.stdout_xml is search('<result>FAIL</result>')
+#   when: antivirus_download_jobid | length > 0
+#   no_log: true
 
 # - name: Install latest antivirus update
 #   paloaltonetworks.panos.panos_op:
@@ -139,6 +139,7 @@
     ha_antivirus_version: >-
       {{ (antivirus_info_raw.stdout_xml | default(''))
           | regex_search('(?s)<entry>.*?<current>yes</current>.*?<version>([^<]+)</version>.*?</entry>', '\\1')
+          | default([])
           | first | default('unknown') }}
 
 - name: Show antivirus upgrade info output
