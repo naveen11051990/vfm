@@ -136,7 +136,10 @@
 
 - name: Cache antivirus version fact
   ansible.builtin.set_fact:
-    ha_antivirus_version: "{{ antivirus_info_raw.stdout_xml | default('') }}"
+    ha_antivirus_version: >-
+      {{ (antivirus_info_raw.stdout_xml | default(''))
+          | regex_search('(?s)<entry>.*?<current>yes</current>.*?<version>([^<]+)</version>.*?</entry>', '\\1')
+          | first | default('unknown') }}
 
 - name: Show antivirus upgrade info output
   ansible.builtin.debug:
