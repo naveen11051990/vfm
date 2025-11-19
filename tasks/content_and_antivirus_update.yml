@@ -128,11 +128,17 @@
 #   no_log: true
 
 - name: Query installed antivirus package information
-  paloaltonetworks.panos.panos_op:
-    provider: "{{ device }}"
-    cmd: "<request><anti-virus><upgrade><info></info></upgrade></anti-virus></request>"
-    cmd_is_xml: true
-  register: antivirus_info_raw
+  block:
+    - name: Run antivirus upgrade info command
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<request><anti-virus><upgrade><info></info></upgrade></anti-virus></request>"
+        cmd_is_xml: true
+      register: antivirus_info_raw
+
+    - name: Display antivirus upgrade info output
+      ansible.builtin.debug:
+        msg: "{{ antivirus_info_raw.stdout_xml | default('') }}"
 
 - name: Cache antivirus version fact
   ansible.builtin.set_fact:
@@ -141,7 +147,3 @@
           | regex_search('(?s)<entry>.*?<current>yes</current>.*?<version>([^<]+)</version>.*?</entry>', '\\1')
           | default([])
           | first | default('unknown') }}
-
-- name: Show antivirus upgrade info output
-  ansible.builtin.debug:
-    msg: "{{ antivirus_info_raw.stdout_xml | default('') }}"
