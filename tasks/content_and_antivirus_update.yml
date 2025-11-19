@@ -34,42 +34,42 @@
   when: content_download_jobid | length > 0
   no_log: true
 
-- name: Install latest content update
-  paloaltonetworks.panos.panos_op:
-    provider: "{{ device }}"
-    cmd: "request content upgrade install version latest"
-  register: content_install
+# - name: Install latest content update
+#   paloaltonetworks.panos.panos_op:
+#     provider: "{{ device }}"
+#     cmd: "request content upgrade install version latest"
+#   register: content_install
 
-- name: Extract job ID for content install
-  ansible.builtin.set_fact:
-    content_install_jobid: "{{ content_install.stdout_xml | default('') | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}"
+# - name: Extract job ID for content install
+#   ansible.builtin.set_fact:
+#     content_install_jobid: "{{ content_install.stdout_xml | default('') | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}"
 
-- name: Wait for content install job to complete
-  paloaltonetworks.panos.panos_op:
-    provider: "{{ device }}"
-    cmd: "<show><jobs><id>{{ content_install_jobid }}</id></jobs></show>"
-    cmd_is_xml: true
-  register: content_install_result
-  until: >
-    content_install_result.stdout_xml is search('<status>FIN</status>') or
-    content_install_result.stdout_xml is search('<status>FAIL</status>')
-  retries: 300
-  delay: 10
-  failed_when: >
-    (content_install_result.stdout_xml is search('<status>FIN</status>') and
-     content_install_result.stdout_xml is search('<result>FAIL</result>')) or
-    content_install_result.stdout_xml is search('<status>FAIL</status>')
-  when: content_install_jobid | length > 0
-  no_log: true
+# - name: Wait for content install job to complete
+#   paloaltonetworks.panos.panos_op:
+#     provider: "{{ device }}"
+#     cmd: "<show><jobs><id>{{ content_install_jobid }}</id></jobs></show>"
+#     cmd_is_xml: true
+#   register: content_install_result
+#   until: >
+#     content_install_result.stdout_xml is search('<status>FIN</status>') or
+#     content_install_result.stdout_xml is search('<status>FAIL</status>')
+#   retries: 300
+#   delay: 10
+#   failed_when: >
+#     (content_install_result.stdout_xml is search('<status>FIN</status>') and
+#      content_install_result.stdout_xml is search('<result>FAIL</result>')) or
+#     content_install_result.stdout_xml is search('<status>FAIL</status>')
+#   when: content_install_jobid | length > 0
+#   no_log: true
 
-- name: Wait for device readiness after content install
-  paloaltonetworks.panos.panos_check:
-    provider: "{{ device }}"
-  register: ready_after_content
-  until: ready_after_content is not failed and ready_after_content.msg == 'Device is ready.'
-  retries: 60
-  delay: 15
-  no_log: true
+# - name: Wait for device readiness after content install
+#   paloaltonetworks.panos.panos_check:
+#     provider: "{{ device }}"
+#   register: ready_after_content
+#   until: ready_after_content is not failed and ready_after_content.msg == 'Device is ready.'
+#   retries: 60
+#   delay: 15
+#   no_log: true
 
 - name: Refresh antivirus update index
   paloaltonetworks.panos.panos_op:
