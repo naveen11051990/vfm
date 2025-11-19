@@ -1,0 +1,110 @@
+---
+- name: PAN-OS HA Content and Antivirus Update
+  hosts: "{{ hosts | default('PA-HA') }}"
+  connection: local
+  gather_facts: false
+
+  vars:
+    device:
+      ip_address: "{{ ip_address }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+
+  collections:
+    - paloaltonetworks.panos
+
+  tasks:
+    - name: Gather HA and system facts
+      paloaltonetworks.panos.panos_facts:
+        provider: "{{ device }}"
+        gather_subset: ["system", "ha"]
+      register: ha_facts
+
+    - name: Gather full HA configuration (running config)
+      paloaltonetworks.panos.panos_facts:
+        provider: "{{ device }}"
+        gather_subset: ["config"]
+      register: ha_cfg
+
+    - name: Record HA snapshot for {{ inventory_hostname }}
+      ansible.builtin.set_fact:
+        ha_runtime:
+          inventory_hostname: "{{ inventory_hostname }}"
+          hostname: "{{ ha_facts.ansible_facts.ansible_net_hostname }}"
+          serial: "{{ ha_facts.ansible_facts.ansible_net_serialnum | default('unknown') }}"
+          sw_version: "{{ ha_facts.ansible_facts.ansible_net_version | default('unknown') }}"
+          ha_enabled: "{{ (ha_facts.ansible_facts.ansible_net_ha_enabled | default(false)) | bool }}"
+          ha_mode: "{{ (ha_facts.ansible_facts.ansible_net_ha_localmode | default('unknown')) | lower }}"
+          ha_initial_role: "{{ (ha_facts.ansible_facts.ansible_net_ha_localstate | default('unknown')) | lower }}"
+          ha_group_id: "{{ ha_facts.ansible_facts.ansible_net_ha_group_id | default('1') }}"
+
+    - name: Discover HA interface wiring from running config
+      ansible.builtin.set_fact:
+        ha1_ip_address: >-
+          {{ (ha_cfg.ansible_facts.ansible_net_config
+              | regex_search('(?s)<interface>.*?<ha1>.*?<ip-address>([^<]+)</ip-address>', '\\1')
+              | default([]))
+             | first | default('') }}
+        ha1_netmask: >-
+          {{ (ha_cfg.ansible_facts.ansible_net_config
+              | regex_search('(?s)<interface>.*?<ha1>.*?<netmask>([^<]+)</netmask>', '\\1')
+              | default([]))
+             | first | default('') }}
+        ha1_port: >-
+          {{ (ha_cfg.ansible_facts.ansible_net_config
+              | regex_search('(?s)<interface>.*?<ha1>.*?<port>([^<]+)</port>', '\\1')
+              | default([]))
+             | first | default('') }}
+        ha_peer_ip: >-
+          {{ (ha_cfg.ansible_facts.ansible_net_config
+              | regex_search('(?s)<high-availability>.*?<group>.*?<peer-ip>([^<]+)</peer-ip>', '\\1')
+              | default([]))
+             | first | default('') }}
+
+    - name: Validate discovered HA wiring
+      ansible.builtin.assert:
+        that:
+          - ha1_ip_address | length > 0
+          - ha1_netmask | length > 0
+          - ha1_port | length > 0
+          - ha_peer_ip | length > 0
+        fail_msg: >-
+          Failed to auto-discover HA1/HA2/peer wiring from running config.
+          Verify high-availability is configured under deviceconfig on each firewall.
+
+    - name: Consolidate HA topology view
+      run_once: true
+      delegate_to: localhost
+      delegate_facts: true
+      vars:
+        ha_view: "{{ ansible_play_hosts_all | map('extract', hostvars, 'ha_runtime') | list }}"
+      block:
+        - name: Validate HA pair is active/passive and healthy
+          ansible.builtin.assert:
+            that:
+              - ha_view | length == 2
+              - (ha_view | map(attribute='ha_enabled') | min)
+              - (ha_view | map(attribute='ha_mode') | unique) == ['active-passive']
+              - (ha_view | selectattr('ha_initial_role', 'equalto', 'active') | list | length) == 1
+              - (ha_view | selectattr('ha_initial_role', 'equalto', 'passive') | list | length) == 1
+            fail_msg: "Playbook currently supports exactly two nodes in active/passive HA."
+        - name: Persist HA role ownership
+          ansible.builtin.set_fact:
+            ha_topology: "{{ ha_view }}"
+            ha_active_host: "{{ (ha_view | selectattr('ha_initial_role', 'equalto', 'active') | first).inventory_hostname }}"
+            ha_passive_host: "{{ (ha_view | selectattr('ha_initial_role', 'equalto', 'passive') | first).inventory_hostname }}"
+
+    - name: Run content and antivirus update workflow
+      ansible.builtin.import_tasks: tasks/content_and_antivirus_update.yml
+
+    - name: Verify antivirus versions match across HA peers
+      run_once: true
+      vars:
+        antivirus_versions: "{{ ansible_play_hosts_all | map('extract', hostvars, 'ha_antivirus_version') | list }}"
+      ansible.builtin.assert:
+        that:
+          - antivirus_versions | reject('equalto', 'unknown') | list | length == antivirus_versions | length
+          - (antivirus_versions | unique | length) == 1
+        fail_msg: >-
+          Antivirus update mismatch detected across HA peers: {{ antivirus_versions }}. Ensure both devices downloaded and
+          installed the latest antivirus package before proceeding.

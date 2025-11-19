@@ -129,78 +129,8 @@
         is_initial_active: "{{ ha_runtime.ha_initial_role == 'active' }}"
         is_initial_passive: "{{ ha_runtime.ha_initial_role == 'passive' }}"
 
-    - name: Ensure device is ready before content upgrade
-      paloaltonetworks.panos.panos_check:
-        provider: "{{ device }}"
-      register: ready_check
-      until: ready_check is not failed and ready_check.msg == 'Device is ready.'
-      retries: 10
-      delay: 10
-
-    - name: Refresh content update index
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "request content upgrade check"
-
-    - name: Download latest content update
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "request content upgrade download latest"
-      register: content_download
-
-    - name: Extract job ID for content download
-      ansible.builtin.set_fact:
-        content_download_jobid: "{{ content_download.stdout_xml | default('') | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}"
-
-    - name: Wait for content download job to complete
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "<show><jobs><id>{{ content_download_jobid }}</id></jobs></show>"
-        cmd_is_xml: true
-      register: content_download_result
-      until: content_download_result.stdout_xml is search('<status>FIN</status>')
-      retries: 300
-      delay: 10
-      failed_when: content_download_result.stdout_xml is search('<result>FAIL</result>')
-      when: content_download_jobid | length > 0
-      no_log: true
-
-    - name: Install latest content update
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "request content upgrade install version latest"
-      register: content_install
-
-    - name: Extract job ID for content install
-      ansible.builtin.set_fact:
-        content_install_jobid: "{{ content_install.stdout_xml | default('') | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}"
-
-    - name: Wait for content install job to complete
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "<show><jobs><id>{{ content_install_jobid }}</id></jobs></show>"
-        cmd_is_xml: true
-      register: content_install_result
-      until: >
-        content_install_result.stdout_xml is search('<status>FIN</status>') or
-        content_install_result.stdout_xml is search('<status>FAIL</status>')
-      retries: 300
-      delay: 10
-      failed_when: >
-        (content_install_result.stdout_xml is search('<status>FIN</status>') and
-         content_install_result.stdout_xml is search('<result>FAIL</result>')) or
-        content_install_result.stdout_xml is search('<status>FAIL</status>')
-      when: content_install_jobid | length > 0
-      no_log: true
-
-    - name: Wait for device readiness after content install
-      paloaltonetworks.panos.panos_check:
-        provider: "{{ device }}"
-      register: ready_after_content
-      until: ready_after_content is not failed and ready_after_content.msg == 'Device is ready.'
-      retries: 60
-      delay: 15
-      no_log: true
+    - name: Include content and antivirus update tasks
+      ansible.builtin.import_tasks: tasks/content_and_antivirus_update.yml
 
     - name: Backup running configuration
       paloaltonetworks.panos.panos_export:
@@ -234,6 +164,18 @@
           - (ha_post_disable.ansible_facts.ansible_net_ha_localmode | lower) == 'active-passive'
           - ha_post_disable.ansible_facts.ansible_net_ha_localstate | lower in ['active', 'passive']
         fail_msg: "Unexpected HA state after disabling config sync; check HA configuration on device."
+
+    - name: Verify antivirus versions match across HA peers
+      run_once: true
+      vars:
+        antivirus_versions: "{{ ansible_play_hosts_all | map('extract', hostvars, 'ha_antivirus_version') | list }}"
+      ansible.builtin.assert:
+        that:
+          - antivirus_versions | reject('equalto', 'unknown') | list | length == antivirus_versions | length
+          - (antivirus_versions | unique | length) == 1
+        fail_msg: >-
+          Antivirus update mismatch detected across HA peers: {{ antivirus_versions }}. Ensure both devices downloaded and
+          installed the latest antivirus package before proceeding.
 
     - name: Orchestrate passive-first upgrade sequence (controller-driven)
       run_once: true
