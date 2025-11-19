@@ -135,4 +135,18 @@
 
 - name: Cache antivirus version fact
   ansible.builtin.set_fact:
-    ha_antivirus_version: "{{ antivirus_version_facts.ansible_facts.ansible_net_antivirus_version | default('unknown') }}"
+    ha_antivirus_version: >-
+      {{
+        (antivirus_version_facts.ansible_facts.ansible_net_antivirus_version | default(''))
+        or (
+          (antivirus_version_facts.ansible_facts.ansible_net_system_info | default({}))
+            .get('antivirus_version', '')
+        )
+        or (
+          (antivirus_version_facts.ansible_facts.ansible_net_system_info | default({}))
+            .get('dynamic_updates', {})
+            .get('anti-virus', {})
+            .get('version', '')
+        )
+        or 'unknown'
+      }}
