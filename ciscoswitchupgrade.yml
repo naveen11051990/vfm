@@ -8,16 +8,33 @@
     tftp_server: "192.168.29.22"
     image_path: "flash:/{{ new_image }}"
     boot_system_cmd: "boot system flash:{{ new_image }}"
+    mgmt_vrf: "Mgmt-vrf" # Management VRF name
   tasks:
-    - name: Check connectivity to TFTP server
+    - name: Check connectivity to TFTP server (via Mgmt VRF)
       cisco.ios.ios_command:
         commands:
-          - "ping {{ tftp_server }} repeat 5"
+          - "ping vrf {{ mgmt_vrf }} {{ tftp_server }} repeat 5"
       register: ping_result
 
     - name: Display ping result
       ansible.builtin.debug:
         var: ping_result.stdout_lines
+
+    - name: Fail if TFTP server is unreachable
+      ansible.builtin.fail:
+        msg: |
+          TFTP server {{ tftp_server }} is unreachable from the switch.
+
+          Troubleshooting steps:
+          1. Verify TFTP server IP is correct
+          2. Check switch routing: 'show ip route {{ tftp_server }}'
+          3. Check switch can reach gateway: 'show ip interface brief'
+          4. Verify no ACLs blocking traffic: 'show ip access-lists'
+          5. Check TFTP server firewall allows UDP port 69
+          6. Verify TFTP service is running on {{ tftp_server }}
+
+          Alternative: Copy image to Ansible controller and use SCP method instead.
+      when: "'Success rate is 0 percent' in ping_result.stdout[0]"
 
     - name: Verify flash space
       cisco.ios.ios_command:
@@ -29,16 +46,16 @@
       ansible.builtin.debug:
         var: flash_space.stdout_lines
 
-    - name: Copy new image to flash from TFTP server
+    - name: Copy new image to flash from TFTP server (via Mgmt VRF)
       cisco.ios.ios_command:
         commands:
-          - command: "copy tftp://{{ tftp_server }}/{{ new_image }} flash:/{{ new_image }}"
+          - command: "copy tftp://{{ tftp_server }}/{{ new_image }} flash:/{{ new_image }} /vrf {{ mgmt_vrf }}"
             prompt:
               - "Destination filename"
               - "\\[.*\\]\\?"
             answer: "\r"
       vars:
-        ansible_command_timeout: 1800
+        ansible_command_timeout: 2700
 
     - name: Verify image checksum
       cisco.ios.ios_command:
