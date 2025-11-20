@@ -71,7 +71,7 @@
 
     - name: Wait for install to complete (pause)
       pause:
-        minutes: 10  # adjust as per the image size / platform
+        minutes: 15  # adjust as per the image size / platform
 
     - name: Reload switch
       cisco.ios.ios_command:
