@@ -1,5 +1,5 @@
 ---
-- name: Upgrade Cisco Catalyst 9300 to new IOS-XE version
+- name: Upgrade Cisco Catalyst 9300 Switch IOS-XE
   hosts: 192.168.29.164
   gather_facts: no
   connection: network_cli
@@ -10,11 +10,11 @@
     remote_image_path: "tftp://{{ tftp_server }}/Users/prabhakaran/Downloads/{{ upgrade_image }}"
     bootflash_image: "bootflash:{{ upgrade_image }}"
     expected_version: "17.15.03"
-    # Timeout for long-running commands (in seconds)
-    ansible_command_timeout: 2700
+    # This variable will be used when we explicitly override command timeout in tasks
+    long_command_timeout: 1200
 
   tasks:
-    - name: Show current IOS-XE version
+    - name: Show current version
       cisco.ios.ios_command:
         commands:
           - "show version"
@@ -24,7 +24,7 @@
       debug:
         msg: "{{ version_out.stdout[0] }}"
 
-    - name: Copy new IOS-XE image to switch via TFTP
+    - name: Copy image via TFTP
       cisco.ios.ios_command:
         commands:
           - "copy {{ remote_image_path }} {{ bootflash_image }}"
@@ -33,56 +33,56 @@
         retries: 60
         interval: 30
       vars:
-        ansible_command_timeout: 1200
+        ansible_command_timeout: "{{ long_command_timeout }}"
       register: copy_out
 
-    - name: Debug copy output
+    - name: Debug copy result
       debug:
         var: copy_out.stdout_lines
 
-    - name: Verify MD5 checksum of the new image (optional)
+    - name: Verify image MD5 (optional)
       cisco.ios.ios_command:
         commands:
           - "verify /md5 {{ bootflash_image }}"
       register: md5_out
 
-    - name: Debug MD5 verify output
+    - name: Debug MD5 output
       debug:
         var: md5_out.stdout_lines
 
-    - name: Install and activate the new image (install mode)
+    - name: Install and activate new image (install mode)
       cisco.ios.ios_command:
         commands:
           - "install add file {{ bootflash_image }} activate commit"
         prompt:
-          - "This operation requires a reload of the system. Do you want to proceed?"
+          - "This operation requires a reload of the system. Do you want to proceed"
         answer:
           - "y"
         wait_for:
           - "result[0] contains install_add_activate_commit"
         retries: 5
         interval: 60
+      vars:
+        ansible_command_timeout: "{{ long_command_timeout }}"
       register: install_out
 
     - name: Debug install output
       debug:
         var: install_out.stdout_lines
 
-    - name: Pause for installation to proceed
+    - name: Pause to let installation proceed
       pause:
         minutes: 10
 
-    - name: Reload the switch to boot the new image
+    - name: Reload the switch
       cisco.ios.ios_command:
         commands:
           - "reload"
         prompt:
-          - "Proceed with reload?"
+          - "Proceed with reload? [confirm]"
           - "confirm"
         answer:
           - "\n"
-        retries: 3
-        interval: 10
       vars:
         ansible_command_timeout: 300
 
@@ -104,7 +104,7 @@
       debug:
         var: post_version.stdout[0]
 
-    - name: Assert that the version is the expected version
+    - name: Assert correct version
       assert:
         that:
           - "'{{ expected_version }}' in post_version.stdout[0]"
