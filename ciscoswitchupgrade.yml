@@ -30,11 +30,6 @@
         fail_msg: "Switch is already at version {{ ansible_net_version }} or newer. No upgrade needed."
       # Using version test to compare versions
 
-    - name: Clean up inactive packages (free space) – remove inactive install
-      cisco.ios.ios_command:
-        commands:
-          - "request platform software package clean switch all"
-        # this removes previously inactive installs; refer to Cisco docs. :contentReference[oaicite:2]{index=2}
 
     - name: Copy new IOS-XE image to switch
       cisco.ios.ios_command:
