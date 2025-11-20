@@ -10,10 +10,10 @@
     remote_image_path: "tftp://{{ tftp_server }}/Users/prabhakaran/Downloads/{{ upgrade_image }}"
     bootflash_image: "bootflash:{{ upgrade_image }}"
     expected_version: "17.15.03"
-    # Timeout for long running commands like install
-    command_timeout: 2700
+    ansible_command_timeout: 2700
 
   tasks:
+
     - name: Show current version
       cisco.ios.ios_command:
         commands:
@@ -32,13 +32,15 @@
           - "result[0] contains Copy complete"
         retries: 60
         interval: 30
+      vars:
+        ansible_command_timeout: 1200
       register: copy_out
 
     - name: Debug copy result
       debug:
         var: copy_out.stdout_lines
 
-    - name: Verify image MD5 (optional, if you know MD5)
+    - name: Verify image MD5 (optional)
       cisco.ios.ios_command:
         commands:
           - "verify /md5 {{ bootflash_image }}"
@@ -51,13 +53,9 @@
     - name: Run install add + activate + commit
       cisco.ios.ios_command:
         commands:
-          - command: "install add file {{ bootflash_image }} activate commit"
-            prompt: 
-              - "This operation requires a reload of the system. Do you want to proceed"
-            answer:
-              - "y"
+          - "install add file {{ bootflash_image }} activate commit"
         wait_for:
-          - "result[0] contains install_add_activate_commit: START"
+          - "result[0] contains install_add_activate_commit"
         retries: 5
         interval: 60
       register: install_out
@@ -73,16 +71,16 @@
     - name: Trigger reload
       cisco.ios.ios_command:
         commands:
-          - command: "reload"
-            prompt:
-              - "Proceed with reload? [confirm]"
-              - "confirm"
-            answer:
-              - "\n"
+          - "reload"
+        prompt:
+          - "Proceed with reload?"
+          - "confirm"
+        answer:
+          - "\n"
         retries: 3
         interval: 10
 
-    - name: Wait for switch to come back
+    - name: Wait for switch to come back after reboot
       wait_for:
         host: "{{ inventory_hostname }}"
         port: 22
@@ -105,4 +103,4 @@
         that:
           - "'{{ expected_version }}' in post_version.stdout[0]"
         fail_msg: "Upgrade failed: Version after reload is not {{ expected_version }}"
-        success_msg: "Upgrade succeeded to {{ expected_version }}"
+        success_msg: "Upgrade succeeded to {{ ex_
