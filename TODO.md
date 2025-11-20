@@ -2,10 +2,11 @@
 
 ## Feature
 
-### HA1 Link Pre-Check
+### HA OS Downgrade Playbook
 
-- [ ] Add a pre-check that validates HA1 status is `up` before any upgrade work begins.
-- [ ] Abort with guidance if HA1 is down to avoid desynchronizing the peers.
+- [ ] Design downgrade workflow for HA pair (see `plans/feature_ha_os_downgrade_plan.md`)
+- [ ] Implement `ha_os_downgrade.yml` playbook aligned with Palo Alto and Ansible docs
+- [ ] Test downgrade procedure in a lab HA environment
 
 ## Fix
 
