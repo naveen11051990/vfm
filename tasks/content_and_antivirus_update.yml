@@ -1,13 +1,8 @@
----
-# Content and Antivirus Update Tasks
-# Uses panos_op for content/antivirus operations (no panos_software module alternative available)
-# Manual job polling is documented limitation due to lack of dedicated job tracking module
-
 - name: Ensure device is ready before content upgrade
   paloaltonetworks.panos.panos_check:
     provider: "{{ device }}"
   register: ready_check
-  until: ready_check is not failed
+  until: ready_check is not failed and ready_check.msg == 'Device is ready.'
   retries: 10
   delay: 10
 
@@ -22,8 +17,6 @@
     cmd: "request content upgrade download latest"
   register: content_download
 
-# NOTE: Manual job ID extraction needed because panos_software does not support content updates
-# panos_op output contains job ID in XML, extracted via regex
 - name: Extract job ID for content download
   ansible.builtin.set_fact:
     content_download_jobid: "{{ content_download.stdout_xml | default('') | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}"
@@ -31,7 +24,8 @@
 - name: Wait for content download job to complete
   paloaltonetworks.panos.panos_op:
     provider: "{{ device }}"
-    cmd: "request job info id {{ content_download_jobid }}"
+    cmd: "<show><jobs><id>{{ content_download_jobid }}</id></jobs></show>"
+    cmd_is_xml: true
   register: content_download_result
   until: content_download_result.stdout_xml is search('<status>FIN</status>')
   retries: 300
@@ -46,7 +40,6 @@
     cmd: "request content upgrade install version latest"
   register: content_install
 
-# NOTE: Manual job ID extraction - see content download note
 - name: Extract job ID for content install
   ansible.builtin.set_fact:
     content_install_jobid: "{{ content_install.stdout_xml | default('') | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}"
@@ -54,7 +47,8 @@
 - name: Wait for content install job to complete
   paloaltonetworks.panos.panos_op:
     provider: "{{ device }}"
-    cmd: "request job info id {{ content_install_jobid }}"
+    cmd: "<show><jobs><id>{{ content_install_jobid }}</id></jobs></show>"
+    cmd_is_xml: true
   register: content_install_result
   until: >
     content_install_result.stdout_xml is search('<status>FIN</status>') or
@@ -72,7 +66,7 @@
   paloaltonetworks.panos.panos_check:
     provider: "{{ device }}"
   register: ready_after_content
-  until: ready_after_content is not failed
+  until: ready_after_content is not failed and ready_after_content.msg == 'Device is ready.'
   retries: 60
   delay: 15
   no_log: true
@@ -88,7 +82,6 @@
     cmd: "request anti-virus upgrade download latest"
   register: antivirus_download
 
-# NOTE: Manual job ID extraction - see content download note
 - name: Extract job ID for antivirus download
   ansible.builtin.set_fact:
     antivirus_download_jobid: "{{ antivirus_download.stdout_xml | default('') | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}"
@@ -96,7 +89,8 @@
 - name: Wait for antivirus download job to complete
   paloaltonetworks.panos.panos_op:
     provider: "{{ device }}"
-    cmd: "request job info id {{ antivirus_download_jobid }}"
+    cmd: "<show><jobs><id>{{ antivirus_download_jobid }}</id></jobs></show>"
+    cmd_is_xml: true
   register: antivirus_download_result
   until: antivirus_download_result.stdout_xml is search('<status>FIN</status>')
   retries: 300
@@ -111,7 +105,6 @@
     cmd: "request anti-virus upgrade install version latest"
   register: antivirus_install
 
-# NOTE: Manual job ID extraction - see content download note
 - name: Extract job ID for antivirus install
   ansible.builtin.set_fact:
     antivirus_install_jobid: "{{ antivirus_install.stdout_xml | default('') | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}"
@@ -119,7 +112,8 @@
 - name: Wait for antivirus install job to complete
   paloaltonetworks.panos.panos_op:
     provider: "{{ device }}"
-    cmd: "request job info id {{ antivirus_install_jobid }}"
+    cmd: "<show><jobs><id>{{ antivirus_install_jobid }}</id></jobs></show>"
+    cmd_is_xml: true
   register: antivirus_install_result
   until: >
     antivirus_install_result.stdout_xml is search('<status>FIN</status>') or
@@ -134,13 +128,18 @@
   no_log: true
 
 - name: Query installed antivirus package information
-  paloaltonetworks.panos.panos_op:
-    provider: "{{ device }}"
-    cmd: "request anti-virus upgrade info"
-  register: antivirus_info_raw
+  block:
+    - name: Run antivirus upgrade info command
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<request><anti-virus><upgrade><info></info></upgrade></anti-virus></request>"
+        cmd_is_xml: true
+      register: antivirus_info_raw
 
-# NOTE: Extract current antivirus version from info output
-# Used for HA peer verification (both nodes must have same antivirus version before upgrade)
+    - name: Display antivirus upgrade info output
+      ansible.builtin.debug:
+        msg: "{{ antivirus_info_raw.stdout_xml | default('') }}"
+
 - name: Cache antivirus version fact
   ansible.builtin.set_fact:
     ha_antivirus_version: >-

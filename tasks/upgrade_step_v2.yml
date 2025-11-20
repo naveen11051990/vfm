@@ -45,7 +45,7 @@
   paloaltonetworks.panos.panos_check:
     provider: "{{ device }}"
   register: ready_result
-  until: ready_result is not failed
+  until: ready_result is not failed and ready_result.msg == 'Device is ready.'
   retries: 100
   delay: 15
   no_log: true
@@ -57,7 +57,7 @@
   register: version_check
 
 - name: Assert version {{ version_item }} installed successfully
-  ansible.builtin.assert:
+  assert:
     that:
       - version_check.ansible_facts.ansible_net_version == version_item
     fail_msg: "Upgrade to {{ version_item }} failed. Device reports {{ version_check.ansible_facts.ansible_net_version }}."
