@@ -5,20 +5,25 @@
   connection: network_cli
   vars:
     new_image: "cat9k_iosxe.17.15.03.SPA.bin"
-    image_path: "flash:/{{ cat9k_iosxe.17.15.03.SPA.bin}}"
-    remote_image_url: "tftp://192.168.29.22/{{ cat9k_iosxe.17.15.03.SPA.bin }}"
-    boot_system_cmd: "boot system flash:{{ cat9k_iosxe.17.15.03.SPA.bin }}"
+    tftp_server: "192.168.29.22"
+    image_path: "flash:/{{ new_image }}"
+    boot_system_cmd: "boot system flash:{{ new_image }}"
   tasks:
-    - name: Copy new image to flash
-      ansible.netcommon.net_put:
-        src: "{{ remote_image_url }}"
-        dest: "{{ image_path }}"
-
+    - name: Copy new image to flash from TFTP server
+      cisco.ios.ios_command:
+        commands:
+          - command: "copy tftp://{{ tftp_server }}/{{ new_image }} flash:/{{ new_image }}"
+            prompt: "Destination filename"
+            answer: "{{ new_image }}"
+      vars:
+        ansible_command_timeout: 1800
 
     - name: Verify image checksum
       cisco.ios.ios_command:
         commands:
-          - "verify /md5 {{ image_path }}"
+          - "verify /md5 flash:{{ new_image }}"
+      vars:
+        ansible_command_timeout: 600
 
     - name: Set boot variable to new image
       cisco.ios.ios_config:
