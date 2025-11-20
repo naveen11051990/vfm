@@ -1,6 +1,6 @@
 ---
 - name: Upgrade Cisco Catalyst 9300 Switch
-  hosts: cisco_switches
+  hosts: 192.168.29.164
   gather_facts: no
   connection: network_cli
   vars:
