@@ -14,6 +14,7 @@
         src: "{{ remote_image_url }}"
         dest: "{{ image_path }}"
 
+
     - name: Verify image checksum
       cisco.ios.ios_command:
         commands:
