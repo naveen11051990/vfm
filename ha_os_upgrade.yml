@@ -54,8 +54,7 @@
           sw_version: "{{ ha_facts.ansible_facts.ansible_net_version | default('unknown') }}"
           ha_enabled: "{{ (ha_facts.ansible_facts.ansible_net_ha_enabled | default(false)) | bool }}"
           ha_mode: "{{ (ha_facts.ansible_facts.ansible_net_ha_localmode | default('unknown')) | lower }}"
-          ha_is_active:
-            { { (ha_role.response.active | default(false)) | bool } }
+          ha_is_active: "{{ (ha_role.response.active | default(false)) | bool }}"
           ha_check_reason: "{{ ha_role.response.reason | default('unknown') }}"
           ha_initial_role: "{{ 'active' if ha_role.response.active | default(false) else 'passive' }}"
           ha_group_id: "{{ ha_facts.ansible_facts.ansible_net_ha_group_id | default('1') }}"
