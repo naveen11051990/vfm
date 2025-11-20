@@ -5,12 +5,12 @@
   connection: network_cli
 
   vars:
-    # define variables
-    upgrade_image: "cat9k_iosxe.17.15.03.SPA.bin"         # change this to your image
-    remote_image_path: "tftp://192.168.29.22/Users/prabhakaran/Downloads{{ cat9k_iosxe.17.15.03.SPA.bin }}"
-    bootflash_image: "bootflash:{{ cat9k_iosxe.17.15.03.SPA.bin }}"
-    expected_version: "17.15.03"   # version string to verify after reboot
-    ansible_command_timeout: 2700  # increase timeout for long operations
+    upgrade_image: "cat9k_iosxe.17.15.03.SPA.bin"
+    remote_image_path: 'tftp://192.168.29.22/Users/prabhakaran/Downloads/{{ upgrade_image }}'
+    bootflash_image: "bootflash:{{ upgrade_image }}"
+    expected_version: "17.15.03"
+    ansible_command_timeout: 2700
+
  
 
   tasks:
