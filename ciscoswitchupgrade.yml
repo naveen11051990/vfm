@@ -2,7 +2,7 @@
 - name: Upgrade Cisco Catalyst 9300 Switch IOS-XE
   hosts: 192.168.29.164
   gather_facts: no
-  connection: network_cli
+  connection: local
 
   vars:
     upgrade_image: cat9k_iosxe.17.15.03.SPA.bin
