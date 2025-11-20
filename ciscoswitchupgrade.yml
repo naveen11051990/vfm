@@ -66,9 +66,15 @@
     - name: Verify image checksum
       cisco.ios.ios_command:
         commands:
-          - "verify /md5 flash:{{ new_image }}"
+          - command: "verify /md5 flash:{{ new_image }}"
+            prompt:
+              - "Source filename"
+              - "\\[.*\\]\\?"
+            answer:
+              - "{{ new_image }}"
+              - "\r"
       vars:
-        ansible_command_timeout: 600
+        ansible_command_timeout: 1800
 
     - name: Set boot variable to new image
       cisco.ios.ios_config:
