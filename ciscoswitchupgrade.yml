@@ -1,0 +1,109 @@
+---
+- name: Upgrade Cisco Catalyst 9300 Switch IOS-XE
+  hosts: c9300_switches
+  gather_facts: no
+  connection: network_cli
+
+  vars:
+    # define variables
+    upgrade_image: "cat9k_iosxe.17.12.02.SPA.bin"         # change this to your image
+    remote_image_path: "tftp://10.0.0.10/{{ upgrade_image }}"  # or scp://, http:// etc.
+    bootflash_image: "bootflash:{{ upgrade_image }}"
+    expected_version: "17.12.02"   # version string to verify after reboot
+    ansible_command_timeout: 2700  # increase timeout for long operations
+
+  tasks:
+    - name: Gather IOS-XE facts
+      cisco.ios.ios_facts:
+
+    - name: Debug current version
+      debug:
+        msg:
+          - "Current IOS-XE version: {{ ansible_net_version }}"
+          - "Expected upgrade version: {{ expected_version }}"
+
+    - name: Only proceed if upgrade is needed
+      assert:
+        that:
+          - ansible_net_version is version(expected_version, '<')
+        fail_msg: "Switch is already at version {{ ansible_net_version }} or newer. No upgrade needed."
+      # Using version test to compare versions
+
+    - name: Clean up inactive packages (free space) – remove inactive install
+      cisco.ios.ios_command:
+        commands:
+          - "request platform software package clean switch all"
+        # this removes previously inactive installs; refer to Cisco docs. :contentReference[oaicite:2]{index=2}
+
+    - name: Copy new IOS-XE image to switch
+      cisco.ios.ios_command:
+        commands:
+          - "copy {{ remote_image_path }} {{ bootflash_image }}"
+        vars:
+          ansible_command_timeout: "{{ ansible_command_timeout }}"
+
+    - name: Verify MD5 checksum of the image
+      cisco.ios.ios_command:
+        commands:
+          - "verify /md5 {{ bootflash_image }}"
+        register: md5_verify
+        vars:
+          ansible_command_timeout: "{{ ansible_command_timeout }}"
+
+    - name: Debug MD5 output
+      debug:
+        var: md5_verify.stdout_lines
+
+    # You might want to validate the MD5 against a known value, you can add that check here.
+
+    - name: Set boot variable to new image
+      cisco.ios.ios_config:
+        lines:
+          - "boot system switch all flash {{ bootflash_image }}"
+        save_when: always
+
+    - name: Request platform software install
+      cisco.ios.ios_command:
+        commands:
+          - "install add file {{ bootflash_image }} activate commit"
+        vars:
+          ansible_command_timeout: "{{ ansible_command_timeout }}"
+
+    - name: Wait for install to complete (pause)
+      pause:
+        minutes: 10  # adjust as per the image size / platform
+
+    - name: Reload switch
+      cisco.ios.ios_command:
+        commands:
+          - command: "reload"
+            prompt:
+              - "Proceed with reload? [confirm]"
+              - "confirm"
+            answer:
+              - "\n"
+        vars:
+          ansible_command_timeout: 120
+
+    - name: Wait for switch to come back
+      wait_for:
+        host: "{{ inventory_hostname }}"
+        port: 22
+        delay: 60
+        timeout: 600
+      delegate_to: localhost
+
+    - name: Gather IOS-XE facts again after reload
+      cisco.ios.ios_facts:
+        # no need to set timeout here, facts are quick
+
+    - name: Assert that the upgrade succeeded
+      assert:
+        that:
+          - ansible_net_version is version(expected_version, '==')
+        fail_msg: "Post-upgrade version ({{ ansible_net_version }}) does not match expected ({{ expected_version }})"
+        success_msg: "Upgrade successful! Current version: {{ ansible_net_version }}"
+
+    - name: Save running config
+      cisco.ios.ios_config:
+        save_when: always
