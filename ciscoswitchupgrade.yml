@@ -49,11 +49,17 @@
     - name: Copy new image to flash from TFTP server (via Mgmt VRF)
       cisco.ios.ios_command:
         commands:
-          - command: "copy tftp:/vrf {{ mgmt_vrf }}/{{ tftp_server }}/{{ new_image }} flash:/{{ new_image }}"
+          - command: "copy tftp: flash: vrf {{ mgmt_vrf }}"
             prompt:
+              - "Address or name of remote host"
+              - "Source filename"
               - "Destination filename"
               - "\\[.*\\]\\?"
-            answer: "\r"
+            answer:
+              - "{{ tftp_server }}"
+              - "{{ new_image }}"
+              - "{{ new_image }}"
+              - "{{ new_image }}"
       vars:
         ansible_command_timeout: 2700
 
