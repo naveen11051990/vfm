@@ -9,12 +9,34 @@
     image_path: "flash:/{{ new_image }}"
     boot_system_cmd: "boot system flash:{{ new_image }}"
   tasks:
+    - name: Check connectivity to TFTP server
+      cisco.ios.ios_command:
+        commands:
+          - "ping {{ tftp_server }} repeat 5"
+      register: ping_result
+
+    - name: Display ping result
+      ansible.builtin.debug:
+        var: ping_result.stdout_lines
+
+    - name: Verify flash space
+      cisco.ios.ios_command:
+        commands:
+          - "show flash: | include bytes"
+      register: flash_space
+
+    - name: Display flash space
+      ansible.builtin.debug:
+        var: flash_space.stdout_lines
+
     - name: Copy new image to flash from TFTP server
       cisco.ios.ios_command:
         commands:
           - command: "copy tftp://{{ tftp_server }}/{{ new_image }} flash:/{{ new_image }}"
-            prompt: "Destination filename"
-            answer: "{{ new_image }}"
+            prompt:
+              - "Destination filename"
+              - "\\[.*\\]\\?"
+            answer: "\r"
       vars:
         ansible_command_timeout: 1800
 
