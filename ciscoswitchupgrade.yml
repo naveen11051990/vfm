@@ -1,115 +1,41 @@
 ---
-- name: Upgrade Cisco Catalyst 9300 Switch IOS-XE
-  hosts: 192.168.29.164
+- name: Upgrade Cisco Catalyst 9300 Switch
+  hosts: cisco_switches
   gather_facts: no
   connection: network_cli
-
   vars:
-    upgrade_image: cat9k_iosxe.17.15.03.SPA.bin
-    tftp_server_ip: 192.168.29.22
-    remote_image_path: tftp://192.168.29.22/cat9k_iosxe.17.15.03.SPA.bin
-    bootflash_image: flash:cat9k_iosxe.17.15.03.SPA.bin
-    vrf: Mgmt-vrf
-    expected_version: 17.15.03
-    copy_timeout: 2700
-    install_timeout: 3600
-    wait_for_reboot_seconds: 600
-    long_command_timeout: 1200
+    new_image: "cat9k_iosxe.17.15.03.SPA.bin"
+    image_path: "flash:/{{ cat9k_iosxe.17.15.03.SPA.bin}}"
+    remote_image_url: "tftp://192.168.29.22/{{ cat9k_iosxe.17.15.03.SPA.bin }}"
+    boot_system_cmd: "boot system flash:{{ cat9k_iosxe.17.15.03.SPA.bin }}"
 
   tasks:
-    - name: Show current version
+    - name: Ensure image is present in flash
+      cisco.ios.ios_file_copy:
+        src: "{{ remote_image_url }}"
+        dest: "{{ image_path }}"
+        protocol: tftp
+      register: copy_result
+
+    - name: Verify image checksum
       cisco.ios.ios_command:
         commands:
-          - "show version"
-      register: version_out
+          - "verify /md5 {{ image_path }}"
+      register: verify_result
 
-    - name: Debug current version
-      debug:
-        msg: "{{ version_out.stdout[0] }}"
+    - name: Set boot variable to new image
+      cisco.ios.ios_config:
+        lines:
+          - "{{ boot_system_cmd }}"
 
-    - name: Copy image via TFTP
-      cisco.ios.ios_command:
-        commands:
-          - "copy {{ remote_image_path }} {{ bootflash_image }}"
-        wait_for:
-          - "result[0] contains Copy complete"
-        retries: 60
-        interval: 30
-      vars:
-        ansible_command_timeout: "{{ long_command_timeout }}"
-      register: copy_out
+    - name: Save running configuration
+      cisco.ios.ios_config:
+        save_when: always
 
-    - name: Debug copy result
-      debug:
-        var: copy_out.stdout_lines
-
-    - name: Verify image MD5 (optional)
-      cisco.ios.ios_command:
-        commands:
-          - "verify /md5 {{ bootflash_image }}"
-      register: md5_out
-
-    - name: Debug MD5 output
-      debug:
-        var: md5_out.stdout_lines
-
-    - name: Install and activate new image (install mode)
-      cisco.ios.ios_command:
-        commands:
-          - "install add file {{ bootflash_image }} activate commit"
-        prompt:
-          - "This operation requires a reload of the system. Do you want to proceed"
-        answer:
-          - "y"
-        wait_for:
-          - "result[0] contains install_add_activate_commit"
-        retries: 5
-        interval: 60
-      vars:
-        ansible_command_timeout: "{{ long_command_timeout }}"
-      register: install_out
-
-    - name: Debug install output
-      debug:
-        var: install_out.stdout_lines
-
-    - name: Pause to let installation proceed
-      pause:
-        minutes: 10
-
-    - name: Reload the switch
+    - name: Reload the switch to activate new image
       cisco.ios.ios_command:
         commands:
           - "reload"
-        prompt:
-          - "Proceed with reload? [confirm]"
-          - "confirm"
-        answer:
-          - "\n"
       vars:
-        ansible_command_timeout: 300
-
-    - name: Wait for switch to come back after reload
-      wait_for:
-        host: "{{ inventory_hostname }}"
-        port: 22
-        delay: 60
-        timeout: 900
-      delegate_to: localhost
-
-    - name: Show version after reload
-      cisco.ios.ios_command:
-        commands:
-          - "show version"
-      register: post_version
-
-    - name: Debug version after reload
-      debug:
-        var: post_version.stdout[0]
-
-    - name: Assert correct version
-      assert:
-        that:
-          - "'{{ expected_version }}' in post_version.stdout[0]"
-        fail_msg: "Upgrade failed: version after reload is not {{ expected_version }}"
-        success_msg: "Upgrade succeeded: version is {{ expected_version }}"
+        ansible_command_timeout: 120
+      ignore_errors: yes
