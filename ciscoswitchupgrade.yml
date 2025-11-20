@@ -6,70 +6,71 @@
 
   vars:
     upgrade_image: "cat9k_iosxe.17.15.03.SPA.bin"
-    remote_image_path: 'tftp://192.168.29.22/Users/prabhakaran/Downloads/{{ upgrade_image }}'
+    tftp_server: "192.168.29.22"
+    remote_image_path: "tftp://{{ tftp_server }}/Users/prabhakaran/Downloads/{{ upgrade_image }}"
     bootflash_image: "bootflash:{{ upgrade_image }}"
     expected_version: "17.15.03"
-    ansible_command_timeout: 2700
-
- 
+    # Timeout for long running commands like install
+    command_timeout: 2700
 
   tasks:
-    - name: Gather IOS-XE facts
-      cisco.ios.ios_facts:
+    - name: Show current version
+      cisco.ios.ios_command:
+        commands:
+          - "show version"
+      register: version_out
 
     - name: Debug current version
       debug:
-        msg:
-          - "Current IOS-XE version: {{ ansible_net_version }}"
-          - "Expected upgrade version: {{ expected_version }}"
+        msg: "{{ version_out.stdout[0] }}"
 
-    - name: Only proceed if upgrade is needed
-      assert:
-        that:
-          - ansible_net_version is version(expected_version, '<')
-        fail_msg: "Switch is already at version {{ ansible_net_version }} or newer. No upgrade needed."
-      # Using version test to compare versions
-
-
-    - name: Copy new IOS-XE image to switch
+    - name: Copy image via TFTP
       cisco.ios.ios_command:
         commands:
           - "copy {{ remote_image_path }} {{ bootflash_image }}"
-        vars:
-          ansible_command_timeout: "{{ ansible_command_timeout }}"
+        wait_for:
+          - "result[0] contains Copy complete"
+        retries: 60
+        interval: 30
+      register: copy_out
 
-    - name: Verify MD5 checksum of the image
+    - name: Debug copy result
+      debug:
+        var: copy_out.stdout_lines
+
+    - name: Verify image MD5 (optional, if you know MD5)
       cisco.ios.ios_command:
         commands:
           - "verify /md5 {{ bootflash_image }}"
-        register: md5_verify
-        vars:
-          ansible_command_timeout: "{{ ansible_command_timeout }}"
+      register: md5_out
 
     - name: Debug MD5 output
       debug:
-        var: md5_verify.stdout_lines
+        var: md5_out.stdout_lines
 
-    # You might want to validate the MD5 against a known value, you can add that check here.
-
-    - name: Set boot variable to new image
-      cisco.ios.ios_config:
-        lines:
-          - "boot system switch all flash {{ bootflash_image }}"
-        save_when: always
-
-    - name: Request platform software install
+    - name: Run install add + activate + commit
       cisco.ios.ios_command:
         commands:
-          - "install add file {{ bootflash_image }} activate commit"
-        vars:
-          ansible_command_timeout: "{{ ansible_command_timeout }}"
+          - command: "install add file {{ bootflash_image }} activate commit"
+            prompt: 
+              - "This operation requires a reload of the system. Do you want to proceed"
+            answer:
+              - "y"
+        wait_for:
+          - "result[0] contains install_add_activate_commit: START"
+        retries: 5
+        interval: 60
+      register: install_out
 
-    - name: Wait for install to complete (pause)
+    - name: Debug install output
+      debug:
+        var: install_out.stdout_lines
+
+    - name: Pause to let installation proceed
       pause:
-        minutes: 15  # adjust as per the image size / platform
+        minutes: 10
 
-    - name: Reload switch
+    - name: Trigger reload
       cisco.ios.ios_command:
         commands:
           - command: "reload"
@@ -78,8 +79,8 @@
               - "confirm"
             answer:
               - "\n"
-        vars:
-          ansible_command_timeout: 120
+        retries: 3
+        interval: 10
 
     - name: Wait for switch to come back
       wait_for:
@@ -89,17 +90,19 @@
         timeout: 600
       delegate_to: localhost
 
-    - name: Gather IOS-XE facts again after reload
-      cisco.ios.ios_facts:
-        # no need to set timeout here, facts are quick
+    - name: Show version after reload
+      cisco.ios.ios_command:
+        commands:
+          - "show version"
+      register: post_version
 
-    - name: Assert that the upgrade succeeded
+    - name: Debug version after reload
+      debug:
+        var: post_version.stdout[0]
+
+    - name: Assert the version is as expected
       assert:
         that:
-          - ansible_net_version is version(expected_version, '==')
-        fail_msg: "Post-upgrade version ({{ ansible_net_version }}) does not match expected ({{ expected_version }})"
-        success_msg: "Upgrade successful! Current version: {{ ansible_net_version }}"
-
-    - name: Save running config
-      cisco.ios.ios_config:
-        save_when: always
+          - "'{{ expected_version }}' in post_version.stdout[0]"
+        fail_msg: "Upgrade failed: Version after reload is not {{ expected_version }}"
+        success_msg: "Upgrade succeeded to {{ expected_version }}"
