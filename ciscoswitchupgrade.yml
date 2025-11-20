@@ -1,5 +1,5 @@
 ---
-- name: Upgrade Cisco Catalyst 9300 Switch IOS-XE
+- name: Upgrade Cisco Catalyst 9300 to new IOS-XE version
   hosts: 192.168.29.164
   gather_facts: no
   connection: network_cli
@@ -10,11 +10,11 @@
     remote_image_path: "tftp://{{ tftp_server }}/Users/prabhakaran/Downloads/{{ upgrade_image }}"
     bootflash_image: "bootflash:{{ upgrade_image }}"
     expected_version: "17.15.03"
+    # Timeout for long-running commands (in seconds)
     ansible_command_timeout: 2700
 
   tasks:
-
-    - name: Show current version
+    - name: Show current IOS-XE version
       cisco.ios.ios_command:
         commands:
           - "show version"
@@ -24,7 +24,7 @@
       debug:
         msg: "{{ version_out.stdout[0] }}"
 
-    - name: Copy image via TFTP
+    - name: Copy new IOS-XE image to switch via TFTP
       cisco.ios.ios_command:
         commands:
           - "copy {{ remote_image_path }} {{ bootflash_image }}"
@@ -36,24 +36,28 @@
         ansible_command_timeout: 1200
       register: copy_out
 
-    - name: Debug copy result
+    - name: Debug copy output
       debug:
         var: copy_out.stdout_lines
 
-    - name: Verify image MD5 (optional)
+    - name: Verify MD5 checksum of the new image (optional)
       cisco.ios.ios_command:
         commands:
           - "verify /md5 {{ bootflash_image }}"
       register: md5_out
 
-    - name: Debug MD5 output
+    - name: Debug MD5 verify output
       debug:
         var: md5_out.stdout_lines
 
-    - name: Run install add + activate + commit
+    - name: Install and activate the new image (install mode)
       cisco.ios.ios_command:
         commands:
           - "install add file {{ bootflash_image }} activate commit"
+        prompt:
+          - "This operation requires a reload of the system. Do you want to proceed?"
+        answer:
+          - "y"
         wait_for:
           - "result[0] contains install_add_activate_commit"
         retries: 5
@@ -64,11 +68,11 @@
       debug:
         var: install_out.stdout_lines
 
-    - name: Pause to let installation proceed
+    - name: Pause for installation to proceed
       pause:
         minutes: 10
 
-    - name: Trigger reload
+    - name: Reload the switch to boot the new image
       cisco.ios.ios_command:
         commands:
           - "reload"
@@ -79,13 +83,15 @@
           - "\n"
         retries: 3
         interval: 10
+      vars:
+        ansible_command_timeout: 300
 
-    - name: Wait for switch to come back after reboot
+    - name: Wait for switch to come back after reload
       wait_for:
         host: "{{ inventory_hostname }}"
         port: 22
         delay: 60
-        timeout: 600
+        timeout: 900
       delegate_to: localhost
 
     - name: Show version after reload
@@ -98,9 +104,9 @@
       debug:
         var: post_version.stdout[0]
 
-    - name: Assert the version is as expected
+    - name: Assert that the version is the expected version
       assert:
         that:
           - "'{{ expected_version }}' in post_version.stdout[0]"
-        fail_msg: "Upgrade failed: Version after reload is not {{ expected_version }}"
-        success_msg: "Upgrade succeeded to {{ ex_
+        fail_msg: "Upgrade failed: version after reload is not {{ expected_version }}"
+        success_msg: "Upgrade succeeded: version is {{ expected_version }}"
