@@ -49,7 +49,7 @@
     - name: Copy new image to flash from TFTP server (via Mgmt VRF)
       cisco.ios.ios_command:
         commands:
-          - command: "copy tftp://{{ tftp_server }}/{{ new_image }} flash:/{{ new_image }} /vrf {{ mgmt_vrf }}"
+          - command: "copy tftp:/vrf {{ mgmt_vrf }}/{{ tftp_server }}/{{ new_image }} flash:/{{ new_image }}"
             prompt:
               - "Destination filename"
               - "\\[.*\\]\\?"
