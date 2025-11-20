@@ -5,13 +5,15 @@
   connection: network_cli
 
   vars:
-    upgrade_image: "cat9k_iosxe.17.15.03.SPA.bin"
-    tftp_server: "192.168.29.22"
-    remote_image_path: "tftp://{{ tftp_server }}/Users/prabhakaran/Downloads/{{ upgrade_image }}"
-    bootflash_image: "bootflash:{{ upgrade_image }}"
-    expected_version: "17.15.03"
-    # This variable will be used when we explicitly override command timeout in tasks
-    long_command_timeout: 1200
+    upgrade_image: cat9k_iosxe.17.15.03.SPA.bin
+    tftp_server_ip: 192.168.29.22
+    remote_image_path: tftp://192.168.29.22/cat9k_iosxe.17.15.03.SPA.bin
+    bootflash_image: flash:cat9k_iosxe.17.15.03.SPA.bin
+    vrf: Mgmt-vrf
+    expected_version: 17.15.03
+    copy_timeout: 2700
+    install_timeout: 3600
+    wait_for_reboot_seconds: 600
 
   tasks:
     - name: Show current version
