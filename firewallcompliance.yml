@@ -55,15 +55,15 @@
             | list
           }}
 
-     - name: Get all decryption rules
-       paloaltonetworks.panos.panos_decryption_rule:
+    - name: Get all decryption rules
+      paloaltonetworks.panos.panos_decryption_rule:
         provider: "{{ provider }}"
         state: gathered
         gathered_filter: "*"
       register: decryption_rules
 
-     - name: Filter rules where action = decrypt (or decrypt-and-forward)
-       set_fact:
+    - name: Filter rules where action = decrypt (or decrypt-and-forward)
+      set_fact:
          decrypt_rules: >-
           {{
             (decryption_rules.decryption_rules | default([]))
