@@ -1,6 +1,6 @@
 ---
 - name: PAN-OS HA OS Downgrade with Config Backup
-  hosts: "{{ hosts | default('PA_HA_DB') }}"
+  hosts: "{{ hosts | default('PA_HA_DG') }}"
   connection: local
   gather_facts: false
 
