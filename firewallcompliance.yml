@@ -1,4 +1,3 @@
----
 - name: Find security rules without description
   hosts: "{{ hosts | default('PRODUCTIONFIREWALL') }}"
   connection: local
@@ -9,7 +8,6 @@
       ip_address: "{{ ip_address }}"
       username: "{{ username }}"
       password: "{{ password }}"
-
 
     required_profiles:
       - antivirus
@@ -26,12 +24,11 @@
       paloaltonetworks.panos.panos_security_rule:
         provider: "{{ device }}"
         state: gathered
-        gathered_filter: "*"  # fetch all rules :contentReference[oaicite:0]{index=0}
+        gathered_filter: "*"
       register: sec_rules
 
-
     - name: Filter any-any insecure rules (source=any, dest=any, service=any)
-      ansible.builtin.set_fact:
+      set_fact:
         any_any_insecure_rules: >-
           {{
             (sec_rules.gathered | default([]))
@@ -43,9 +40,8 @@
             | list
           }}
 
-
     - name: Filter rules missing description
-      ansible.builtin.set_fact:
+      set_fact:
         rules_missing_description: >-
           {{
             (sec_rules.gathered | default([]))
@@ -54,7 +50,7 @@
           }}
 
     - name: Filter rules that use specific source_user (i.e. not 'any')
-      ansible.builtin.set_fact:
+      set_fact:
         user_based_rules: >-
           {{
             (sec_rules.gathered | default([]))
@@ -72,14 +68,12 @@
 
     - name: Filter rules where action = decrypt (or decrypt-and-forward)
       set_fact:
-         decrypt_rules: >-
+        decrypt_rules: >-
           {{
             (decryption_rules.decryption_rules | default([]))
-            | selectattr('action', 'in', ['decrypt','decrypt-and-forward'])
+            | selectattr('action', 'in', ['decrypt', 'decrypt-and-forward'])
             | list
           }}
-
-    
 
     - name: Filter rules missing at least one required profile and not using a profile group
       set_fact:
@@ -88,72 +82,44 @@
             (sec_rules.gathered | default([]))
             | selectattr('group_profile', 'equalto', None)
             | select(
-                # filter rule if any of the required_profiles is missing
                 attribute => required_profiles
                 | map('attr', attribute)
                 | map('default', None)
                 | map('equalto', None)
                 | list
                 | max
-            )
+              )
             | list
           }}
-
-    
 
     - name: Print rules without description
       ansible.builtin.debug:
         msg: |
           The following security rules are missing a description and audit comment:
           {% for rule in rules_missing_description %}
-            - {{ rule.rule_name | default(rule.name) }}
+          - {{ rule.rule_name | default(rule.name) }}
           {% else %}
-            (None found)
+          (None found)
           {% endfor %}
-
-
 
     - name: Print insecure any-any rules
       ansible.builtin.debug:
         msg: |
           Insecure any-any rules (source=any, dest=any, service=any):
           {% for rule in any_any_insecure_rules %}
-            - {{ rule.rule_name | default(rule.name) }}
+          - {{ rule.rule_name | default(rule.name) }}
           {% else %}
-            (None found)
+          (None found)
           {% endfor %}
-
 
     - name: Print rules that are user-based
       ansible.builtin.debug:
         msg: |
           The following security rules are using source_user (User-ID):
           {% for rule in user_based_rules %}
-            - {{ rule.rule_name | default(rule.name) }} → source_user: {{ rule.source_user }}
+          - {{ rule.rule_name | default(rule.name) }} → source_user: {{ rule.source_user }}
           {% else %}
-            (No user-based security rules found)
+          (No user-based security rules found)
           {% endfor %}
 
-    - name: Debug decrypt rules
-      debug:
-        msg: |
-          Decryption rules with action decrypt:
-          {% for rule in decrypt_rules %}
-            - {{ rule.name }} → action: {{ rule.action }}, decryption_type: {{ rule.decryption_type }}
-          {% else %}
-            (No decrypt rules found)
-          {% endfor %}
-
-
-    - name: Debug rules missing profile(s)
-      debug:
-        msg: |
-          Security rules missing at least one required profile:
-          {% for rule in rules_missing_profiles %}
-            - {{ rule.rule_name | default(rule.name) }}
-              {% for prof in required_profiles %}
-                * {{ prof }} = {{ (rule[prof] | default('None')) }}
-              {% endfor %}
-          {% else %}
-            (None found.)
-          {% endfor %}
+    - name
