@@ -247,7 +247,8 @@
               ip_address: "{{ hostvars[active_host].ip_address }}"
               username: "{{ hostvars[active_host].username }}"
               password: "{{ hostvars[active_host].password }}"
-            cmd: "<show><jobs><all></jobs></show>"
+            # Corrected XML: close <all> tag so stdout_xml is returned
+            cmd: "<show><jobs><all></all></jobs></show>"
             cmd_is_xml: true
           register: active_jobs
           until: active_jobs.stdout_xml is not search('<type>Commit</type>.*?<status>(PEND|ACT|RUN|ACTIVE)</status>')
