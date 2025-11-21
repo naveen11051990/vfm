@@ -10,13 +10,19 @@
     image_path: "flash:{{ new_image }}"
     boot_system_cmd: "boot system flash:{{ new_image }}"
     mgmt_vrf: "Mgmt-vrf"
-    command_timeout: 2700
+    # Number of retries for long-running IOS commands
+    cmd_retries: 60
+    cmd_interval: 10
 
   tasks:
     - name: Check connectivity to TFTP server (via Mgmt VRF)
       cisco.ios.ios_command:
         commands:
           - "ping vrf {{ mgmt_vrf }} {{ tftp_server }} repeat 5"
+        wait_for:
+          - "result[0] contains Success rate"
+        retries: "{{ cmd_retries }}"
+        interval: "{{ cmd_interval }}"
       register: ping_result
 
     - name: Display ping result
@@ -38,17 +44,22 @@
         commands:
           - command: "copy tftp://{{ tftp_server }}/{{ new_image }} flash:"
             prompt:
-              - "Address or name of remote host.*\\?"
-              - "Source filename \\[{{ new_image }}\\]\\?"
-              - "Destination filename \\[{{ new_image }}\\]\\?"
+              - "Address or name of remote host.*\\?"  
+              - "Source filename \\[{{ new_image }}\\]\\?"  
+              - "Destination filename \\[{{ new_image }}\\]\\?"  
             answer:
               - "{{ tftp_server }}"
               - "{{ new_image }}"
               - "{{ new_image }}"
-        check_all: true
-        async: "{{ command_timeout }}"
-        poll: 0
+        wait_for:
+          - "result[0] contains bytes"    # adjust based on the real copy output
+        retries: "{{ cmd_retries }}"
+        interval: "{{ cmd_interval }}"
       register: tftp_copy
+
+    - name: Debug copy result
+      debug:
+        msg: "{{ tftp_copy.stdout_lines }}"
 
     - name: Set boot variable to new image
       cisco.ios.ios_command:
@@ -60,19 +71,26 @@
           - "write memory"
       register: boot_out
 
+    - name: Debug boot config output
+      debug:
+        msg: "{{ boot_out.stdout_lines }}"
+
     - name: Reload the switch to activate new image
       cisco.ios.ios_command:
         commands:
           - command: "reload"
             prompt:
-              - 'Proceed with reload\\? \\[confirm\\]'
+              - "Proceed with reload\\? \\[confirm\\]"
             answer:
               - "\r"
-        async: 300
-        poll: 0
+        wait_for:
+          - "result[0] contains Reload"
+        retries: "{{ cmd_retries }}"
+        interval: "{{ cmd_interval }}"
       ignore_errors: yes
+      register: reload_cmd
 
-    - name: Wait for switch to come back
+    - name: Wait for switch to come back (SSH)
       wait_for:
         host: "{{ inventory_hostname }}"
         port: 22
