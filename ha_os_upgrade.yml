@@ -194,6 +194,18 @@
         filename: "{{ backup_filename }}"
         create_directory: true
 
+    - name: Determine tech-support bundle filename
+      ansible.builtin.set_fact:
+        tech_support_bundle_path: >-
+          {{ backup_directory }}/{{ inventory_hostname | default('pa-fw') }}-tech-support-{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.tgz
+
+    - name: Capture tech-support bundle before upgrade
+      paloaltonetworks.panos.panos_export:
+        provider: "{{ device }}"
+        category: tech-support
+        filename: "{{ tech_support_bundle_path }}"
+        create_directory: true
+
     - name: Disable config sync
       paloaltonetworks.panos.panos_type_cmd:
         provider: "{{ device }}"

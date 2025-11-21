@@ -2,16 +2,20 @@
 
 ## Feature
 
-### HA OS Upgrade Hardening
-
-- [x] Add HA1 link pre-check step to `ha_os_upgrade.yml` before starting upgrades (see `plans/feature_ha_os_upgrade_hardening_plan.md`)
-- [ ] Capture tech-support bundle from each firewall ahead of the upgrade and store with existing backups (see `plans/feature_ha_os_upgrade_hardening_plan.md`)
-
 ## Fix
 
 ## Rework
 
 # DONE
+
+### HA Tech-Support Capture Automation
+
+- [x] Capture tech-support bundle from each HA peer before upgrades using `panos_export` (see `plans/feature_ha_tech_support_capture_plan.md`)
+
+### HA OS Upgrade Hardening
+
+- [x] Add HA1 link pre-check step to `ha_os_upgrade.yml` before starting upgrades (see `plans/feature_ha_os_upgrade_hardening_plan.md`)
+- [x] Capture tech-support bundle from each firewall ahead of the upgrade and store with existing backups (see `plans/feature_ha_os_upgrade_hardening_plan.md`)
 
 ### HA OS Downgrade Playbook
 
