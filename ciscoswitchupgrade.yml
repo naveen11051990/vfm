@@ -10,7 +10,7 @@
     image_path: "flash:{{ new_image }}"
     boot_system_cmd: "boot system flash:{{ new_image }}"
     mgmt_vrf: "Mgmt-vrf"
-    ansible_command_timeout: 2700
+    command_timeout: 2700
 
   tasks:
     - name: Check connectivity to TFTP server (via Mgmt VRF)
@@ -45,9 +45,10 @@
               - "{{ tftp_server }}"
               - "{{ new_image }}"
               - "{{ new_image }}"
-        vars:
-          ansible_command_timeout: "{{ ansible_command_timeout }}"
+        # Increase timeout for long copy
       register: copy_out
+      async: "{{ command_timeout }}"
+      poll: 0
 
     - name: Set boot variable to new image
       cisco.ios.ios_config:
@@ -66,8 +67,9 @@
               - 'Proceed with reload\? \[confirm\]'
             answer:
               - "\r"
-        vars:
-          ansible_command_timeout: 300
+      register: reload_out
+      async: 300
+      poll: 0
       ignore_errors: yes
 
     - name: Wait for switch to come back
@@ -91,6 +93,6 @@
     - name: Assert the version is as expected
       assert:
         that:
-          - "'17.15.03' in post_version.stdout_lines[0]"
+          - "'17.15.03' in (post_version.stdout_lines[0] | default(''))"
         fail_msg: "Upgrade failed: Version after reload is not 17.15.03"
         success_msg: "Upgrade succeeded to version 17.15.03"
