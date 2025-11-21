@@ -57,7 +57,7 @@
 
     - name: Get all decryption rules
       paloaltonetworks.panos.panos_decryption_rule:
-        provider: "{{ provider }}"
+        provider: "{{ device }}"
         state: gathered
         gathered_filter: "*"
       register: decryption_rules
