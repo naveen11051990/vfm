@@ -51,9 +51,15 @@
       poll: 0
 
     - name: Set boot variable to new image
-      cisco.ios.ios_config:
-        lines:
-          - "{{ boot_system_cmd }}"
+      cisco.ios.ios_command:
+        commands:
+          - command: "configure terminal"
+          - command: "no boot system"
+          - command: "boot system flash {{ new_image }}"
+          - command: "end"
+          - command: "write memory"
+      register: boot_out
+
 
     - name: Save running configuration
       cisco.ios.ios_config:
