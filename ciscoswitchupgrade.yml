@@ -63,7 +63,7 @@
         commands:
           - command: "reload"
             prompt:
-              - "Proceed with reload\? \[confirm\]"
+              - 'Proceed with reload\? \[confirm\]'
             answer:
               - "\r"
         vars:
