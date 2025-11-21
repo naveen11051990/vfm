@@ -136,10 +136,6 @@
         cmd_is_xml: true
       register: antivirus_info_raw
 
-    - name: Display antivirus upgrade info output
-      ansible.builtin.debug:
-        msg: "{{ antivirus_info_raw.stdout_xml | default('') }}"
-
 - name: Cache antivirus version fact
   ansible.builtin.set_fact:
     ha_antivirus_version: >-
