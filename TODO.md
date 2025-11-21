@@ -2,17 +2,22 @@
 
 ## Feature
 
-### HA OS Downgrade Playbook
+### HA OS Upgrade Hardening
 
-- [ ] Design downgrade workflow for HA pair (see `plans/feature_ha_os_downgrade_plan.md`)
-- [ ] Implement `ha_os_downgrade.yml` playbook aligned with Palo Alto and Ansible docs
-- [ ] Test downgrade procedure in a lab HA environment
+- [x] Add HA1 link pre-check step to `ha_os_upgrade.yml` before starting upgrades (see `plans/feature_ha_os_upgrade_hardening_plan.md`)
+- [ ] Capture tech-support bundle from each firewall ahead of the upgrade and store with existing backups (see `plans/feature_ha_os_upgrade_hardening_plan.md`)
 
 ## Fix
 
 ## Rework
 
 # DONE
+
+### HA OS Downgrade Playbook
+
+- [x] Design downgrade workflow for HA pair (see `plans/feature_ha_os_downgrade_plan.md`)
+- [x] Implement `ha_os_downgrade.yml` playbook aligned with Palo Alto and Ansible docs
+- [x] Test downgrade procedure in a lab HA environment
 
 ### Antivirus Parity After HA Upgrade
 
