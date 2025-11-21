@@ -86,6 +86,41 @@
           Failed to auto-discover HA1/HA2/peer wiring from running config.
           Verify high-availability is configured under deviceconfig on each firewall.
 
+    - name: Validate HA1 control channel via Upgrade Assurance
+      paloaltonetworks.panos.panos_active_in_ha:
+        provider: "{{ device }}"
+      register: ha_upgrade_assurance_raw
+
+    - name: Record HA1 pre-check result for {{ inventory_hostname }}
+      ansible.builtin.set_fact:
+        ha_upgrade_assurance: >-
+          {{
+            {
+              'inventory_hostname': inventory_hostname,
+              'is_active': (ha_upgrade_assurance_raw.response.active | default(false)),
+              'response_reason': (ha_upgrade_assurance_raw.response.reason | default(''))
+            }
+          }}
+
+    - name: Enforce HA1 pre-check status across HA pair
+      run_once: true
+      delegate_to: localhost
+      delegate_facts: true
+      vars:
+        ha1_checks: "{{ ansible_play_hosts_all | map('extract', hostvars, 'ha_upgrade_assurance') | list }}"
+      block:
+        - name: Assert Upgrade Assurance sees exactly one active node
+          ansible.builtin.assert:
+            that:
+              - ha1_checks | length == 2
+              - (ha1_checks | map(attribute='is_active') | select('equalto', true) | list | length) == 1
+              - (ha1_checks | map(attribute='is_active') | select('equalto', false) | list | length) == 1
+            fail_msg: >-
+              HA1 pre-check failed: expected one active and one passive peer but received {{ ha1_checks }}.
+        - name: Persist HA1 pre-check snapshot
+          ansible.builtin.set_fact:
+            ha1_upgrade_assurance_snapshot: "{{ ha1_checks }}"
+
     - name: Consolidate HA topology view
       run_once: true
       delegate_to: localhost
