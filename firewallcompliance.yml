@@ -83,7 +83,7 @@
 
     - name: Filter rules missing *all* security profiles (No Security profiles used)
       set_fact:
-        unprotected_rules: >-
+        rules_missing_profiles : >-
           {{
             (sec_rules.gathered | default([]))
             | selectattr('antivirus', 'equalto', None)
