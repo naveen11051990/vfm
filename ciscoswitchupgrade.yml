@@ -39,13 +39,12 @@
           - command: "copy tftp: flash: vrf {{ mgmt_vrf }}"
             prompt:
               - "Address or name of remote host.*\\?"
-              - "Source filename.*\\[\\]\\?"
+              - "Source filename.*\\[.*\\]\\?"
               - "Destination filename.*\\[.*\\]\\?\\s*"
             answer:
               - "{{ tftp_server }}"
               - "{{ new_image }}"
               - "{{ new_image }}"
-        # Increase timeout for long copy
       register: copy_out
       async: "{{ command_timeout }}"
       poll: 0
@@ -53,17 +52,12 @@
     - name: Set boot variable to new image
       cisco.ios.ios_command:
         commands:
-          - command: "configure terminal"
-          - command: "no boot system"
-          - command: "boot system flash {{ new_image }}"
-          - command: "end"
-          - command: "write memory"
+          - "configure terminal"
+          - "no boot system"
+          - "{{ boot_system_cmd }}"
+          - "end"
+          - "write memory"
       register: boot_out
-
-
-    - name: Save running configuration
-      cisco.ios.ios_config:
-        save_when: always
 
     - name: Reload the switch to activate new image
       cisco.ios.ios_command:
