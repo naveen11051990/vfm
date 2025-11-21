@@ -2,6 +2,14 @@
 
 ## Feature
 
+### HA Config Sync Guardrails
+
+- [ ] Add a pre-flight config-sync parity check by parsing `show high-availability state` (look for `Running Configuration: synchronized`) before disabling sync.
+
+### HA Post-Upgrade Validation Parity
+
+- [ ] Repeat HA1 health, antivirus parity, and config-sync status checks after upgrade/downgrade completion to match the pre-check coverage.
+
 ## Fix
 
 ## Rework
