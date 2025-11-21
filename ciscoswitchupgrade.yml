@@ -1,14 +1,17 @@
 ---
-- name: Upgrade Cisco Catalyst 9300 Switch
+- name: Upgrade Cisco Catalyst 9300 Switch IOS-XE
   hosts: 192.168.29.164
   gather_facts: no
   connection: network_cli
+
   vars:
     new_image: "cat9k_iosxe.17.15.03.SPA.bin"
     tftp_server: "192.168.29.63"
-    image_path: "flash:/{{ new_image }}"
+    image_path: "flash:{{ new_image }}"
     boot_system_cmd: "boot system flash:{{ new_image }}"
-    mgmt_vrf: "Mgmt-vrf" # Management VRF name
+    mgmt_vrf: "Mgmt-vrf"
+    ansible_command_timeout: 2700
+
   tasks:
     - name: Check connectivity to TFTP server (via Mgmt VRF)
       cisco.ios.ios_command:
@@ -17,7 +20,7 @@
       register: ping_result
 
     - name: Display ping result
-      ansible.builtin.debug:
+      debug:
         var: ping_result.stdout_lines
 
     - name: Verify flash space
@@ -27,7 +30,7 @@
       register: flash_space
 
     - name: Display flash space
-      ansible.builtin.debug:
+      debug:
         var: flash_space.stdout_lines
 
     - name: Copy new image to flash from TFTP server (via Mgmt VRF)
@@ -35,18 +38,16 @@
         commands:
           - command: "copy tftp: flash: vrf {{ mgmt_vrf }}"
             prompt:
-              - "Address or name of remote host"
-              - "Source filename"
-              - "Destination filename"
-              - "\\[.*\\]\\?"
+              - "Address or name of remote host.*\\?"
+              - "Source filename.*\\[\\]\\?"
+              - "Destination filename.*\\[.*\\]\\?\\s*"
             answer:
               - "{{ tftp_server }}"
               - "{{ new_image }}"
               - "{{ new_image }}"
-              - "{{ new_image }}"
-      vars:
-        ansible_command_timeout: 2700
-
+        vars:
+          ansible_command_timeout: "{{ ansible_command_timeout }}"
+      register: copy_out
 
     - name: Set boot variable to new image
       cisco.ios.ios_config:
@@ -60,7 +61,36 @@
     - name: Reload the switch to activate new image
       cisco.ios.ios_command:
         commands:
-          - "reload"
-      vars:
-        ansible_command_timeout: 120
+          - command: "reload"
+            prompt:
+              - "Proceed with reload\? \[confirm\]"
+            answer:
+              - "\r"
+        vars:
+          ansible_command_timeout: 300
       ignore_errors: yes
+
+    - name: Wait for switch to come back
+      wait_for:
+        host: "{{ inventory_hostname }}"
+        port: 22
+        delay: 60
+        timeout: 900
+      delegate_to: localhost
+
+    - name: Show version after reload
+      cisco.ios.ios_command:
+        commands:
+          - "show version"
+      register: post_version
+
+    - name: Debug version after reload
+      debug:
+        var: post_version.stdout_lines
+
+    - name: Assert the version is as expected
+      assert:
+        that:
+          - "'17.15.03' in post_version.stdout_lines[0]"
+        fail_msg: "Upgrade failed: Version after reload is not 17.15.03"
+        success_msg: "Upgrade succeeded to version 17.15.03"
