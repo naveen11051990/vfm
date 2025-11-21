@@ -55,7 +55,31 @@
             | list
           }}
 
+     - name: Get all decryption rules
+       paloaltonetworks.panos.panos_decryption_rule:
+        provider: "{{ provider }}"
+        state: gathered
+        gathered_filter: "*"
+      register: decryption_rules
 
+     - name: Filter rules where action = decrypt (or decrypt-and-forward)
+       set_fact:
+         decrypt_rules: >-
+          {{
+            (decryption_rules.decryption_rules | default([]))
+            | selectattr('action', 'in', ['decrypt','decrypt-and-forward'])
+            | list
+          }}
+
+    - name: Debug decrypt rules
+      debug:
+        msg: |
+          Decryption rules with action decrypt:
+          {% for rule in decrypt_rules %}
+            - {{ rule.name }} → action: {{ rule.action }}, decryption_type: {{ rule.decryption_type }}
+          {% else %}
+            (No decrypt rules found)
+          {% endfor %}
 
     - name: Print rules without description
       ansible.builtin.debug:
@@ -69,7 +93,7 @@
 
 
 
-    - name: Report insecure any-any rules
+    - name: Print insecure any-any rules
       ansible.builtin.debug:
         msg: |
           Insecure any-any rules (source=any, dest=any, service=any):
@@ -88,4 +112,14 @@
             - {{ rule.rule_name | default(rule.name) }} → source_user: {{ rule.source_user }}
           {% else %}
             (No user-based security rules found)
+          {% endfor %}
+
+    - name: Debug decrypt rules
+      debug:
+        msg: |
+          Decryption rules with action decrypt:
+          {% for rule in decrypt_rules %}
+            - {{ rule.name }} → action: {{ rule.action }}, decryption_type: {{ rule.decryption_type }}
+          {% else %}
+            (No decrypt rules found)
           {% endfor %}
