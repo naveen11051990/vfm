@@ -81,6 +81,19 @@
             (No decrypt rules found)
           {% endfor %}
 
+    - name: Filter rules missing *all* security profiles
+      set_fact:
+        unprotected_rules: >-
+          {{
+            (sec_rules.gathered | default([]))
+            | selectattr('antivirus', 'equalto', None)
+            | selectattr('vulnerability', 'equalto', None)
+            | selectattr('spyware', 'equalto', None)
+            | selectattr('url_filtering', 'equalto', None)
+            | selectattr('file_blocking', 'equalto', None)
+            | list
+          }}
+
     - name: Print rules without description
       ansible.builtin.debug:
         msg: |
@@ -122,4 +135,15 @@
             - {{ rule.name }} → action: {{ rule.action }}, decryption_type: {{ rule.decryption_type }}
           {% else %}
             (No decrypt rules found)
+          {% endfor %}
+
+
+    - name: Show rules that do not have any security profile set
+      debug:
+        msg: |
+          The following security rules are *not* protected by any security profile:
+          {% for rule in unprotected_rules %}
+            - {{ rule.rule_name | default(rule.name) }}
+          {% else %}
+            (None found)
           {% endfor %}
