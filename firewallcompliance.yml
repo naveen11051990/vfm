@@ -89,6 +89,16 @@
             | selectattr('file_blocking', 'equalto', None)
             | list
           }}
+
+    - name: Find security rules where logging is not enabled
+      set_fact:
+        rules_without_logging: >-
+          {{
+            (sec_rules.gathered | default([]))
+            | selectattr('log_start', 'equalto', False)
+            | selectattr('log_end', 'equalto', False)
+            | list
+          }}
   
 
     - name: Print rules without description  
@@ -145,3 +155,13 @@
           {% else %}  
           (All rules have at least one of the required profiles or a profile group.)  
           {% endfor %}  
+
+    - name: Report security rules missing logging
+      ansible.builtin.debug:
+        msg: |
+          The following security rules do NOT have logging enabled (neither start nor end):
+          {% for rule in rules_without_logging %}
+          - {{ rule.rule_name | default(rule.name) }}: log_start={{ rule.log_start }}, log_end={{ rule.log_end }}
+         {% else %}
+         (All rules have logging on at least at start or end.)
+         {% endfor %}
