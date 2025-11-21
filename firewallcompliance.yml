@@ -74,4 +74,77 @@
             (decryption_rules.decryption_rules | default([]))  
             | selectattr('action', 'in', ['decrypt', 'decrypt-and-forward'])  
             | list  
-         
+          }}  
+
+    - name: Filter security rules where any required profile is missing  
+      set_fact:  
+        rules_missing_profiles: >-  
+          {{  
+            (sec_rules.gathered | default([]))  
+            | selectattr('group_profile', 'equalto', None)  
+            | select(  
+                lambda r: (  
+                  r.antivirus is none or  
+                  r.vulnerability is none or  
+                  r.spyware is none or  
+                  r.url_filtering is none or  
+                  r.file_blocking is none  
+                )  
+              )  
+            | list  
+          }}  
+
+    - name: Print rules without description  
+      ansible.builtin.debug:  
+        msg: |  
+          The following security rules are missing descriptions:  
+          {% for rule in rules_missing_description %}  
+          - {{ rule.rule_name | default(rule.name) }}  
+          {% else %}  
+          (None found)  
+          {% endfor %}  
+
+    - name: Print insecure any-any rules  
+      ansible.builtin.debug:  
+        msg: |  
+          Insecure any-any rules:  
+          {% for rule in any_any_insecure_rules %}  
+          - {{ rule.rule_name | default(rule.name) }}  
+          {% else %}  
+          (None found)  
+          {% endfor %}  
+
+    - name: Print user-based rules  
+      ansible.builtin.debug:  
+        msg: |  
+          Security rules with specific source_user:  
+          {% for rule in user_based_rules %}  
+          - {{ rule.rule_name | default(rule.name) }} → source_user: {{ rule.source_user }}  
+          {% else %}  
+          (No user-based security rules found)  
+          {% endfor %}  
+
+    - name: Print decrypt rules  
+      ansible.builtin.debug:  
+        msg: |  
+          Decryption rules (action = decrypt or decrypt-and-forward):  
+          {% for rule in decrypt_rules %}  
+          - {{ rule.name }} → action: {{ rule.action }}, decryption_type: {{ rule.decryption_type }}  
+          {% else %}  
+          (No decrypt rules found)  
+          {% endfor %}  
+
+    - name: Print rules missing required profile(s)  
+      ansible.builtin.debug:  
+        msg: |  
+          Security rules missing one or more mandatory profiles:  
+          {% for rule in rules_missing_profiles %}  
+          - {{ rule.rule_name | default(rule.name) }}:  
+            * antivirus = {{ rule.antivirus | default('None') }}  
+            * vulnerability = {{ rule.vulnerability | default('None') }}  
+            * spyware = {{ rule.spyware | default('None') }}  
+            * url_filtering = {{ rule.url_filtering | default('None') }}  
+            * file_blocking = {{ rule.file_blocking | default('None') }}  
+          {% else %}  
+          (All rules have at least one of the required profiles or a profile group.)  
+          {% endfor %}  
