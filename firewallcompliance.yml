@@ -76,23 +76,20 @@
             | list  
           }}  
 
-    - name: Filter security rules where any required profile is missing  
-      set_fact:  
-        rules_missing_profiles: >-  
-          {{  
-            (sec_rules.gathered | default([]))  
-            | selectattr('group_profile', 'equalto', None)  
-            | select(  
-                lambda r: (  
-                  r.antivirus is none or  
-                  r.vulnerability is none or  
-                  r.spyware is none or  
-                  r.url_filtering is none or  
-                  r.file_blocking is none  
-                )  
-              )  
-            | list  
-          }}  
+    - name: Filter security rules where any required profile is missing
+      set_fact:
+        rules_missing_profiles: >-
+          {{
+            (sec_rules.gathered | default([]))
+            | selectattr('group_profile', 'equalto', None)
+            | selectattr('antivirus', 'equalto', None)
+            | selectattr('vulnerability', 'equalto', None)
+            | selectattr('spyware', 'equalto', None)
+            | selectattr('url_filtering', 'equalto', None)
+            | selectattr('file_blocking', 'equalto', None)
+            | list
+          }}
+  
 
     - name: Print rules without description  
       ansible.builtin.debug:  
