@@ -10,6 +10,14 @@
       username: "{{ username }}"
       password: "{{ password }}"
 
+
+    required_profiles:
+      - antivirus
+      - vulnerability
+      - spyware
+      - url_filtering
+      - file_blocking
+
   collections:
     - paloaltonetworks.panos
 
@@ -71,46 +79,27 @@
             | list
           }}
 
-    - name: Debug decrypt rules
-      debug:
-        msg: |
-          Decryption rules with action decrypt:
-          {% for rule in decrypt_rules %}
-            - {{ rule.name }} → action: {{ rule.action }}, decryption_type: {{ rule.decryption_type }}
-          {% else %}
-            (No decrypt rules found)
-          {% endfor %}
+    
 
-    - name: Filter rules missing *all* security profiles (No Security profiles used)
+    - name: Filter rules missing at least one required profile and not using a profile group
       set_fact:
-        rules_missing_profiles : >-
+        rules_missing_profiles: >-
           {{
             (sec_rules.gathered | default([]))
-            | selectattr('antivirus', 'equalto', None)
-            | selectattr('vulnerability', 'equalto', None)
-            | selectattr('spyware', 'equalto', None)
-            | selectattr('url_filtering', 'equalto', None)
-            | selectattr('file_blocking', 'equalto', None)
+            | selectattr('group_profile', 'equalto', None)
+            | select(
+                # filter rule if any of the required_profiles is missing
+                attribute => required_profiles
+                | map('attr', attribute)
+                | map('default', None)
+                | map('equalto', None)
+                | list
+                | max
+            )
             | list
           }}
 
-    - name: Filter rules which use group_profile but group_profile is blank / empty
-      set_fact:
-        rules_with_empty_group_profile: >-
-          {{
-            (sec_rules.gathered | default([]))
-            | selectattr('group_profile', 'defined')
-            | selectattr('group_profile', 'equalto', '')
-            | list
-          }}
-
-    - name: Combine all problematic rules
-      set_fact:
-        unprotected_or_incomplete_rules: >-
-          {{
-            rules_missing_profiles +
-            rules_with_empty_group_profile
-          }}
+    
 
     - name: Print rules without description
       ansible.builtin.debug:
@@ -156,18 +145,15 @@
           {% endfor %}
 
 
-    - name: Report rules missing security protections
+    - name: Debug rules missing profile(s)
       debug:
         msg: |
-          Rules potentially missing security profiles:
-          {% for rule in unprotected_or_incomplete_rules %}
-            - {{ rule.rule_name | default(rule.name) }}:
-              antivirus={{ rule.antivirus | default('None') }},
-              vulnerability={{ rule.vulnerability | default('None') }},
-              spyware={{ rule.spyware | default('None') }},
-              url_filtering={{ rule.url_filtering | default('None') }},
-              file_blocking={{ rule.file_blocking | default('None') }},
-              group_profile={{ rule.group_profile | default('None') }}
+          Security rules missing at least one required profile:
+          {% for rule in rules_missing_profiles %}
+            - {{ rule.rule_name | default(rule.name) }}
+              {% for prof in required_profiles %}
+                * {{ prof }} = {{ (rule[prof] | default('None')) }}
+              {% endfor %}
           {% else %}
-            (All rules have either individual profiles or a profile group.)
+            (None found.)
           {% endfor %}
