@@ -5,7 +5,7 @@
   connection: network_cli
   vars:
     new_image: "cat9k_iosxe.17.15.03.SPA.bin"
-    tftp_server: "192.168.29.22"
+    tftp_server: "192.168.29.63"
     image_path: "flash:/{{ new_image }}"
     boot_system_cmd: "boot system flash:{{ new_image }}"
     mgmt_vrf: "Mgmt-vrf" # Management VRF name
