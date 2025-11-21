@@ -156,18 +156,12 @@
           (All rules have at least one of the required profiles or a profile group.)  
           {% endfor %}  
 
-    - name: Print rules missing required profile(s)
+    - name: Report security rules missing logging
       ansible.builtin.debug:
-        msg: |
-          Security rules missing one or more mandatory profiles:
-          {% for rule in rules_missing_profiles %}
-          - {{ rule.rule_name | default(rule.name) }}:
-          * antivirus = {{ rule.antivirus | default('None') }}
-          * vulnerability = {{ rule.vulnerability | default('None') }}
-          * spyware = {{ rule.spyware | default('None') }}
-          * url_filtering = {{ rule.url_filtering | default('None') }}
-          * file_blocking = {{ rule.file_blocking | default('None') }}
-          {% else %}
-          (All rules have at least one of the required profiles or a profile group.)
-          {% endfor %}
-
+       msg: |
+         The following security rules do NOT have logging enabled (neither start nor end):
+         {% for rule in rules_without_logging %}
+         - {{ rule.rule_name | default(rule.name) }}: log_start={{ rule.log_start }}, log_end={{ rule.log_end }}
+         {% else %}
+         (All rules have logging on at least at start or end.)
+         {% endfor %}
