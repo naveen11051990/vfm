@@ -28,6 +28,26 @@
         fail_msg: 'You must provide -e upgrade_path=''["10.2.3","10.2.4"]'''
       run_once: true
 
+    - name: Report controller dependency versions
+      run_once: true
+      delegate_to: localhost
+      block:
+        - name: Collect pan-os-python version
+          ansible.builtin.command: python3 -c "import panos; print(panos.__version__)"
+          register: panos_python_version
+          changed_when: false
+          failed_when: false
+        - name: Collect paloaltonetworks.panos collection version
+          ansible.builtin.command: ansible-galaxy collection list paloaltonetworks.panos --format yaml
+          register: panos_collection_info
+          changed_when: false
+          failed_when: false
+        - name: Show dependency versions
+          ansible.builtin.debug:
+            msg:
+              - "pan-os-python: {{ (panos_python_version.stdout_lines | first) | default('unknown') }}"
+              - "paloaltonetworks.panos collection info:\n{{ panos_collection_info.stdout | default('unknown') }}"
+
     - name: Gather HA and system facts
       paloaltonetworks.panos.panos_facts:
         provider: "{{ device }}"
