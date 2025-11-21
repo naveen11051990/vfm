@@ -33,21 +33,22 @@
       debug:
         var: flash_space.stdout_lines
 
-    - name: Copy new image to flash from TFTP server (via Mgmt VRF)
+    - name: Copy image from TFTP to switch flash
       cisco.ios.ios_command:
         commands:
-          - command: "copy tftp: flash: vrf {{ mgmt_vrf }}"
+          - command: "copy tftp://{{ tftp_server }}/{{ new_image }} flash:"
             prompt:
               - "Address or name of remote host.*\\?"
-              - "Source filename.*\\[.*\\]\\?"
-              - "Destination filename.*\\[.*\\]\\?\\s*"
+              - "Source filename \\[{{ new_image }}\\]\\?"
+              - "Destination filename \\[{{ new_image }}\\]\\?"
             answer:
               - "{{ tftp_server }}"
               - "{{ new_image }}"
               - "{{ new_image }}"
-      register: copy_out
-      async: "{{ command_timeout }}"
-      poll: 0
+        check_all: true
+        async: "{{ command_timeout }}"
+        poll: 0
+      register: tftp_copy
 
     - name: Set boot variable to new image
       cisco.ios.ios_command:
@@ -64,12 +65,11 @@
         commands:
           - command: "reload"
             prompt:
-              - 'Proceed with reload\? \[confirm\]'
+              - 'Proceed with reload\\? \\[confirm\\]'
             answer:
               - "\r"
-      register: reload_out
-      async: 300
-      poll: 0
+        async: 300
+        poll: 0
       ignore_errors: yes
 
     - name: Wait for switch to come back
