@@ -202,7 +202,7 @@
           PREFLIGHT FAILURE: Running configuration is not synchronized on {{ inventory_hostname }}.
           Cannot safely disable config-sync during OS upgrade with mismatched configurations.
           Sync running configurations on both HA peers before retrying.
-          Sync status on {{ inventory_hostname }}: {{ ha_sync_state.stdout_xml | regex_search('<running-config-sync>([^<]+)</running-config-sync>', '\1') | first | default('unknown') }}
+          Sync status on {{ inventory_hostname }}: {{ ha_sync_state.stdout_xml | regex_search('<running-config-sync>([^<]+)</running-config-sync>', '\1') | default('unknown') }}
 
     - name: Disable config sync
       paloaltonetworks.panos.panos_type_cmd:
