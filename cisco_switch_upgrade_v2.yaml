@@ -1,18 +1,17 @@
 ---
 - name: Full Cisco 9300 Upgrade via TFTP (Mgmt-vrf)
-  hosts: c9300
+  hosts: 192.168.29.164
   gather_facts: no
   connection: network_cli
   collections:
     - cisco.ios
- 
+
   tasks:
- 
     - name: Ping TFTP server via Mgmt-vrf
       cisco.ios.ios_command:
         commands:
           - "ping vrf Mgmt-vrf 192.168.29.208"
- 
+
     - name: Copy image from TFTP to flash using Mgmt-vrf
       cisco.ios.ios_command:
         commands:
@@ -20,32 +19,32 @@
             prompt: "Destination filename"
             answer: "cat9k_iosxe.17.15.03.SPA.bin"
       register: copy_output
- 
+
     - name: Show copy output
       debug:
         var: copy_output.stdout_lines
- 
+
     - name: Verify image exists in flash
       cisco.ios.ios_command:
         commands:
           - "dir flash:cat9k_iosxe.17.15.03.SPA.bin"
       register: dir_output
- 
+
     - name: Show dir result
       debug:
         var: dir_output.stdout_lines
- 
+
     - name: Configure boot variable to new image
       cisco.ios.ios_config:
         lines:
           - no boot system
           - "boot system flash:cat9k_iosxe.17.15.03.SPA.bin"
- 
+
     - name: Save running-config
       cisco.ios.ios_command:
         commands:
           - write memory
- 
+
     - name: Reload device
       cisco.ios.ios_command:
         commands:
