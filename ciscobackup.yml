@@ -26,6 +26,9 @@
             answer:
               - "192.168.29.23"
               - "192.168.29.164_backup"
+      vars:
+        ansible_command_timeout: 120
+
       register: copy_result
 
     - name: Show result of backup
