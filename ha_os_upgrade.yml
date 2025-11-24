@@ -210,15 +210,16 @@
              | default('unknown')
              | string
              | lower }}
-        ha_running_sync_enabled: >-
+        ha_running_sync_enabled_raw: >-
           {{ (ha_sync_state.stdout_xml | string)
              | regex_search('running-sync-enabled[^<]*>([^<]+)<', '\1')
              | default([])
              | first
-             | default('unknown')
-             | string
-             | lower }}
-        ha_running_sync_enabled_bool: "{{ ha_running_sync_enabled | bool }}"
+             | default('unknown') }}
+    - name: Normalize running-sync enabled value
+      ansible.builtin.set_fact:
+        ha_running_sync_enabled: "{{ ha_running_sync_enabled_raw | string | lower }}"
+        ha_running_sync_enabled_bool: "{{ ha_running_sync_enabled in ['yes', 'true', '1'] }}"
 
     - name: Show running-sync status when not synchronized
       ansible.builtin.debug:
