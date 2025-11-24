@@ -1,5 +1,6 @@
 ---
 - name: Full Cisco 9300 Upgrade via TFTP (Mgmt-vrf)
+  # hosts: "{{ target_host | default('192.168.29.164') }}"
   hosts: 192.168.29.164
   gather_facts: no
   connection: network_cli
@@ -15,9 +16,9 @@
     - name: Copy image from TFTP to flash using Mgmt-vrf
       cisco.ios.ios_command:
         commands:
-          - command: "copy tftp://192.168.29.208/cat9k_iosxe.17.15.03.SPA.bin flash:cat9k_iosxe.17.15.03.SPA.bin vrf Mgmt-vrf"
+          - command: "copy tftp://192.168.29.208/cat9k_iosxe.17.15.04.SPA.bin flash:cat9k_iosxe.17.15.04.SPA.bin vrf Mgmt-vrf"
             prompt: "Destination filename"
-            answer: "cat9k_iosxe.17.15.03.SPA.bin"
+            answer: "cat9k_iosxe.17.15.04.SPA.bin"
       register: copy_output
       vars:
         ansible_command_timeout: 600
@@ -29,18 +30,32 @@
     - name: Verify image exists in flash
       cisco.ios.ios_command:
         commands:
-          - "dir flash:cat9k_iosxe.17.15.03.SPA.bin"
+          - "dir flash:cat9k_iosxe.17.15.04.SPA.bin"
       register: dir_output
 
     - name: Show dir result
       debug:
         var: dir_output.stdout_lines
 
-    - name: Configure boot variable to new image
+    - name: Convert to install mode
+      cisco.ios.ios_command:
+        commands:
+          - command: "install replace flash:cat9k_iosxe.17.15.04.SPA.bin"
+            prompt: "This operation may take a while"
+            answer: "y"
+      register: install_output
+      vars:
+        ansible_command_timeout: 900
+
+    - name: Show install output
+      debug:
+        var: install_output.stdout_lines
+
+    - name: Configure boot variable for install mode
       cisco.ios.ios_config:
         lines:
           - no boot system
-          - "boot system flash:cat9k_iosxe.17.15.03.SPA.bin"
+          - "boot system switch all flash:packages.conf"
 
     - name: Check and set configuration register to 0x2102
       cisco.ios.ios_config:
