@@ -42,10 +42,23 @@
           - no boot system
           - "boot system flash:cat9k_iosxe.17.15.03.SPA.bin"
 
+    - name: Check and set configuration register to 0x2102
+      cisco.ios.ios_config:
+        lines:
+          - "config-register 0x2102"
+
     - name: Save running-config
       cisco.ios.ios_command:
         commands:
           - write memory
+      vars:
+        ansible_command_timeout: 60
+
+    - name: Backup running config before reload
+      cisco.ios.ios_command:
+        commands:
+          - "show running-config"
+      register: config_backup
 
     - name: Reload device
       cisco.ios.ios_command:
@@ -58,8 +71,9 @@
 
     - name: Wait for device to become reachable after reload
       wait_for_connection:
-        timeout: 600
-        delay: 10
+        timeout: 900
+        delay: 30
+        sleep: 5
 
     - name: Verify device is back (show version)
       cisco.ios.ios_command:
