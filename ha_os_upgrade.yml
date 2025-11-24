@@ -223,11 +223,17 @@
         msg: "running-sync ({{ inventory_hostname }}): {{ ha_running_sync }} (enabled: {{ ha_running_sync_enabled }})"
       when: ha_running_sync != 'synchronized' or not ha_running_sync_enabled_bool
 
+    - name: Warn when config-sync is disabled before upgrade
+      ansible.builtin.debug:
+        msg: "Warning: config-sync is currently disabled on {{ inventory_hostname }} (running-sync-enabled={{ ha_running_sync_enabled }}). Proceeding because running-sync is synchronized."
+      when:
+        - ha_running_sync == 'synchronized'
+        - not ha_running_sync_enabled_bool
+
     - name: Assert running configuration is synchronized on all HA peers
       ansible.builtin.assert:
         that:
           - ha_running_sync == 'synchronized'
-          - ha_running_sync_enabled_bool
         fail_msg: |
           PREFLIGHT FAILURE: Running configuration is not synchronized on {{ inventory_hostname }}.
           Cannot safely disable config-sync during OS upgrade with mismatched configurations.
