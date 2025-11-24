@@ -16,9 +16,9 @@
     - name: Copy image from TFTP to flash using Mgmt-vrf
       cisco.ios.ios_command:
         commands:
-          - command: "copy tftp://192.168.29.208/cat9k_iosxe.17.15.04.SPA.bin flash:cat9k_iosxe.17.15.04.SPA.bin vrf Mgmt-vrf"
+          - command: "copy tftp://192.168.29.208/cat9k_iosxe.17.16.01.SPA.bin flash:cat9k_iosxe.17.16.01.SPA.bin vrf Mgmt-vrf"
             prompt: "Destination filename"
-            answer: "cat9k_iosxe.17.15.04.SPA.bin"
+            answer: "cat9k_iosxe.17.16.01.SPA.bin"
       register: copy_output
       vars:
         ansible_command_timeout: 600
@@ -30,7 +30,7 @@
     - name: Verify image exists in flash
       cisco.ios.ios_command:
         commands:
-          - "dir flash:cat9k_iosxe.17.15.04.SPA.bin"
+          - "dir flash:cat9k_iosxe.17.16.01.SPA.bin"
       register: dir_output
 
     - name: Show dir result
@@ -72,7 +72,7 @@
     - name: Run install add/activate/commit to convert to install mode
       cisco.ios.ios_command:
         commands:
-          - command: "install add file flash:cat9k_iosxe.17.15.04.SPA.bin activate commit"
+          - command: "install add file flash:cat9k_iosxe.17.16.01.SPA.bin activate commit"
             prompt:
               - "Do you want to proceed"
               - "This operation requires a reload"
