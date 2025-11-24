@@ -1,0 +1,32 @@
+---
+- name: Full Cisco 9300 Upgrade via TFTP (Mgmt-vrf)
+  # hosts: "{{ target_host | default('192.168.29.164') }}"
+  hosts: 192.168.29.164
+  gather_facts: no
+  connection: network_cli
+  collections:
+    - cisco.ios
+	
+	
+tasks:
+
+- name: Save running-config
+        cisco.ios.ios_command:
+          commands:
+            - write memory
+        vars:
+          ansible_command_timeout: 120
+
+- name: Copy running-config to TFTP server
+        cisco.ios.ios_command:
+          commands:
+            - command: "copy system:running-config tftp://192.168.29.23/192.168.29.164_backup"
+                prompt:
+                  - "Address or name of remote host"
+                  - "Destination filename"
+                  answer:
+                  - "192.168.29.23"
+                  - "192.168.29.164_backup"
+        register: copy_result
+		
+---
