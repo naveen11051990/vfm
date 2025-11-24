@@ -1,5 +1,5 @@
 ---
-- name: Full Cisco 9300 Upgrade via TFTP (Mgmt-vrf)
+- name: Backup running-config from Cisco 9300 to TFTP
   hosts: 192.168.29.164
   gather_facts: no
   connection: network_cli
@@ -7,15 +7,12 @@
     - cisco.ios
 
   tasks:
-    - name: Save running-config
+    - name: Save running configuration
       cisco.ios.ios_command:
         commands:
           - write memory
-        timeout: 300            # increase timeout for this command
-      vars:
-        ansible_command_timeout: 300
 
-    - name: Copy running-config to TFTP server
+    - name: Copy running-config to TFTP server (with retries)
       cisco.ios.ios_command:
         commands:
           - command: "copy system:running-config tftp://192.168.29.23/192.168.29.164_backup"
@@ -25,11 +22,14 @@
             answer:
               - "192.168.29.23"
               - "192.168.29.164_backup"
-        timeout: 600            # increase timeout here too
-      vars:
-        ansible_command_timeout: 600
-      register: copy_result
+        retries: 3
+        interval: 300
+        wait_for:
+          - stdout[0] contains "Writing"
+          - stdout[0] contains "bytes copied"
+        match: all
+      register: backup_result
 
     - name: Show result of backup
       debug:
-        var: copy_result.stdout_lines
+        var: backup_result.stdout_lines
