@@ -11,10 +11,9 @@
       cisco.ios.ios_command:
         commands:
           - write memory
-        # ensuring enough time for save
-        # you can set timeout here if needed
+        timeout: 300            # increase timeout for this command
       vars:
-        ansible_command_timeout: 120
+        ansible_command_timeout: 300
 
     - name: Copy running-config to TFTP server
       cisco.ios.ios_command:
@@ -26,9 +25,9 @@
             answer:
               - "192.168.29.23"
               - "192.168.29.164_backup"
+        timeout: 600            # increase timeout here too
       vars:
-        ansible_command_timeout: 120
-
+        ansible_command_timeout: 600
       register: copy_result
 
     - name: Show result of backup
