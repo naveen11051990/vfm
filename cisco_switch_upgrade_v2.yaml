@@ -18,21 +18,13 @@
           - command: "copy tftp://192.168.29.208/cat9k_iosxe.17.15.03.SPA.bin flash:cat9k_iosxe.17.15.03.SPA.bin vrf Mgmt-vrf"
             prompt: "Destination filename"
             answer: "cat9k_iosxe.17.15.03.SPA.bin"
-      async: 600
-      poll: 0
       register: copy_output
-
-    - name: Wait for TFTP copy to complete
-      async_status:
-        jid: "{{ copy_output.ansible_job_id }}"
-      register: copy_result
-      until: copy_result.finished
-      retries: 120
-      delay: 5
+      vars:
+        ansible_command_timeout: 600
 
     - name: Show copy output
       debug:
-        var: copy_result.stdout_lines
+        var: copy_output.stdout_lines
 
     - name: Verify image exists in flash
       cisco.ios.ios_command:
