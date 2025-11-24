@@ -44,8 +44,8 @@
           - "boot system flash:packages.conf"
 
     - name: Check and set configuration register to 0x2102
-      cisco.ios.ios_config:
-        lines:
+      cisco.ios.ios_command:
+        commands:
           - "config-register 0x2102"
 
     - name: Save running-config
