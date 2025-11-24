@@ -168,24 +168,26 @@
     # - name: Include content and antivirus update tasks
     #   ansible.builtin.import_tasks: tasks/content_and_antivirus_update.yml
 
-    - name: Backup running configuration
-      paloaltonetworks.panos.panos_export:
-        provider: "{{ device }}"
-        category: configuration
-        filename: "{{ backup_filename }}"
-        create_directory: true
+    # Disabled for test run: config backup
+    # - name: Backup running configuration
+    #   paloaltonetworks.panos.panos_export:
+    #     provider: "{{ device }}"
+    #     category: configuration
+    #     filename: "{{ backup_filename }}"
+    #     create_directory: true
 
-    - name: Determine tech-support bundle filename
-      ansible.builtin.set_fact:
-        tech_support_bundle_path: >-
-          {{ backup_directory }}/{{ inventory_hostname | default('pa-fw') }}-tech-support-{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.tgz
+    # Disabled for test run: tech-support bundle capture
+    # - name: Determine tech-support bundle filename
+    #   ansible.builtin.set_fact:
+    #     tech_support_bundle_path: >-
+    #       {{ backup_directory }}/{{ inventory_hostname | default('pa-fw') }}-tech-support-{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.tgz
 
-    - name: Capture tech-support bundle before upgrade
-      paloaltonetworks.panos.panos_export:
-        provider: "{{ device }}"
-        category: tech-support
-        filename: "{{ tech_support_bundle_path }}"
-        create_directory: true
+    # - name: Capture tech-support bundle before upgrade
+    #   paloaltonetworks.panos.panos_export:
+    #     provider: "{{ device }}"
+    #     category: tech-support
+    #     filename: "{{ tech_support_bundle_path }}"
+    #     create_directory: true
 
     - name: Validate HA config sync before disabling (pre-flight check)
       paloaltonetworks.panos.panos_op:
@@ -194,15 +196,27 @@
         cmd_is_xml: true
       register: ha_sync_state
 
+    - name: Extract running-config-sync status from HA state XML
+      ansible.builtin.set_fact:
+        ha_running_config_sync: >-
+          {{ ha_sync_state.stdout_xml
+             | regex_search('<running-config-sync>([^<]+)</running-config-sync>', '\1')
+             | default('unknown', true) }}
+
+    - name: Show running-config-sync status when not 'yes'
+      ansible.builtin.debug:
+        msg: "running-config-sync ({{ inventory_hostname }}): {{ ha_running_config_sync }}"
+      when: ha_running_config_sync | lower != 'yes'
+
     - name: Assert running configuration is synchronized on all HA peers
       ansible.builtin.assert:
         that:
-          - ha_sync_state.stdout_xml is search('<running-config-sync>\s*yes\s*</running-config-sync>')
+          - ha_running_config_sync | lower == 'yes'
         fail_msg: |
           PREFLIGHT FAILURE: Running configuration is not synchronized on {{ inventory_hostname }}.
           Cannot safely disable config-sync during OS upgrade with mismatched configurations.
           Sync running configurations on both HA peers before retrying.
-          Sync status on {{ inventory_hostname }}: {{ ha_sync_state.stdout_xml | regex_search('<running-config-sync>([^<]+)</running-config-sync>', '\1') | default('unknown') }}
+          Sync status on {{ inventory_hostname }}: {{ ha_running_config_sync }}
 
     - name: Disable config sync
       paloaltonetworks.panos.panos_type_cmd:
