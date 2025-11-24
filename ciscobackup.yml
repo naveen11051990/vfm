@@ -6,7 +6,6 @@
   connection: network_cli
   collections:
     - cisco.ios
-	
   tasks:
 
 - name: Save running-config
