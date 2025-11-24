@@ -40,22 +40,16 @@
     - name: Convert to install mode
       cisco.ios.ios_command:
         commands:
-          - command: "install replace flash:cat9k_iosxe.17.15.04.SPA.bin"
-            prompt: "This operation may take a while"
+          - command: "install add file flash:cat9k_iosxe.17.15.04.SPA.bin"
+            prompt: "Proceed with reload"
             answer: "y"
       register: install_output
       vars:
-        ansible_command_timeout: 900
+        ansible_command_timeout: 1200
 
     - name: Show install output
       debug:
         var: install_output.stdout_lines
-
-    - name: Configure boot variable for install mode
-      cisco.ios.ios_config:
-        lines:
-          - no boot system
-          - "boot system switch all flash:packages.conf"
 
     - name: Check and set configuration register to 0x2102
       cisco.ios.ios_config:
