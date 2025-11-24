@@ -47,6 +47,8 @@
       cisco.ios.ios_command:
         commands:
           - "config-register 0x2102"
+      vars:
+        ansible_command_timeout: 60
 
     - name: Save running-config
       cisco.ios.ios_command:
