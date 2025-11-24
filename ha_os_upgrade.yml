@@ -196,11 +196,15 @@
         cmd_is_xml: true
       register: ha_sync_state
 
+    - name: Show HA state payload (for sync debug)
+      ansible.builtin.debug:
+        var: ha_sync_state.stdout_xml
+
     - name: Extract running-config-sync status from HA state XML
       ansible.builtin.set_fact:
         ha_running_config_sync: >-
-          {{ ha_sync_state.stdout_xml
-             | regex_search('<running-config-sync>([^<]+)</running-config-sync>', '\1')
+          {{ (ha_sync_state.stdout_xml | string)
+             | regex_search('running-config-sync[^<]*>([^<]+)<', '\1')
              | default('unknown', true) }}
 
     - name: Show running-config-sync status when not 'yes'
