@@ -6,6 +6,12 @@
 
 - [ ] Repeat HA1 health, antivirus parity, and config-sync status checks after upgrade/downgrade completion to match the pre-check coverage.
 
+### HA Backups Offload to TFTP
+
+- [ ] Capture the PAN-OS CLI requirements for exporting configuration and tech-support bundles to TFTP and mirror the successful Cisco flow (see `plans/feature_ha_tftp_backup_plan.md`).
+- [ ] Extend `ha_os_upgrade.yml` so every config backup and tech-support bundle is optionally copied to the configured TFTP target with clear failure handling.
+- [ ] Document the new TFTP variables/assumptions and add validation or dry-run coverage before rollout.
+
 ## Fix
 
 ## Rework

@@ -176,7 +176,7 @@
 
     - name: Determine tech-support bundle filename
       ansible.builtin.set_fact:
-        tech_support_bundle_path: >-
+        tech_support_bundle_path: >
           {{ backup_directory }}/{{ inventory_hostname | default('pa-fw') }}-tech-support-{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.tgz
 
     - name: Capture tech-support bundle before downgrade
@@ -185,6 +185,62 @@
         category: tech-support
         filename: "{{ tech_support_bundle_path }}"
         create_directory: true
+
+    - name: Validate HA config sync before disabling (pre-flight check)
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<show><high-availability><state></state></high-availability></show>"
+        cmd_is_xml: true
+      register: ha_sync_state
+
+    - name: Show HA state payload (for sync debug)
+      ansible.builtin.debug:
+        var: ha_sync_state.stdout_xml
+
+    - name: Extract running-sync status from HA state XML
+      ansible.builtin.set_fact:
+        ha_running_sync: >-
+          {{ (ha_sync_state.stdout_xml | string)
+             | regex_search('running-sync[^<]*>([^<]+)<', '\1')
+             | default([])
+             | first
+             | default('unknown')
+             | string
+             | lower }}
+        ha_running_sync_enabled_raw: >-
+          {{ (ha_sync_state.stdout_xml | string)
+             | regex_search('running-sync-enabled[^<]*>([^<]+)<', '\1')
+             | default([])
+             | first
+             | default('unknown') }}
+
+    - name: Normalize running-sync enabled value
+      ansible.builtin.set_fact:
+        ha_running_sync_enabled: "{{ ha_running_sync_enabled_raw | string | lower }}"
+        ha_running_sync_enabled_bool: "{{ (ha_running_sync_enabled_raw | string | lower) in ['yes', 'true', '1'] }}"
+
+    - name: Show running-sync status when not synchronized
+      ansible.builtin.debug:
+        msg: "running-sync ({{ inventory_hostname }}): {{ ha_running_sync }} (enabled: {{ ha_running_sync_enabled }})"
+      when: ha_running_sync != 'synchronized' or not ha_running_sync_enabled_bool
+
+    - name: Warn when config-sync is disabled before downgrade
+      ansible.builtin.debug:
+        msg: "Warning: config-sync is currently disabled on {{ inventory_hostname }} (running-sync-enabled={{ ha_running_sync_enabled }}). Proceeding because running-sync is synchronized."
+      when:
+        - ha_running_sync == 'synchronized'
+        - not ha_running_sync_enabled_bool
+
+    - name: Assert running configuration is synchronized on all HA peers
+      ansible.builtin.assert:
+        that:
+          - ha_running_sync == 'synchronized'
+        fail_msg: |
+          PREFLIGHT FAILURE: Running configuration is not synchronized on {{ inventory_hostname }}.
+          Cannot safely disable config-sync during OS downgrade with mismatched configurations.
+          Sync running configurations on both HA peers before retrying.
+          Sync status on {{ inventory_hostname }}: running-sync={{ ha_running_sync }}, running-sync-enabled={{ ha_running_sync_enabled }}
+
     - name: Disable config sync
       paloaltonetworks.panos.panos_type_cmd:
         provider: "{{ device }}"
@@ -293,7 +349,6 @@
               ip_address: "{{ hostvars[active_host].ip_address }}"
               username: "{{ hostvars[active_host].username }}"
               password: "{{ hostvars[active_host].password }}"
-            Corrected XML: close <all> tag so stdout_xml is returned
             cmd: "<show><jobs><all></all></jobs></show>"
             cmd_is_xml: true
           register: active_jobs
@@ -321,22 +376,22 @@
               password: "{{ hostvars[active_host].password }}"
             cmd: "request high-availability state functional"
 
-    - name: Re-enable config sync
-      paloaltonetworks.panos.panos_type_cmd:
-        provider: "{{ device }}"
-        cmd: set
-        xpath: "/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/group/configuration-synchronization"
-        element: "<enabled>yes</enabled>"
+        - name: Re-enable config sync
+          paloaltonetworks.panos.panos_type_cmd:
+            provider: "{{ device }}"
+            cmd: set
+            xpath: "/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/group/configuration-synchronization"
+            element: "<enabled>yes</enabled>"
 
-    - name: Commit HA change (config sync enabled)
-      paloaltonetworks.panos.panos_commit_firewall:
-        provider: "{{ device }}"
-        description: "Re-enable HA config sync after OS downgrade"
+        - name: Commit HA change (config sync enabled)
+          paloaltonetworks.panos.panos_commit_firewall:
+            provider: "{{ device }}"
+            description: "Re-enable HA config sync after OS downgrade"
 
-    - name: Force running-config sync from initial active back to peer
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "request high-availability sync-to-remote running-config"
+        - name: Force running-config sync from initial active back to peer
+          paloaltonetworks.panos.panos_op:
+            provider: "{{ device }}"
+            cmd: "request high-availability sync-to-remote running-config"
       when: inventory_hostname == hostvars['localhost'].ha_active_host
 
     - name: Ensure original active regains active role if needed
