@@ -43,12 +43,18 @@
           - no boot system
           - "boot system flash:packages.conf"
 
-    - name: Check and set configuration register to 0x2102
-      cisco.ios.ios_command:
-        commands:
-          - "config-register 0x2102"
-      vars:
-        ansible_command_timeout: 60
+    - name: Disable ignore startup-config on 9300  
+      cisco.ios.ios_config:  
+        lines:  
+          - no system ignore startupconfig switch all
+          - no boot manual
+
+    - name: Save config  
+      cisco.ios.ios_command:  
+        commands:  
+          
+          - write memory  
+
 
     - name: Save running-config
       cisco.ios.ios_command:
@@ -61,7 +67,7 @@
       cisco.ios.ios_command:
         commands:
           - "show running-config"
-      register: config_backup
+      register: startup_backup.cfg
 
     - name: Run install add/activate/commit to convert to install mode
       cisco.ios.ios_command:
