@@ -18,6 +18,7 @@
           - command: "copy tftp://192.168.29.208/cat9k_iosxe.17.15.03.SPA.bin flash:cat9k_iosxe.17.15.03.SPA.bin vrf Mgmt-vrf"
             prompt: "Destination filename"
             answer: "cat9k_iosxe.17.15.03.SPA.bin"
+            timeout: 600
       register: copy_output
 
     - name: Show copy output
