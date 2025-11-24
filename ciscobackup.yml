@@ -22,12 +22,9 @@
             answer:
               - "192.168.29.23"
               - "192.168.29.164_backup"
-        retries: 3
-        interval: 300
-        wait_for:
-          - stdout[0] contains "Writing"
-          - stdout[0] contains "bytes copied"
-        match: all
+      vars:
+        ansible_command_timeout: 1200
+
       register: backup_result
 
     - name: Show result of backup
