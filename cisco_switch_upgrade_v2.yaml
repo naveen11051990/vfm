@@ -67,7 +67,7 @@
       cisco.ios.ios_command:
         commands:
           - "show running-config"
-      register: startup_backup.cfg
+      register: config_backup.cfg
 
     - name: Run install add/activate/commit to convert to install mode
       cisco.ios.ios_command:
