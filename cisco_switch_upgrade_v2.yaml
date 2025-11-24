@@ -47,13 +47,7 @@
       cisco.ios.ios_config:  
         lines:  
           - no system ignore startupconfig switch all
-          - no boot manual
-
-    - name: Save config  
-      cisco.ios.ios_command:  
-        commands:  
-          
-          - write memory  
+          - no boot manual 
 
 
     - name: Save running-config
@@ -63,11 +57,34 @@
       vars:
         ansible_command_timeout: 120
 
-    - name: Backup running config before install
+    - name: Copy running-config to TFTP server
       cisco.ios.ios_command:
         commands:
-          - "show running-config"
-      register: config_backup
+          - command: "copy system:running-config tftp://192.168.29.23/192.168.29.164_backup"
+            prompt:
+              - "Address or name of remote host"
+              - "Destination filename"
+            answer:
+              - "192.168.29.23"
+              - "192.168.29.164_backup"
+      register: copy_result
+
+    - name: Show result of TFTP backup
+      debug:
+        var: copy_result.stdout_lines
+
+    - name: Copy image from TFTP to flash using Mgmt-vrf
+      cisco.ios.ios_command:
+        commands:
+          - command: "copy tftp://192.168.29.208/cat9k_iosxe.17.16.01.SPA.bin flash:cat9k_iosxe.17.16.01.SPA.bin vrf Mgmt-vrf"
+            prompt: "Destination filename"
+            answer: "cat9k_iosxe.17.16.01.SPA.bin"
+      register: copy_output
+      vars:
+        ansible_command_timeout: 600
+
+
+
 
     - name: Run install add/activate/commit to convert to install mode
       cisco.ios.ios_command:
