@@ -205,11 +205,15 @@
         ha_running_sync: >-
           {{ (ha_sync_state.stdout_xml | string)
              | regex_search('running-sync[^<]*>([^<]+)<', '\1')
-             | default('unknown', true) }}
+             | default([])
+             | first
+             | default('unknown') }}
         ha_running_sync_enabled: >-
           {{ (ha_sync_state.stdout_xml | string)
              | regex_search('running-sync-enabled[^<]*>([^<]+)<', '\1')
-             | default('unknown', true) }}
+             | default([])
+             | first
+             | default('unknown') }}
 
     - name: Show running-sync status when not synchronized
       ansible.builtin.debug:
