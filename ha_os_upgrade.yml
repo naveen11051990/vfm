@@ -28,6 +28,26 @@
         fail_msg: 'You must provide -e upgrade_path=''["10.2.3","10.2.4"]'''
       run_once: true
 
+    - name: Report controller dependency versions
+      run_once: true
+      delegate_to: localhost
+      block:
+        - name: Collect pan-os-python version
+          ansible.builtin.command: python3 -c "import panos; print(panos.__version__)"
+          register: panos_python_version
+          changed_when: false
+          failed_when: false
+        - name: Collect paloaltonetworks.panos collection version
+          ansible.builtin.command: ansible-galaxy collection list paloaltonetworks.panos --format yaml
+          register: panos_collection_info
+          changed_when: false
+          failed_when: false
+        - name: Show dependency versions
+          ansible.builtin.debug:
+            msg:
+              - "pan-os-python: {{ (panos_python_version.stdout_lines | first) | default('unknown') }}"
+              - "paloaltonetworks.panos collection info:\n{{ panos_collection_info.stdout | default('unknown') }}"
+
     - name: Gather HA and system facts
       paloaltonetworks.panos.panos_facts:
         provider: "{{ device }}"
@@ -164,84 +184,27 @@
         is_initial_active: "{{ ha_runtime.ha_initial_role == 'active' }}"
         is_initial_passive: "{{ ha_runtime.ha_initial_role == 'passive' }}"
 
-    # Temporarily skipping content and antivirus updates for targeted sync testing
-    #- name: Include content and antivirus update tasks
-    #  ansible.builtin.import_tasks: tasks/content_and_antivirus_update.yml
+    - name: Include content and antivirus update tasks
+      ansible.builtin.import_tasks: tasks/content_and_antivirus_update.yml
 
-    # Temporarily skipping backups for targeted sync testing
-    #- name: Backup running configuration
-    #  paloaltonetworks.panos.panos_export:
-    #    provider: "{{ device }}"
-    #    category: configuration
-    #    filename: "{{ backup_filename }}"
-    #    create_directory: true
-
-    # Temporarily skipping tech-support bundle capture for targeted sync testing
-    #- name: Determine tech-support bundle filename
-    #  ansible.builtin.set_fact:
-    #    tech_support_bundle_path: >
-    #      {{ backup_directory }}/{{ inventory_hostname | default('pa-fw') }}-tech-support-{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.tgz
-
-    #- name: Capture tech-support bundle before upgrade
-    #  paloaltonetworks.panos.panos_export:
-    #    provider: "{{ device }}"
-    #    category: tech-support
-    #    filename: "{{ tech_support_bundle_path }}"
-    #    create_directory: true
-
-    - name: Validate HA config sync before disabling (pre-flight check)
-      paloaltonetworks.panos.panos_op:
+    - name: Backup running configuration
+      paloaltonetworks.panos.panos_export:
         provider: "{{ device }}"
-        cmd: "<show><high-availability><state></state></high-availability></show>"
-        cmd_is_xml: true
-      register: ha_sync_state
+        category: configuration
+        filename: "{{ backup_filename }}"
+        create_directory: true
 
-    - name: Show HA state payload (for sync debug)
-      ansible.builtin.debug:
-        var: ha_sync_state.stdout_xml
-
-    - name: Extract running-sync status from HA state XML
+    - name: Determine tech-support bundle filename
       ansible.builtin.set_fact:
-        ha_running_sync: >-
-          {{ (ha_sync_state.stdout_xml | string)
-             | regex_search('running-sync[^<]*>([^<]+)<', '\1')
-             | default([])
-             | first
-             | default('unknown')
-             | string
-             | lower }}
-        ha_running_sync_enabled_raw: >-
-          {{ (ha_sync_state.stdout_xml | string)
-             | regex_search('running-sync-enabled[^<]*>([^<]+)<', '\1')
-             | default([])
-             | first
-             | default('unknown') }}
-    - name: Normalize running-sync enabled value
-      ansible.builtin.set_fact:
-        ha_running_sync_enabled: "{{ ha_running_sync_enabled_raw | string | lower }}"
-        ha_running_sync_enabled_bool: "{{ (ha_running_sync_enabled_raw | string | lower) in ['yes', 'true', '1'] }}"
+        tech_support_bundle_path: >-
+          {{ backup_directory }}/{{ inventory_hostname | default('pa-fw') }}-tech-support-{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.tgz
 
-    - name: Show running-sync status when not synchronized
-      ansible.builtin.debug:
-        msg: "running-sync ({{ inventory_hostname }}): {{ ha_running_sync }} (enabled: {{ ha_running_sync_enabled }})"
-      when: ha_running_sync != 'synchronized' or not ha_running_sync_enabled_bool
-
-    - name: Warn when config-sync is disabled before upgrade
-      ansible.builtin.debug:
-        msg: "Warning: config-sync is currently disabled on {{ inventory_hostname }} (running-sync-enabled={{ ha_running_sync_enabled }}). Proceeding because running-sync is synchronized."
-      when:
-        - ha_running_sync == 'synchronized'
-        - not ha_running_sync_enabled_bool
-
-    - name: Assert running configuration is synchronized on all HA peers
-      ansible.builtin.assert:
-        that:
-          - ha_running_sync == 'synchronized'
-        fail_msg: |
-          PREFLIGHT FAILURE: Running configuration is not synchronized on {{ inventory_hostname }}.
-          Cannot safely disable config-sync during OS upgrade with mismatched configurations.
-          Sync running configurations on both HA peers before retrying.
-          Sync status on {{ inventory_hostname }}: running-sync={{ ha_running_sync }}, running-sync-enabled={{ ha_running_sync_enabled }}
+    - name: Capture tech-support bundle before upgrade
+      paloaltonetworks.panos.panos_export:
+        provider: "{{ device }}"
+        category: tech-support
+        filename: "{{ tech_support_bundle_path }}"
+        create_directory: true
 
     - name: Disable config sync
       paloaltonetworks.panos.panos_type_cmd:
@@ -269,18 +232,17 @@
           - ha_post_disable.ansible_facts.ansible_net_ha_localstate | lower in ['active', 'passive']
         fail_msg: "Unexpected HA state after disabling config sync; check HA configuration on device."
 
-    # Temporarily skipping antivirus parity check for targeted sync testing
-    #- name: Verify antivirus versions match across HA peers
-    #  run_once: true
-    #  vars:
-    #    antivirus_versions: "{{ ansible_play_hosts_all | map('extract', hostvars, 'ha_antivirus_version') | list }}"
-    #  ansible.builtin.assert:
-    #    that:
-    #      - antivirus_versions | reject('equalto', 'unknown') | list | length == antivirus_versions | length
-    #      - (antivirus_versions | unique | length) == 1
-    #    fail_msg: >
-    #      Antivirus update mismatch detected across HA peers: {{ antivirus_versions }}. Ensure both devices downloaded and
-    #      installed the latest antivirus package before proceeding.
+    - name: Verify antivirus versions match across HA peers
+      run_once: true
+      vars:
+        antivirus_versions: "{{ ansible_play_hosts_all | map('extract', hostvars, 'ha_antivirus_version') | list }}"
+      ansible.builtin.assert:
+        that:
+          - antivirus_versions | reject('equalto', 'unknown') | list | length == antivirus_versions | length
+          - (antivirus_versions | unique | length) == 1
+        fail_msg: >-
+          Antivirus update mismatch detected across HA peers: {{ antivirus_versions }}. Ensure both devices downloaded and
+          installed the latest antivirus package before proceeding.
 
     - name: Orchestrate passive-first upgrade sequence (controller-driven)
       run_once: true
@@ -301,18 +263,17 @@
           retries: 120
           delay: 5
 
-        # Temporarily skipping OS download/install/reboot on passive for targeted sync testing
-        #- name: Upgrade passive firewall first
-        #  ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
-        #  loop: "{{ upgrade_path }}"
-        #  loop_control:
-        #    label: "{{ item }}"
-        #  vars:
-        #    version_item: "{{ item }}"
-        #    device:
-        #      ip_address: "{{ hostvars[passive_host].ip_address }}"
-        #      username: "{{ hostvars[passive_host].username }}"
-        #      password: "{{ hostvars[passive_host].password }}"
+        - name: Upgrade passive firewall first
+          ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
+          loop: "{{ upgrade_path }}"
+          loop_control:
+            label: "{{ item }}"
+          vars:
+            version_item: "{{ item }}"
+            device:
+              ip_address: "{{ hostvars[passive_host].ip_address }}"
+              username: "{{ hostvars[passive_host].username }}"
+              password: "{{ hostvars[passive_host].password }}"
 
         - name: Suspend original active to trigger failover
           paloaltonetworks.panos.panos_op:
@@ -360,18 +321,17 @@
           retries: 120
           delay: 5
 
-        # Temporarily skipping OS download/install/reboot on original active for targeted sync testing
-        #- name: Upgrade originally active firewall
-        #  ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
-        #  loop: "{{ upgrade_path }}"
-        #  loop_control:
-        #    label: "{{ item }}"
-        #  vars:
-        #    version_item: "{{ item }}"
-        #    device:
-        #      ip_address: "{{ hostvars[active_host].ip_address }}"
-        #      username: "{{ hostvars[active_host].username }}"
-        #      password: "{{ hostvars[active_host].password }}"
+        - name: Upgrade originally active firewall
+          ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
+          loop: "{{ upgrade_path }}"
+          loop_control:
+            label: "{{ item }}"
+          vars:
+            version_item: "{{ item }}"
+            device:
+              ip_address: "{{ hostvars[active_host].ip_address }}"
+              username: "{{ hostvars[active_host].username }}"
+              password: "{{ hostvars[active_host].password }}"
 
         - name: Return suspended firewall to functional state
           paloaltonetworks.panos.panos_op:
@@ -381,96 +341,22 @@
               password: "{{ hostvars[active_host].password }}"
             cmd: "request high-availability state functional"
 
-        - name: Collect HA state to find current active before re-enabling sync
-          paloaltonetworks.panos.panos_facts:
-            provider:
-              ip_address: "{{ hostvars[item].ip_address }}"
-              username: "{{ hostvars[item].username }}"
-              password: "{{ hostvars[item].password }}"
-            gather_subset: ["ha"]
-          loop: "{{ [active_host, passive_host] }}"
-          register: ha_state_pre_sync
+    - name: Re-enable config sync
+      paloaltonetworks.panos.panos_type_cmd:
+        provider: "{{ device }}"
+        cmd: set
+        xpath: "/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/group/configuration-synchronization"
+        element: "<enabled>yes</enabled>"
 
-        - name: Determine config sync source (current active) before enabling sync
-          ansible.builtin.set_fact:
-            config_sync_source: >-
-              {{ (ha_state_pre_sync.results
-                  | selectattr('ansible_facts.ansible_net_ha_localstate', 'defined')
-                  | selectattr('ansible_facts.ansible_net_ha_localstate', 'equalto', 'active')
-                  | map(attribute='item')
-                  | list
-                  | first
-                  | default(active_host)) }}
+    - name: Commit HA change (config sync enabled)
+      paloaltonetworks.panos.panos_commit_firewall:
+        provider: "{{ device }}"
+        description: "Re-enable HA config sync after OS upgrade"
 
-        - name: Re-enable config sync on both peers
-          paloaltonetworks.panos.panos_type_cmd:
-            provider:
-              ip_address: "{{ hostvars[item].ip_address }}"
-              username: "{{ hostvars[item].username }}"
-              password: "{{ hostvars[item].password }}"
-            cmd: set
-            xpath: "/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/group/configuration-synchronization"
-            element: "<enabled>yes</enabled>"
-          loop: "{{ [active_host, passive_host] }}"
-
-        - name: Commit HA change on current active (config sync enabled)
-          paloaltonetworks.panos.panos_commit_firewall:
-            provider:
-              ip_address: "{{ hostvars[config_sync_source | default(active_host)].ip_address }}"
-              username: "{{ hostvars[config_sync_source | default(active_host)].username }}"
-              password: "{{ hostvars[config_sync_source | default(active_host)].password }}"
-            description: "Re-enable HA config sync after OS upgrade"
-
-        - name: Collect HA state to find current active for config sync
-          paloaltonetworks.panos.panos_facts:
-            provider:
-              ip_address: "{{ hostvars[item].ip_address }}"
-              username: "{{ hostvars[item].username }}"
-              password: "{{ hostvars[item].password }}"
-            gather_subset: ["ha"]
-          loop: "{{ [active_host, passive_host] }}"
-          register: ha_state_before_sync
-
-        - name: Determine config sync source (current active)
-          ansible.builtin.set_fact:
-            config_sync_source: >-
-              {{ (ha_state_before_sync.results
-                  | selectattr('ansible_facts.ansible_net_ha_localstate', 'defined')
-                  | selectattr('ansible_facts.ansible_net_ha_localstate', 'equalto', 'active')
-                  | map(attribute='item')
-                  | list
-                  | first
-                  | default('')) }}
-
-        - name: Ensure an active peer was detected for config sync
-          ansible.builtin.assert:
-            that:
-              - config_sync_source | length > 0
-            fail_msg: "Unable to identify the active HA peer after re-enabling config sync."
-
-        - name: Force running-config sync from current active to peer (XML form via panos_op)
-          paloaltonetworks.panos.panos_op:
-            provider:
-              ip_address: "{{ hostvars[config_sync_source].ip_address }}"
-              username: "{{ hostvars[config_sync_source].username }}"
-              password: "{{ hostvars[config_sync_source].password }}"
-            # CLI: request high-availability sync-to-remote running-config
-            # XML form uses an empty <running-config/> element (not <type>running-config</type>)
-            cmd: "<request><high-availability><sync-to-remote><running-config /></sync-to-remote></high-availability></request>"
-            cmd_is_xml: true
-          register: config_sync_cmd
-          retries: 3
-          delay: 10
-          until: config_sync_cmd is not failed
-          failed_when: false
-          delegate_to: localhost
-
-        - name: Fail clearly if config sync did not succeed
-          ansible.builtin.assert:
-            that:
-              - config_sync_cmd is not failed
-              - config_sync_cmd.stdout is defined or config_sync_cmd.stdout_xml is defined
-            fail_msg: "HA running-config sync request failed: {{ config_sync_cmd }}"
+    - name: Force running-config sync from initial active back to peer
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "request high-availability sync-to-remote running-config"
       when: inventory_hostname == hostvars['localhost'].ha_active_host
 
     - name: Ensure original active regains active role if needed
