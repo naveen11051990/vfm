@@ -1,0 +1,13 @@
+---
+- name: Reboot Windows Server 2019
+  hosts: Winserver_2019_Cred
+  gather_facts: false
+
+  tasks:
+    - name: Reboot the Windows server
+      ansible.windows.win_reboot:
+        msg: "Reboot initiated by Ansible"
+        pre_reboot_delay: 5 # seconds to wait before reboot
+        post_reboot_delay: 10 # seconds to wait after reboot
+        reboot_timeout: 600 # max seconds to wait for reboot to complete
+        connect_timeout: 10 # seconds to wait between connection attempts after reboot
