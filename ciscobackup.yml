@@ -15,5 +15,11 @@
           dir_path: /var/lib/awx/projects
 
       register: backup_path
+      
+    - name: Summary for host
+      ansible.builtin.debug:
+        msg: >
+          "backup is stored on {{backup_path}}"
+          "Filename is {{filename}}"
 
     
