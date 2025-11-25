@@ -393,6 +393,23 @@
             provider: "{{ device }}"
             description: "Re-enable HA config sync after OS upgrade"
 
+        - name: Wait for config-sync to report enabled and synchronized
+          paloaltonetworks.panos.panos_op:
+            provider:
+              ip_address: "{{ hostvars[item].ip_address }}"
+              username: "{{ hostvars[item].username }}"
+              password: "{{ hostvars[item].password }}"
+            cmd: "<show><high-availability><state></state></high-availability></show>"
+            cmd_is_xml: true
+          loop: "{{ [active_host, passive_host] }}"
+          register: ha_sync_poll
+          until: >-
+            (ha_sync_poll.stdout_xml | regex_search('running-sync-enabled[^<]*>([^<]+)<', '\\1') | first | default('no') | lower) == 'yes'
+            and (ha_sync_poll.stdout_xml | regex_search('running-sync[^<]*>([^<]+)<', '\\1') | first | default('unknown') | lower) == 'synchronized'
+          retries: 10
+          delay: 15
+          delegate_to: localhost
+
         - name: Collect HA state to find current active for config sync
           paloaltonetworks.panos.panos_facts:
             provider:
@@ -420,13 +437,22 @@
               - config_sync_source | length > 0
             fail_msg: "Unable to identify the active HA peer after re-enabling config sync."
 
-        - name: Force running-config sync from current active to peer
+        - name: Force running-config sync from current active to peer (XML form via panos_op)
           paloaltonetworks.panos.panos_op:
             provider:
               ip_address: "{{ hostvars[config_sync_source].ip_address }}"
               username: "{{ hostvars[config_sync_source].username }}"
               password: "{{ hostvars[config_sync_source].password }}"
-            cmd: "request high-availability sync-to-remote running-config"
+            cmd: "<request><high-availability><sync-to-remote><type>running-config</type></sync-to-remote></high-availability></request>"
+            cmd_is_xml: true
+          register: config_sync_cmd
+
+        - name: Fail clearly if config sync did not succeed
+          ansible.builtin.assert:
+            that:
+              - config_sync_cmd is not failed
+              - config_sync_cmd.stdout is defined or config_sync_cmd.stdout_xml is defined
+            fail_msg: "HA running-config sync request failed: {{ config_sync_cmd }}"
       when: inventory_hostname == hostvars['localhost'].ha_active_host
 
     - name: Ensure original active regains active role if needed
