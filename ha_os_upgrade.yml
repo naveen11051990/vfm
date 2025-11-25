@@ -387,9 +387,39 @@
             provider: "{{ device }}"
             description: "Re-enable HA config sync after OS upgrade"
 
-        - name: Force running-config sync from initial active back to peer
+        - name: Collect HA state to find current active for config sync
+          paloaltonetworks.panos.panos_facts:
+            provider:
+              ip_address: "{{ hostvars[item].ip_address }}"
+              username: "{{ hostvars[item].username }}"
+              password: "{{ hostvars[item].password }}"
+            gather_subset: ["ha"]
+          loop: "{{ [active_host, passive_host] }}"
+          register: ha_state_before_sync
+
+        - name: Determine config sync source (current active)
+          ansible.builtin.set_fact:
+            config_sync_source: >-
+              {{ (ha_state_before_sync.results
+                  | selectattr('ansible_facts.ansible_net_ha_localstate', 'defined')
+                  | selectattr('ansible_facts.ansible_net_ha_localstate', 'equalto', 'active')
+                  | map(attribute='item')
+                  | list
+                  | first
+                  | default('')) }}
+
+        - name: Ensure an active peer was detected for config sync
+          ansible.builtin.assert:
+            that:
+              - config_sync_source | length > 0
+            fail_msg: "Unable to identify the active HA peer after re-enabling config sync."
+
+        - name: Force running-config sync from current active to peer
           paloaltonetworks.panos.panos_op:
-            provider: "{{ device }}"
+            provider:
+              ip_address: "{{ hostvars[config_sync_source].ip_address }}"
+              username: "{{ hostvars[config_sync_source].username }}"
+              password: "{{ hostvars[config_sync_source].password }}"
             cmd: "request high-availability sync-to-remote running-config"
       when: inventory_hostname == hostvars['localhost'].ha_active_host
 
