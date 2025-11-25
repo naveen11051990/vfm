@@ -458,7 +458,6 @@
             # XML form uses an empty <running-config/> element (not <type>running-config</type>)
             cmd: "<request><high-availability><sync-to-remote><running-config /></sync-to-remote></high-availability></request>"
             cmd_is_xml: true
-            timeout: 120
           register: config_sync_cmd
           retries: 3
           delay: 10
