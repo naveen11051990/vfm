@@ -470,13 +470,6 @@
           ansible.builtin.assert:
             that:
               - config_sync_cmd is not failed
-          fail_msg: "HA running-config sync request failed: {{ config_sync_cmd }}"
-          register: config_sync_cmd
-
-        - name: Fail clearly if config sync did not succeed
-          ansible.builtin.assert:
-            that:
-              - config_sync_cmd is not failed
               - config_sync_cmd.stdout is defined or config_sync_cmd.stdout_xml is defined
             fail_msg: "HA running-config sync request failed: {{ config_sync_cmd }}"
       when: inventory_hostname == hostvars['localhost'].ha_active_host
