@@ -8,22 +8,8 @@
 
   tasks:
     - name: Save running configuration
-      cisco.ios.ios_command:
-        commands:
-          - write memory
-
-    - name: Copy running-config to TFTP server (with retries)
-      cisco.ios.ios_command:
-        commands:
-          - command: "copy system:running-config tftp://192.168.29.23/192.168.29.164_backup"
-            prompt:
-              - "Address or name of remote host"
-              - "Destination filename"
-            answer:
-              - "192.168.29.23"
-              - "192.168.29.164_backup"
-      vars:
-        ansible_command_timeout: 1200
+      cisco.ios.ios_config:
+        backup: yes
 
       register: backup_result
 
