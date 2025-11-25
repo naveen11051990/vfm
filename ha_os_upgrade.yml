@@ -164,27 +164,30 @@
         is_initial_active: "{{ ha_runtime.ha_initial_role == 'active' }}"
         is_initial_passive: "{{ ha_runtime.ha_initial_role == 'passive' }}"
 
-    - name: Include content and antivirus update tasks
-      ansible.builtin.import_tasks: tasks/content_and_antivirus_update.yml
+    # Temporarily skipping content and antivirus updates for targeted sync testing
+    #- name: Include content and antivirus update tasks
+    #  ansible.builtin.import_tasks: tasks/content_and_antivirus_update.yml
 
-    - name: Backup running configuration
-      paloaltonetworks.panos.panos_export:
-        provider: "{{ device }}"
-        category: configuration
-        filename: "{{ backup_filename }}"
-        create_directory: true
+    # Temporarily skipping backups for targeted sync testing
+    #- name: Backup running configuration
+    #  paloaltonetworks.panos.panos_export:
+    #    provider: "{{ device }}"
+    #    category: configuration
+    #    filename: "{{ backup_filename }}"
+    #    create_directory: true
 
-    - name: Determine tech-support bundle filename
-      ansible.builtin.set_fact:
-        tech_support_bundle_path: >
-          {{ backup_directory }}/{{ inventory_hostname | default('pa-fw') }}-tech-support-{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.tgz
+    # Temporarily skipping tech-support bundle capture for targeted sync testing
+    #- name: Determine tech-support bundle filename
+    #  ansible.builtin.set_fact:
+    #    tech_support_bundle_path: >
+    #      {{ backup_directory }}/{{ inventory_hostname | default('pa-fw') }}-tech-support-{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.tgz
 
-    - name: Capture tech-support bundle before upgrade
-      paloaltonetworks.panos.panos_export:
-        provider: "{{ device }}"
-        category: tech-support
-        filename: "{{ tech_support_bundle_path }}"
-        create_directory: true
+    #- name: Capture tech-support bundle before upgrade
+    #  paloaltonetworks.panos.panos_export:
+    #    provider: "{{ device }}"
+    #    category: tech-support
+    #    filename: "{{ tech_support_bundle_path }}"
+    #    create_directory: true
 
     - name: Validate HA config sync before disabling (pre-flight check)
       paloaltonetworks.panos.panos_op:
@@ -297,17 +300,18 @@
           retries: 120
           delay: 5
 
-        - name: Upgrade passive firewall first
-          ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
-          loop: "{{ upgrade_path }}"
-          loop_control:
-            label: "{{ item }}"
-          vars:
-            version_item: "{{ item }}"
-            device:
-              ip_address: "{{ hostvars[passive_host].ip_address }}"
-              username: "{{ hostvars[passive_host].username }}"
-              password: "{{ hostvars[passive_host].password }}"
+        # Temporarily skipping OS download/install/reboot on passive for targeted sync testing
+        #- name: Upgrade passive firewall first
+        #  ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
+        #  loop: "{{ upgrade_path }}"
+        #  loop_control:
+        #    label: "{{ item }}"
+        #  vars:
+        #    version_item: "{{ item }}"
+        #    device:
+        #      ip_address: "{{ hostvars[passive_host].ip_address }}"
+        #      username: "{{ hostvars[passive_host].username }}"
+        #      password: "{{ hostvars[passive_host].password }}"
 
         - name: Suspend original active to trigger failover
           paloaltonetworks.panos.panos_op:
@@ -355,17 +359,18 @@
           retries: 120
           delay: 5
 
-        - name: Upgrade originally active firewall
-          ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
-          loop: "{{ upgrade_path }}"
-          loop_control:
-            label: "{{ item }}"
-          vars:
-            version_item: "{{ item }}"
-            device:
-              ip_address: "{{ hostvars[active_host].ip_address }}"
-              username: "{{ hostvars[active_host].username }}"
-              password: "{{ hostvars[active_host].password }}"
+        # Temporarily skipping OS download/install/reboot on original active for targeted sync testing
+        #- name: Upgrade originally active firewall
+        #  ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
+        #  loop: "{{ upgrade_path }}"
+        #  loop_control:
+        #    label: "{{ item }}"
+        #  vars:
+        #    version_item: "{{ item }}"
+        #    device:
+        #      ip_address: "{{ hostvars[active_host].ip_address }}"
+        #      username: "{{ hostvars[active_host].username }}"
+        #      password: "{{ hostvars[active_host].password }}"
 
         - name: Return suspended firewall to functional state
           paloaltonetworks.panos.panos_op:
