@@ -230,3 +230,5 @@ memory/
 .github/
 inventory.ini
 plans/
+.kilocode/
+.claude/

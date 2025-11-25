@@ -1,0 +1,15 @@
+---
+- name: Gather Basic Windows Server Facts
+  hosts: windows
+  gather_facts: yes
+
+  tasks:
+    - name: Display key system information
+      ansible.builtin.debug:
+        msg:
+          - "Hostname: {{ ansible_facts.hostname }}"
+          - "OS Family: {{ ansible_facts.os_family }}"
+          - "RAM (GB): {{ (ansible_facts.memtotal_mb / 1024) | round(1) }}"
+          - "FQDN: {{ ansible_facts.fqdn }}"
+          - "IP Address: {{ ansible_facts.ip_addresses[0] | default('N/A') }}"
+          - "Windows Version: {{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }}"
