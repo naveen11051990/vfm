@@ -1,6 +1,6 @@
 ---
 - name: Gather Basic Windows Server Facts
-  hosts: windows
+  hosts: Winserver_2019_Cred
   gather_facts: yes
 
   tasks:
