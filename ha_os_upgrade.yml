@@ -381,34 +381,45 @@
               password: "{{ hostvars[active_host].password }}"
             cmd: "request high-availability state functional"
 
-        - name: Re-enable config sync
-          paloaltonetworks.panos.panos_type_cmd:
-            provider: "{{ device }}"
-            cmd: set
-            xpath: "/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/group/configuration-synchronization"
-            element: "<enabled>yes</enabled>"
-
-        - name: Commit HA change (config sync enabled)
-          paloaltonetworks.panos.panos_commit_firewall:
-            provider: "{{ device }}"
-            description: "Re-enable HA config sync after OS upgrade"
-
-        - name: Wait for config-sync to report enabled and synchronized
-          paloaltonetworks.panos.panos_op:
+        - name: Collect HA state to find current active before re-enabling sync
+          paloaltonetworks.panos.panos_facts:
             provider:
               ip_address: "{{ hostvars[item].ip_address }}"
               username: "{{ hostvars[item].username }}"
               password: "{{ hostvars[item].password }}"
-            cmd: "<show><high-availability><state></state></high-availability></show>"
-            cmd_is_xml: true
+            gather_subset: ["ha"]
           loop: "{{ [active_host, passive_host] }}"
-          register: ha_sync_poll
-          until: >-
-            (ha_sync_poll.stdout_xml | regex_search('running-sync-enabled[^<]*>([^<]+)<', '\\1') | first | default('no') | lower) == 'yes'
-            and (ha_sync_poll.stdout_xml | regex_search('running-sync[^<]*>([^<]+)<', '\\1') | first | default('unknown') | lower) == 'synchronized'
-          retries: 10
-          delay: 15
-          delegate_to: localhost
+          register: ha_state_pre_sync
+
+        - name: Determine config sync source (current active) before enabling sync
+          ansible.builtin.set_fact:
+            config_sync_source: >-
+              {{ (ha_state_pre_sync.results
+                  | selectattr('ansible_facts.ansible_net_ha_localstate', 'defined')
+                  | selectattr('ansible_facts.ansible_net_ha_localstate', 'equalto', 'active')
+                  | map(attribute='item')
+                  | list
+                  | first
+                  | default(active_host)) }}
+
+        - name: Re-enable config sync on both peers
+          paloaltonetworks.panos.panos_type_cmd:
+            provider:
+              ip_address: "{{ hostvars[item].ip_address }}"
+              username: "{{ hostvars[item].username }}"
+              password: "{{ hostvars[item].password }}"
+            cmd: set
+            xpath: "/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/group/configuration-synchronization"
+            element: "<enabled>yes</enabled>"
+          loop: "{{ [active_host, passive_host] }}"
+
+        - name: Commit HA change on current active (config sync enabled)
+          paloaltonetworks.panos.panos_commit_firewall:
+            provider:
+              ip_address: "{{ hostvars[config_sync_source | default(active_host)].ip_address }}"
+              username: "{{ hostvars[config_sync_source | default(active_host)].username }}"
+              password: "{{ hostvars[config_sync_source | default(active_host)].password }}"
+            description: "Re-enable HA config sync after OS upgrade"
 
         - name: Collect HA state to find current active for config sync
           paloaltonetworks.panos.panos_facts:
