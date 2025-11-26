@@ -16,5 +16,4 @@
         backup_options:
           filename: newbackup1.cfg
           dir_path: /var/lib/awx/projects
-      register: backup_path
 ---
