@@ -1,6 +1,5 @@
 ---
 - name: Full Cisco 9300 Upgrade via TFTP (Mgmt-vrf)
-  # hosts: "{{ target_host | default('192.168.29.164') }}"
   hosts: cisco_stack_switch
   gather_facts: no
 
