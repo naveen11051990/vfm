@@ -13,4 +13,3 @@
           - logging trap informational
         save_when: modified
         backup: yes
----
