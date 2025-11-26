@@ -2,12 +2,6 @@
 - name: Backup running-config from Cisco 9300 to TFTP
   hosts: cisco_stack_switch
   gather_facts: no
-  ansible_connection: ansible.netcommon.network_cli
-  ansible_network_os: cisco.ios.ios
-  ansible_user: admin
-  ansible_password: admin@123
-  ansible_become: true
-  ansible_become_method: enable
 
   tasks:
     - name: Configure NTP, logging and timestamps
