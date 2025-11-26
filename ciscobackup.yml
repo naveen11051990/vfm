@@ -13,7 +13,4 @@
           - logging trap informational
         save_when: modified
         backup: yes
-        backup_options:
-          filename: newbackup1.cfg
-          dir_path: /var/lib/awx/projects
 ---
