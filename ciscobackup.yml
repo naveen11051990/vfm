@@ -22,5 +22,4 @@
       ansible.builtin.debug:
         msg: >
           Backup is stored at {{ backup_location.backup_path }}
-          Filename is {{ backup_location.filename }}
-          --- End of Backup ---
+--- End of Backup ---
