@@ -2,24 +2,34 @@
 - name: Backup running-config from Cisco 9300 to TFTP
   hosts: 192.168.29.164
   gather_facts: no
-  connection: network_cli
-  collections:
-    - cisco.ios
+
 
   tasks:
-    - name: Save running configuration
-      cisco.ios.ios_config:
-        backup: yes
-        backup_options:
-          filename: newbackup.cfg
-          dir_path: /var/lib/awx/projects
+    
+    
 
-      register: backup_path
-      
+    - name: Configure NTP, logging and timestamps
+      cisco.ios.ios_config:
+        lines:
+          - ntp server 192.168.29.3 prefer
+          - service timestamps log datetime msec localtime show-timezone
+          - logging host 192.168.29.3
+          - logging trap informational
+      save_when: modified
+      backup: yes
+       backup_options:
+        filename: newbackup1.cfg
+        dir_path: /var/lib/awx/projects
+
+      register: backup_location
+
     - name: Summary for host
       ansible.builtin.debug:
         msg: >
-          "backup is stored on {{backup_path}}"
-          "Filename is {{filename}}"
+          "backup is stored onat {{backup_location.backup_path}}"
+          "Filename is {{backup_location.filename}}"
+          --- End of Backup ---
+
+    
 
     
