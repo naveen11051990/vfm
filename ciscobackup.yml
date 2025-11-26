@@ -18,8 +18,7 @@
           dir_path: /var/lib/awx/projects
       register: backup_location
 
-    - name: Summary for host
-      ansible.builtin.debug:
-        msg: >
-          Backup is stored at {{ backup_location.backup_path }}
+  - name: Show backup paths
+      debug:
+        msg: "Backup created at {{ backup_out.backup_path }}"
 --- End of Backup ---
