@@ -1,11 +1,8 @@
 ---
 - name: Full Cisco 9300 Upgrade via TFTP (Mgmt-vrf)
   # hosts: "{{ target_host | default('192.168.29.164') }}"
-  hosts: 192.168.29.164
+  hosts: cisco_stack_switch
   gather_facts: no
-  connection: network_cli
-  collections:
-    - cisco.ios
 
   tasks:
     - name: Ping TFTP server via Mgmt-vrf
@@ -16,9 +13,9 @@
     - name: Copy image from TFTP to flash using Mgmt-vrf
       cisco.ios.ios_command:
         commands:
-          - command: "copy tftp://192.168.29.208/cat9k_iosxe.17.16.01.SPA.bin flash:cat9k_iosxe.17.16.01.SPA.bin vrf Mgmt-vrf"
+          - command: "copy tftp://192.168.29.208/cat9k_iosxe.17.12.06.SPA.bin flash:cat9k_iosxe.17.12.06.SPA.bin vrf Mgmt-vrf"
             prompt: "Destination filename"
-            answer: "cat9k_iosxe.17.16.01.SPA.bin"
+            answer: "cat9k_iosxe.17.12.06.SPA.bin"
       register: copy_output
       vars:
         ansible_command_timeout: 600
@@ -30,7 +27,7 @@
     - name: Verify image exists in flash
       cisco.ios.ios_command:
         commands:
-          - "dir flash:cat9k_iosxe.17.16.01.SPA.bin"
+          - "dir flash:cat9k_iosxe.17.12.06.SPA.bin"
       register: dir_output
 
     - name: Show dir result
@@ -57,28 +54,13 @@
       vars:
         ansible_command_timeout: 120
 
-    - name: Copy running-config to TFTP server
-      cisco.ios.ios_command:
-        commands:
-          - command: "copy system:running-config tftp://192.168.29.23/192.168.29.164_backup"
-            prompt:
-              - "Address or name of remote host"
-              - "Destination filename"
-            answer:
-              - "192.168.29.23"
-              - "192.168.29.164_backup"
-      register: copy_result
-
-    - name: Show result of TFTP backup
-      debug:
-        var: copy_result.stdout_lines
 
     - name: Copy image from TFTP to flash using Mgmt-vrf
       cisco.ios.ios_command:
         commands:
-          - command: "copy tftp://192.168.29.208/cat9k_iosxe.17.16.01.SPA.bin flash:cat9k_iosxe.17.16.01.SPA.bin vrf Mgmt-vrf"
+          - command: "copy tftp://192.168.29.208/cat9k_iosxe.17.12.06.SPA.bin flash:cat9k_iosxe.17.12.06.SPA.bin vrf Mgmt-vrf"
             prompt: "Destination filename"
-            answer: "cat9k_iosxe.17.16.01.SPA.bin"
+            answer: "cat9k_iosxe.17.12.06.SPA.bin"
       register: copy_output
       vars:
         ansible_command_timeout: 600
@@ -89,7 +71,7 @@
     - name: Run install add/activate/commit to convert to install mode
       cisco.ios.ios_command:
         commands:
-          - command: "install add file flash:cat9k_iosxe.17.16.01.SPA.bin activate commit"
+          - command: "install add file flash:cat9k_iosxe.17.12.06.SPA.bin activate commit"
             prompt:
               - "Do you want to proceed"
               - "This operation requires a reload"
