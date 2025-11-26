@@ -17,8 +17,4 @@
           filename: newbackup1.cfg
           dir_path: /var/lib/awx/projects
       register: backup_location
-
-  - name: Show backup paths
-      debug:
-        msg: "Backup created at {{ backup_out.backup_path }}"
---- End of Backup ---
+---
