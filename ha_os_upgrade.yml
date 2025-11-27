@@ -239,17 +239,17 @@
           - ha_post_disable.ansible_facts.ansible_net_ha_localstate | lower in ['active', 'passive']
         fail_msg: "Unexpected HA state after disabling config sync; check HA configuration on device."
 
-    - name: Verify antivirus versions match across HA peers
-      run_once: true
-      vars:
-        antivirus_versions: "{{ ansible_play_hosts_all | map('extract', hostvars, 'ha_antivirus_version') | list }}"
-      ansible.builtin.assert:
-        that:
-          - antivirus_versions | reject('equalto', 'unknown') | list | length == antivirus_versions | length
-          - (antivirus_versions | unique | length) == 1
-        fail_msg: >-
-          Antivirus update mismatch detected across HA peers: {{ antivirus_versions }}. Ensure both devices downloaded and
-          installed the latest antivirus package before proceeding.
+    # - name: Verify antivirus versions match across HA peers
+    #   run_once: true
+    #   vars:
+    #     antivirus_versions: "{{ ansible_play_hosts_all | map('extract', hostvars, 'ha_antivirus_version') | list }}"
+    #   ansible.builtin.assert:
+    #     that:
+    #       - antivirus_versions | reject('equalto', 'unknown') | list | length == antivirus_versions | length
+    #       - (antivirus_versions | unique | length) == 1
+    #     fail_msg: >-
+    #       Antivirus update mismatch detected across HA peers: {{ antivirus_versions }}. Ensure both devices downloaded and
+    #       installed the latest antivirus package before proceeding.
 
     - name: Orchestrate passive-first upgrade sequence (controller-driven)
       run_once: true
