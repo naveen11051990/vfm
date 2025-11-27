@@ -1,0 +1,21 @@
+---
+- name: Simulated S3 backup flow with deliberate failure on final step
+  hosts: backup_clients
+  gather_facts: false
+
+  tasks:
+    - name: Collect files to archive
+      ansible.builtin.debug:
+        msg: "Discovered 12 log files to include in today's backup."
+
+    - name: Compress archive
+      ansible.builtin.debug:
+        msg: "Created tarball /tmp/audit-logs-2025-11-27.tar.gz (24 MB)."
+
+    - name: Encrypt archive
+      ansible.builtin.debug:
+        msg: "Encrypted archive with KMS key alias/audit-backups."
+
+    - name: Upload to S3 (intentionally fails for demo)
+      ansible.builtin.fail:
+        msg: "Demo stop: simulated S3 upload error (403 Forbidden)."

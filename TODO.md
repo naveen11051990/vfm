@@ -41,3 +41,9 @@
 
 - [x] Investigate why antivirus definitions remain mismatched post-upgrade even though the playbook installs latest content (see `plans/feature_antivirus_parity_after_ha_upgrade_plan.md`).
 - [x] Update the workflow to apply or verify antivirus updates so both peers report the same version.
+
+### Sample Failing Training Playbooks
+
+- [x] Add maintenance window guard playbook that fails outside approved hours (`Daniel/maintenance_window_patch_fail.yml`).
+- [x] Add deployment blocker for excessive database replication lag (`Daniel/db_replication_lag_abort.yml`).
+- [x] Add S3 backup prerequisite checker that fails when credentials are missing (`Daniel/s3_backup_prereq_fail.yml`).

@@ -1,0 +1,21 @@
+---
+- name: Simulated patch cycle with final step failure
+  hosts: patch_targets
+  gather_facts: false
+
+  tasks:
+    - name: Validate change ticket
+      ansible.builtin.debug:
+        msg: "Change CHG003217 approved for tonight."
+
+    - name: Drain node from load balancer
+      ansible.builtin.debug:
+        msg: "Node web-01 marked out of rotation; no active sessions."
+
+    - name: Apply OS updates
+      ansible.builtin.debug:
+        msg: "Patched 7 packages, kernel pending reboot."
+
+    - name: Reboot and health check (intentionally fails for demo)
+      ansible.builtin.fail:
+        msg: "Demo stop: post-reboot health check failed (service not responding on port 443)."

@@ -1,0 +1,21 @@
+---
+- name: Simulated database deploy halted on final validation
+  hosts: db_primary
+  gather_facts: false
+
+  tasks:
+    - name: Verify schema diff
+      ansible.builtin.debug:
+        msg: "Schema diff generated: 3 tables altered, 1 index added."
+
+    - name: Confirm backup snapshot
+      ansible.builtin.debug:
+        msg: "Snapshot snap-2025-11-27T0200Z available for rollback."
+
+    - name: Run pre-deployment checks
+      ansible.builtin.debug:
+        msg: "Replication lag steady at 4s; connections healthy."
+
+    - name: Final gate (intentionally fails for demo)
+      ansible.builtin.fail:
+        msg: "Demo stop: last-minute capacity check failed (primary at 95% CPU)."
