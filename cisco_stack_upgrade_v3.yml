@@ -70,6 +70,8 @@
         commands:
           - "copy running-config tftp://192.168.29.208/192.168.29.168_running.backup vrf Mgmt-vrf"
       register: backup_result
+
+    - name: Show backup result
       debug:
         var: backup_result.stdout_lines
     - name: Run install add/activate/commit to convert to install mode
