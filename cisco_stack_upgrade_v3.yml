@@ -32,9 +32,9 @@
       cisco.ios.ios_command:
         commands:
           - command: copy tftp://192.168.29.208/cat9k_iosxe.17.13.01.SPA.bin
-              flash:cat9k_iosxe.17.12.06.SPA.bin vrf Mgmt-vrf
+              flash:cat9k_iosxe.17.13.01.SPA.bin vrf Mgmt-vrf
             prompt: Destination filename
-            answer: cat9k_iosxe.17.12.06.SPA.bin
+            answer: cat9k_iosxe.17.13.01.SPA.bin
       register: copy_output
       vars:
         ansible_command_timeout: 600
@@ -70,9 +70,8 @@
         commands:
           - "copy running-config tftp://192.168.29.208/192.168.29.168_running.backup vrf Mgmt-vrf"
       register: backup_result
-
-    - debug:
-      var: backup_result.stdout_lines
+      debug:
+        var: backup_result.stdout_lines
     - name: Run install add/activate/commit to convert to install mode
       cisco.ios.ios_command:
         commands:
