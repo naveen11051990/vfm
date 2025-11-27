@@ -1,6 +1,6 @@
 ---
 - name: Audit Palo Alto Security Rules for Missing Profiles / Description / Decryption  
-  hosts: "{{ hosts | default('PRODUCTIONFIREWALL') }}"  
+  hosts: "PRODUCTIONFIREWALL"  
   connection: local  
   gather_facts: no  
 
