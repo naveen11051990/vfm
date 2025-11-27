@@ -1,0 +1,35 @@
+---
+- name: Gather system info
+  hosts: "host_sec_test"
+  connection: local
+
+  vars:
+    device:
+      ip_address: "{{ ip_address }}"
+      username: "{{ ansible_user }}"
+      password: "{{ ansible_password }}"
+
+  collections:
+    - paloaltonetworks.panos
+
+  tasks:
+    - name: Gather facts for device
+      paloaltonetworks.panos.panos_facts:
+        provider: "{{ device }}"
+
+    - name: Filter invalid OS versions
+      ansible.builtin.set_fact:
+        msgq: >-
+          {{
+            (msg | default([]))
+            | selectattr(Version, 'equalto', ['10.2.7-h3'])
+            | list
+          }}
+
+    - name: Show invalid OS
+      ansible.builtin.debug:
+        var: msgq
+    - name: Display information
+      # Changed to output only the device serial number per request
+      ansible.builtin.debug:
+        msg: "{{ ansible_facts['net_serial'] }}"
