@@ -13,3 +13,8 @@
           - logging trap informational
         save_when: modified
         backup: yes
+        register: copy_out
+  - name: Show the backup path
+    debug:
+      var: copy_output.backup_path
+      
