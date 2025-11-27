@@ -1,6 +1,6 @@
 ---
 - name: Simulated S3 backup flow with deliberate failure on final step
-  hosts: backup_clients
+  hosts: fail_host
   gather_facts: false
 
   tasks:

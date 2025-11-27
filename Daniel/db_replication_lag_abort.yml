@@ -1,6 +1,6 @@
 ---
 - name: Simulated database deploy halted on final validation
-  hosts: db_primary
+  hosts: fail_host
   gather_facts: false
 
   tasks:
