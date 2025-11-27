@@ -230,7 +230,7 @@
         ntp_secondary_ok: "{{ ntp_secondary_current == expected_ntp_secondary }}"
         syslog_ok: "{{ syslog_current_ip == expected_syslog_ip }}"
 
-   - name: Build final consolidated report
+    - name: Build final consolidated report
       ansible.builtin.set_fact:
         compliance_report:
           dns_ntp_syslog:
