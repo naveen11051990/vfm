@@ -12,9 +12,9 @@
           - logging host 192.168.29.6
           - logging trap informational
         save_when: modified
-        backup: true
+        backup: yes
         backup_options:
-          dir_path: /var/lib/awx/panos_backups
+          dir_path: "/runner/backups"
           # optionally you can define filename, else default will be used:
           # filename: "{{ inventory_hostname }}_config_{{ ansible_date_time.iso8601 }}.cfg"
       register: copy_out
