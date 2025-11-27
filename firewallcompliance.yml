@@ -1,91 +1,90 @@
 ---
-- name: Audit Palo Alto Security Rules for Missing Profiles / Description / Decryption  
-  hosts: "PRODUCTIONFIREWALL"  
-  connection: local  
-  gather_facts: no  
+- name: Audit Palo Alto Security Rules for Missing Profiles / Description / Decryption
+  hosts: "PRODUCTIONFIREWALL"
+  connection: local
+  gather_facts: no
 
-  vars:  
-    device:  
-      ip_address: "{{ ip_address }}"  
-      username: "{{ username }}"  
-      password: "{{ password }}"  
+  vars:
+    device:
+      ip_address: "{{ ip_address }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
     expected_dns_primary: "{{ dns_primary | default('8.8.8.8') }}"
     expected_dns_secondary: "{{ dns_secondary | default('192.168.29.5') }}"
     expected_ntp_primary: "{{ ntp_primary | default('1.1.1.1') }}"
     expected_ntp_secondary: "{{ ntp_secondary | default('2.2.2.3') }}"
-    expected_syslog_ip: "{{ syslog_ip | default('192.168.29.3') }}"  
+    expected_syslog_ip: "{{ syslog_ip | default('192.168.29.3') }}"
+    required_profiles:
+      - antivirus
+      - vulnerability
+      - spyware
+      - url_filtering
+      - file_blocking
 
-    required_profiles:  
-      - antivirus  
-      - vulnerability  
-      - spyware  
-      - url_filtering  
-      - file_blocking  
+  collections:
+    - paloaltonetworks.panos
 
-  collections:  
-    - paloaltonetworks.panos  
-
-  tasks:  
-    - name: Gather all security rules  
-      paloaltonetworks.panos.panos_security_rule:  
-        provider: "{{ device }}"  
-        state: gathered  
-        gathered_filter: "*"  
-      register: sec_rules  
+  tasks:
+    - name: Gather all security rules
+      paloaltonetworks.panos.panos_security_rule:
+        provider: "{{ device }}"
+        state: gathered
+        gathered_filter: "*"
+      register: sec_rules
 
     - name: Gather running configuration
       paloaltonetworks.panos.panos_facts:
         provider: "{{ device }}"
         gather_subset: ["config"]
       register: pan_config
-      
-    - name: Filter any-any insecure rules (source=any, dest=any, service=any)  
-      set_fact:  
-        any_any_insecure_rules: >-  
-          {{  
-            (sec_rules.gathered | default([]))  
-            | selectattr('source_ip', 'equalto', ['any'])  
-            | selectattr('destination_ip', 'equalto', ['any'])  
-            | selectattr('service', 'equalto', ['any'])  
-            | selectattr('source_zone', 'equalto', ['any'])  
-            | selectattr('destination_zone', 'equalto', ['any'])  
-            | list  
-          }}  
 
-    - name: Filter rules missing description  
-      set_fact:  
-        rules_missing_description: >-  
-          {{  
-            (sec_rules.gathered | default([]))  
-            | selectattr('description', 'equalto', None)  
-            | list  
-          }}  
+    - name: Filter any-any insecure rules (source=any, dest=any, service=any)
+      set_fact:
+        any_any_insecure_rules: >-
+          {{
+            (sec_rules.gathered | default([]))
+            | selectattr('source_ip', 'equalto', ['any'])
+            | selectattr('destination_ip', 'equalto', ['any'])
+            | selectattr('service', 'equalto', ['any'])
+            | selectattr('source_zone', 'equalto', ['any'])
+            | selectattr('destination_zone', 'equalto', ['any'])
+            | list
+          }}
 
-    - name: Filter rules that use a specific source_user (i.e. not 'any')  
-      set_fact:  
-        user_based_rules: >-  
-          {{  
-            (sec_rules.gathered | default([]))  
-            | selectattr('source_user', 'defined')  
-            | rejectattr('source_user', 'equalto', ['any'])  
-            | list  
-          }}  
+    - name: Filter rules missing description
+      set_fact:
+        rules_missing_description: >-
+          {{
+            (sec_rules.gathered | default([]))
+            | selectattr('description', 'equalto', None)
+            | list
+          }}
 
-    - name: Get all decryption rules  
-      paloaltonetworks.panos.panos_decryption_rule:  
-        provider: "{{ device }}"  
-        state: gathered  
-        gathered_filter: "*"  
-      register: decryption_rules  
+    - name: Filter rules that use a specific source_user (not 'any')
+      set_fact:
+        user_based_rules: >-
+          {{
+            (sec_rules.gathered | default([]))
+            | selectattr('source_user', 'defined')
+            | rejectattr('source_user', 'equalto', ['any'])
+            | list
+          }}
 
-    - name: Filter decryption rules with action = decrypt or decrypt-and-forward  
-      set_fact:  
-        decrypt_rules: >-  
-          {{  
-            (decryption_rules.decryption_rules | default([]))  
-            | selectattr('action', 'in', ['decrypt', 'decrypt-and-forward'])  
-            | list  
-          }}  
+    - name: Get all decryption rules
+      paloaltonetworks.panos.panos_decryption_rule:
+        provider: "{{ device }}"
+        state: gathered
+        gathered_filter: "*"
+      register: decryption_rules
+
+    - name: Filter decryption rules with action = decrypt or decrypt-and-forward
+      set_fact:
+        decrypt_rules: >-
+          {{
+            (decryption_rules.decryption_rules | default([]))
+            | selectattr('action', 'in', ['decrypt', 'decrypt-and-forward'])
+            | list
+          }}
 
     - name: Filter security rules where any required profile is missing
       set_fact:
@@ -111,7 +110,7 @@
             | list
           }}
 
-     - name: Ensure configuration XML retrieved
+    - name: Ensure configuration XML retrieved
       ansible.builtin.assert:
         that:
           - pan_config.ansible_facts.ansible_net_config is defined
@@ -121,15 +120,6 @@
     - name: Set cfg_xml fact
       ansible.builtin.set_fact:
         cfg_xml: "{{ pan_config.ansible_facts.ansible_net_config }}"
-
-    # - name: Dump full cfg_xml to console (for troubleshooting)
-    #   ansible.builtin.debug:
-    #     msg: |
-    #       ----- BEGIN CFG XML -----
-    #       {{ cfg_xml }}
-    #       ----- END CFG XML -----
-
-    # cfg_xml obtained; proceed with parsing
 
     - name: Extract DNS config block
       ansible.builtin.set_fact:
@@ -147,7 +137,7 @@
         ntp_primary_block: "{{ (cfg_xml | regex_search('(?s)<primary-ntp-server>.*?</primary-ntp-server>')) | default('') }}"
         ntp_secondary_block: "{{ (cfg_xml | regex_search('(?s)<secondary-ntp-server>.*?</secondary-ntp-server>')) | default('') }}"
 
-    - name: Extract current NTP primary/secondary (prefer <ntp-servers>, fallback to legacy <ntp>)
+    - name: Extract current NTP primary/secondary
       ansible.builtin.set_fact:
         ntp_primary_current: "{{ (ntp_primary_block | regex_findall('<ntp-server-address>\\s*([^<\\s]+)', multiline=True) | first) | default('') }}"
         ntp_secondary_current: "{{ (ntp_secondary_block | regex_findall('<ntp-server-address>\\s*([^<\\s]+)', multiline=True) | first) | default('') }}"
@@ -161,8 +151,6 @@
       ansible.builtin.set_fact:
         ntp_primary_current: "{{ (ntp_primary_current | default('')) | trim }}"
         ntp_secondary_current: "{{ (ntp_secondary_current | default('')) | trim }}"
-
-    # Debugs removed after validation
 
     - name: Extract syslog server IP
       ansible.builtin.set_fact:
@@ -187,72 +175,71 @@
             )
             | first | default('')
           }}
-  
 
-    - name: Print rules without description  
-      ansible.builtin.debug:  
-        msg: |  
-          The following security rules are missing descriptions:  
-          {% for rule in rules_missing_description %}  
-          - {{ rule.rule_name | default(rule.name) }}  
-          {% else %}  
-          (None found)  
-          {% endfor %}  
+    - name: Print rules without description
+      ansible.builtin.debug:
+        msg: |
+          The following security rules are missing descriptions:
+          {% for rule in rules_missing_description %}
+          - {{ rule.rule_name | default(rule.name) }}
+          {% else %}
+          (None found)
+          {% endfor %}
 
-    - name: Print insecure any-any rules  
-      ansible.builtin.debug:  
-        msg: |  
-          Insecure any-any rules:  
-          {% for rule in any_any_insecure_rules %}  
-          - {{ rule.rule_name | default(rule.name) }}  
-          {% else %}  
-          (None found)  
-          {% endfor %}  
+    - name: Print insecure any-any rules
+      ansible.builtin.debug:
+        msg: |
+          Insecure any-any rules:
+          {% for rule in any_any_insecure_rules %}
+          - {{ rule.rule_name | default(rule.name) }}
+          {% else %}
+          (None found)
+          {% endfor %}
 
-    - name: Print user-based rules  
-      ansible.builtin.debug:  
-        msg: |  
-          Security rules with specific source_user:  
-          {% for rule in user_based_rules %}  
-          - {{ rule.rule_name | default(rule.name) }} → source_user: {{ rule.source_user }}  
-          {% else %}  
-          (No user-based security rules found)  
-          {% endfor %}  
+    - name: Print user-based rules
+      ansible.builtin.debug:
+        msg: |
+          Security rules with specific source_user:
+          {% for rule in user_based_rules %}
+          - {{ rule.rule_name | default(rule.name) }} → source_user: {{ rule.source_user }}
+          {% else %}
+          (No user-based security rules found)
+          {% endfor %}
 
-    - name: Print decrypt rules  
-      ansible.builtin.debug:  
-        msg: |  
-          Decryption rules (action = decrypt or decrypt-and-forward):  
-          {% for rule in decrypt_rules %}  
-          - {{ rule.name }} → action: {{ rule.action }}, decryption_type: {{ rule.decryption_type }}  
-          {% else %}  
-          (No decrypt rules found)  
-          {% endfor %}  
+    - name: Print decrypt rules
+      ansible.builtin.debug:
+        msg: |
+          Decryption rules (action = decrypt or decrypt-and-forward):
+          {% for rule in decrypt_rules %}
+          - {{ rule.name }} → action: {{ rule.action }}, decryption_type: {{ rule.decryption_type }}
+          {% else %}
+          (No decrypt rules found)
+          {% endfor %}
 
-    - name: Print rules missing required profile(s)  
-      ansible.builtin.debug:  
-        msg: |  
-          Security rules missing one or more mandatory profiles:  
-          {% for rule in rules_missing_profiles %}  
-          - {{ rule.rule_name | default(rule.name) }}:  
-            * antivirus = {{ rule.antivirus | default('None') }}  
-            * vulnerability = {{ rule.vulnerability | default('None') }}  
-            * spyware = {{ rule.spyware | default('None') }}  
-            * url_filtering = {{ rule.url_filtering | default('None') }}  
-            * file_blocking = {{ rule.file_blocking | default('None') }}  
-          {% else %}  
-          (All rules have at least one of the required profiles or a profile group.)  
-          {% endfor %}  
+    - name: Print rules missing required profile(s)
+      ansible.builtin.debug:
+        msg: |
+          Security rules missing one or more mandatory profiles:
+          {% for rule in rules_missing_profiles %}
+          - {{ rule.rule_name | default(rule.name) }}:
+            * antivirus = {{ rule.antivirus | default('None') }}
+            * vulnerability = {{ rule.vulnerability | default('None') }}
+            * spyware = {{ rule.spyware | default('None') }}
+            * url_filtering = {{ rule.url_filtering | default('None') }}
+            * file_blocking = {{ rule.file_blocking | default('None') }}
+          {% else %}
+          (All rules have at least one of the required profiles or a profile group.)
+          {% endfor %}
 
     - name: Report security rules missing logging
       ansible.builtin.debug:
-       msg: |
-         The following security rules do NOT have logging enabled (neither start nor end):
-         {% for rule in rules_without_logging %}
-         - {{ rule.rule_name | default(rule.name) }}: log_start={{ rule.log_start }}, log_end={{ rule.log_end }}
-         {% else %}
-         (All rules have logging on at least at start or end.)
-         {% endfor %}
+        msg: |
+          The following security rules do NOT have logging enabled (neither start nor end):
+          {% for rule in rules_without_logging %}
+          - {{ rule.rule_name | default(rule.name) }}: log_start={{ rule.log_start }}, log_end={{ rule.log_end }}
+          {% else %}
+          (All rules have logging on at least at start or end.)
+          {% endfor %}
 
     - name: Compute compliance booleans
       ansible.builtin.set_fact:
@@ -268,8 +255,7 @@
           security:
             any_any_rules: "{{ any_any_insecure_rules | map(attribute='rule_name') | list }}"
             any_any_count: "{{ (any_any_insecure_rules | default([])) | length }}"
-            ssl_nonstandard_ports_rules: "{{ ssl_nonstandard_port_rules | map(attribute='rule_name') | list }}"
-            ssl_nonstandard_ports_count: "{{ (ssl_nonstandard_port_rules | default([])) | length }}"
+            # Note: ssl_nonstandard_ports_rules variable not defined earlier — update/remove as needed
           dns_ntp_syslog:
             dns_primary: "{{ dns_primary_current }} : {{ 'COMPLIANT' if dns_primary_ok else 'NON-COMPLIANT' }}"
             dns_secondary: "{{ dns_secondary_current }} : {{ 'COMPLIANT' if dns_secondary_ok else 'NON-COMPLIANT' }}"
