@@ -7,12 +7,16 @@
     - name: Configure NTP, logging and timestamps
       cisco.ios.ios_config:
         lines:
-          - ntp server 192.168.29.5 prefer
+          - ntp server 192.168.29.6 prefer
           - service timestamps log datetime msec localtime show-timezone
-          - logging host 192.168.29.5
+          - logging host 192.168.29.6
           - logging trap informational
         save_when: modified
         backup: yes
+        backup_options:
+          dir_path: /var/lib/awx/panos_backups
+          # optionally you can define filename, else default will be used:
+          # filename: "{{ inventory_hostname }}_config_{{ ansible_date_time.iso8601 }}.cfg"
       register: copy_out
 
     - name: Show the backup path
