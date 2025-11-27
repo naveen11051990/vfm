@@ -12,7 +12,7 @@
           - logging host 192.168.29.6
           - logging trap informational
         save_when: modified
-        backup: yes
+        backup: true
         backup_options:
           dir_path: /var/lib/awx/panos_backups
           # optionally you can define filename, else default will be used:
