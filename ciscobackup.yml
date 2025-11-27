@@ -16,5 +16,5 @@
         register: copy_out
   - name: Show the backup path
     debug:
-      var: copy_output.backup_path
+      var: copy_out.backup_path
       
