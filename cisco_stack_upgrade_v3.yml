@@ -27,7 +27,6 @@
       cisco.ios.ios_command:
         commands:
           - "request platform software package clean switch all"
-          - "y"
       vars:
         ansible_command_timeout: 300
     - name: Copy image from TFTP to flash using Mgmt-vrf
