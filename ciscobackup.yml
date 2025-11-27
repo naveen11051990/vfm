@@ -1,6 +1,6 @@
 ---
 - name: Backup running-config from Cisco 9300 to TFTP
-  hosts: 192.168.29.164
+  hosts: cisco_stack_switch
   gather_facts: no
 
   tasks:
