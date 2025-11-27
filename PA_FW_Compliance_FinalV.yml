@@ -1,5 +1,5 @@
 ---
-- name: Audit Palo Alto security rules – missing meta + any-any insecure
+- name: Combined compliance checks – PAN-OS
   hosts: "{{ hosts | default('PRODUCTIONFIREWALL') }}"
   connection: local
   gather_facts: no
@@ -9,6 +9,11 @@
       ip_address: "{{ ip_address }}"
       username: "{{ username }}"
       password: "{{ password }}"
+    expected_dns_primary: "{{ dns_primary | default('8.8.8.8') }}"
+    expected_dns_secondary: "{{ dns_secondary | default('192.168.29.3') }}"
+    expected_ntp_primary: "{{ ntp_primary | default('10.1.1.10') }}"
+    expected_ntp_secondary: "{{ ntp_secondary | default('10.1.1.11') }}"
+    expected_syslog_ip: "{{ syslog_ip | default('192.168.29.3') }}"
 
   collections:
     - paloaltonetworks.panos
@@ -17,11 +22,11 @@
     - name: Gather all security rules
       paloaltonetworks.panos.panos_security_rule:
         provider: "{{ device }}"
+        gathered_filter: "*"
         state: gathered
-        gathered_filter: "*"            # Fetch all rules
       register: sec_rules
 
-    - name: Filter any-any insecure rules (source=any, dest=any, service=any)
+    - name: Compute any-any insecure rules
       ansible.builtin.set_fact:
         any_any_insecure_rules: >-
           {{
@@ -32,35 +37,90 @@
             | list
           }}
 
-    - name: Filter rules missing description or audit_comment
+    - name: Compute SSL rules using non-standard ports
       ansible.builtin.set_fact:
-        rules_missing_meta: >-
+        ssl_nonstandard_port_rules: >-
           {{
             (sec_rules.gathered | default([]))
-            | selectattr('description', 'equalto', None)
-            | union(
-                (sec_rules.gathered | default([]))
-                | selectattr('audit_comment', 'equalto', None)
-              )
+            | selectattr('application', 'equalto', ['ssl'])
+            | rejectattr('service', 'equalto', ['application-default'])
             | list
           }}
 
-    - name: Report insecure any-any rules
-      ansible.builtin.debug:
-        msg: |
-          Insecure any-any rules (source=any, dest=any, service=any):
-          {% for rule in any_any_insecure_rules %}
-            - {{ rule.rule_name | default(rule.name) }}
-          {% else %}
-            (None found)
-          {% endfor %}
+    - name: Gather running configuration
+      paloaltonetworks.panos.panos_facts:
+        provider: "{{ device }}"
+        gather_subset: ["config"]
+      register: pan_config
 
-    - name: Report rules missing description or comment
+    - name: Ensure configuration XML retrieved
+      ansible.builtin.assert:
+        that:
+          - pan_config.ansible_facts.ansible_net_config is defined
+          - pan_config.ansible_facts.ansible_net_config | length > 0
+        fail_msg: "Failed to retrieve configuration XML from firewall – cannot proceed."
+
+    - name: Set cfg_xml fact
+      ansible.builtin.set_fact:
+        cfg_xml: "{{ pan_config.ansible_facts.ansible_net_config }}"
+
+    - name: Extract configured DNS servers
+      ansible.builtin.set_fact:
+        dns_servers: >-
+          {{
+            cfg_xml
+            | regex_findall('<dns\\-server>\\s*<entry>\\s*<ip>([0-9\\.]+)</ip>\\s*</entry>')
+          }}
+
+    - name: Set DNS primary/secondary values
+      ansible.builtin.set_fact:
+        dns_primary_current: "{{ dns_servers.0 | default('') }}"
+        dns_secondary_current: "{{ dns_servers.1 | default('') }}"
+
+    - name: Extract configured NTP servers
+      ansible.builtin.set_fact:
+        ntp_servers: >-
+          {{
+            cfg_xml
+            | regex_findall('<ntp\\-server>\\s*<primary>([0-9\\.]+)</primary>.*?<secondary>([0-9\\.]+)</secondary>')
+          }}
+
+    - name: Set NTP primary/secondary values
+      ansible.builtin.set_fact:
+        ntp_primary_current: "{{ ntp_servers.0 | default('') }}"
+        ntp_secondary_current: "{{ ntp_servers.1 | default('') }}"
+
+    - name: Extract syslog server IP
+      ansible.builtin.set_fact:
+        syslog_current_ip: >-
+          {{
+            (cfg_xml | regex_findall('<syslog\\-server>\\s*<entry>\\s*<ip>([0-9\\.]+)</ip>')) 
+            | first | default('')
+          }}
+
+    - name: Compute compliance booleans
+      ansible.builtin.set_fact:
+        dns_primary_ok: "{{ dns_primary_current == expected_dns_primary }}"
+        dns_secondary_ok: "{{ dns_secondary_current == expected_dns_secondary }}"
+        ntp_primary_ok: "{{ ntp_primary_current == expected_ntp_primary }}"
+        ntp_secondary_ok: "{{ ntp_secondary_current == expected_ntp_secondary }}"
+        syslog_ok: "{{ syslog_current_ip == expected_syslog_ip }}"
+
+    - name: Build final consolidated report
+      ansible.builtin.set_fact:
+        compliance_report:
+          security:
+            any_any_rules: "{{ any_any_insecure_rules | map(attribute='rule_name') | list }}"
+            any_any_count: "{{ (any_any_insecure_rules | default([])) | length }}"
+            ssl_nonstandard_ports_rules: "{{ ssl_nonstandard_port_rules | map(attribute='rule_name') | list }}"
+            ssl_nonstandard_ports_count: "{{ (ssl_nonstandard_port_rules | default([])) | length }}"
+          dns_ntp_syslog:
+            dns_primary: "{{ dns_primary_current }} : {{ 'COMPLIANT' if dns_primary_ok else 'NON-COMPLIANT' }}"
+            dns_secondary: "{{ dns_secondary_current }} : {{ 'COMPLIANT' if dns_secondary_ok else 'NON-COMPLIANT' }}"
+            ntp_primary: "{{ ntp_primary_current }} : {{ 'COMPLIANT' if ntp_primary_ok else 'NON-COMPLIANT' }}"
+            ntp_secondary: "{{ ntp_secondary_current }} : {{ 'COMPLIANT' if ntp_secondary_ok else 'NON-COMPLIANT' }}"
+            syslog_server: "{{ syslog_current_ip }} : {{ 'COMPLIANT' if syslog_ok else 'NON-COMPLIANT' }}"
+
+    - name: Display consolidated compliance report
       ansible.builtin.debug:
-        msg: |
-          Rules missing description or audit_comment:
-          {% for rule in rules_missing_meta %}
-            - {{ rule.rule_name | default(rule.name) }}
-          {% else %}
-            (None found)
-          {% endfor %}
+        msg: "{{ compliance_report }}"
