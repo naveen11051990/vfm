@@ -176,6 +176,12 @@
             | first | default('')
           }}
 
+    - name: Get management-service configuration
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<show><deviceconfig><system><service/></system></deviceconfig></show>"
+      register: svc_cfg
+
     - name: Print rules without description
       ansible.builtin.debug:
         msg: |
@@ -266,3 +272,9 @@
     - name: Display consolidated compliance report
       ansible.builtin.debug:
         msg: "{{ compliance_report }}"
+
+    - name: Get management-service configuration
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<show><deviceconfig><system><service/></system></deviceconfig></show>"
+      register: svc_cfg
