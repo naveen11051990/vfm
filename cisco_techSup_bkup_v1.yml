@@ -30,11 +30,9 @@
     - name: Copy tech-support log to TFTP
       cisco.ios.ios_command:
         commands:
-          - command: "copy flash:{{ tech_support_filename }} tftp://{{ tftp_server }}/{{ tech_support_filename }}"
-            prompt:
-              - "Address or name of remote host"
-            answer:
-              - "{{ tftp_server }}"
+          - command: "copy flash:{{ tech_support_filename }} tftp://{{ tftp_server }}/{{ tech_support_filename }} vrf Mgmt-vrf"
+            prompt: "Destination filename"
+            answer: "{{ tech_support_filename }}"
       vars:
         ansible_command_timeout: "{{ copy_timeout }}"
       register: copy_output
