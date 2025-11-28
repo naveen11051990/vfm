@@ -2,19 +2,42 @@
   hosts: cisco_stack_switch
   gather_facts: no
 
+  vars:
+    tftp_server: "192.168.29.208"
+    tech_support_timeout: 300 # 5 minutes for tech-support generation
+    copy_timeout: 120 # 2 minutes for file transfer
+
   tasks:
     - name: Generate tech-support log
       cisco.ios.ios_command:
         commands:
-          - command: "show tech-support | redirect flash:techsupport.txt"
+          - "show tech-support | redirect flash:techsupport.txt"
+      vars:
+        ansible_command_timeout: "{{ tech_support_timeout }}"
       register: tech_output
+
+    - name: Verify tech-support file was created
+      cisco.ios.ios_command:
+        commands:
+          - "dir flash: | include techsupport.txt"
+      register: file_check
+
+    - name: Display file verification
+      debug:
+        var: file_check.stdout_lines
 
     - name: Copy tech-support log to TFTP
       cisco.ios.ios_command:
         commands:
-          - command: "copy flash:techsupport.txt tftp://192.168.29.208/"
-            prompt: "Address or name of remote host"
-            answer: "192.168.29.208"
+          - command: "copy flash:techsupport.txt tftp://{{ tftp_server }}/"
+            prompt:
+              - "Address or name of remote host"
+              - "Destination filename"
+            answer:
+              - "{{ tftp_server }}"
+              - "techsupport.txt"
+      vars:
+        ansible_command_timeout: "{{ copy_timeout }}"
       register: copy_output
 
     - name: Show transfer result
