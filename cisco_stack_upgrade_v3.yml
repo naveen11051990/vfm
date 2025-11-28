@@ -66,15 +66,18 @@
           - write memory
       vars:
         ansible_command_timeout: 120
-    - name: Backup running-config to TFTP server
-      cisco.ios.ios_command:
-        commands:
-          - "copy running-config tftp://192.168.29.208/192.168.29.168_running.backup vrf Mgmt-vrf"
-      register: backup_result
+    - name: Config backup before upgrade
+      cisco.ios.ios_config:
+        backup: yes
+        backup_options:
+          dir_path: "/runner/backups"
+          # optionally you can define filename, else default will be used:
+          # filename: "{{ inventory_hostname }}_config_{{ ansible_date_time.iso8601 }}.cfg"
+      register: copy_out
 
-    - name: Show backup result
+    - name: Show the backup path
       debug:
-        var: backup_result.stdout_lines
+        var: copy_out.backup_path
     - name: Run install add/activate/commit to convert to install mode
       cisco.ios.ios_command:
         commands:
