@@ -1,0 +1,34 @@
+- name: Export tech-support logs to TFTP
+  hosts: cisco_stack_switch
+  gather_facts: no
+
+  tasks:
+    - name: Generate tech-support log
+      cisco.ios.ios_command:
+        commands:
+          - command: "show tech-support | redirect flash:techsupport.txt"
+      register: tech_output
+
+    - name: Copy tech-support log to TFTP
+      cisco.ios.ios_command:
+        commands:
+          - command: "copy flash:techsupport.txt tftp://192.168.29.208/"
+            prompt: "Address or name of remote host"
+            answer: "192.168.29.208"
+      register: copy_output
+
+    - name: Show transfer result
+      debug:
+        var: copy_output.stdout_lines
+
+    - name: Post-check | Environment, Power, EtherChannel
+      cisco.ios.ios_command:
+        commands:
+          - show environment all
+          - show power inline
+          - show etherchannel summary
+      register: postcheck_output
+
+    - name: Display Post-check Output
+      debug:
+        var: postcheck_output.stdout_lines
