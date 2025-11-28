@@ -11,7 +11,7 @@
     - name: Generate tech-support log
       cisco.ios.ios_command:
         commands:
-          - "show tech-support | redirect flash:techsupport.txt"
+          - "show tech-support | redirect flash:techsupport001.txt"
       vars:
         ansible_command_timeout: "{{ tech_support_timeout }}"
       register: tech_output
