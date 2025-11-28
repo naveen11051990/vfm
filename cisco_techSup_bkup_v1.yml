@@ -9,6 +9,11 @@
     copy_timeout: 300 # allow longer TFTP transfers
 
   tasks:
+    - name: Suppress file prompts for copy
+      cisco.ios.ios_config:
+        lines:
+          - file prompt quiet
+
     - name: Generate tech-support log
       cisco.ios.ios_command:
         commands:
@@ -40,6 +45,11 @@
     - name: Show transfer result
       debug:
         var: copy_output.stdout_lines
+
+    - name: Restore default file prompt behavior
+      cisco.ios.ios_config:
+        lines:
+          - no file prompt quiet
 
     - name: Post-check | Environment, Power, EtherChannel
       cisco.ios.ios_command:
