@@ -4,14 +4,15 @@
 
   vars:
     tftp_server: "192.168.29.208"
+    tech_support_filename: "techsupport.txt"
     tech_support_timeout: 300 # 5 minutes for tech-support generation
-    copy_timeout: 120 # 2 minutes for file transfer
+    copy_timeout: 300 # allow longer TFTP transfers
 
   tasks:
     - name: Generate tech-support log
       cisco.ios.ios_command:
         commands:
-          - "show tech-support | redirect flash:techsupport001.txt"
+          - "show tech-support | redirect flash:{{ tech_support_filename }}"
       vars:
         ansible_command_timeout: "{{ tech_support_timeout }}"
       register: tech_output
@@ -19,7 +20,7 @@
     - name: Verify tech-support file was created
       cisco.ios.ios_command:
         commands:
-          - "dir flash: | include techsupport.txt"
+          - "dir flash: | include {{ tech_support_filename }}"
       register: file_check
 
     - name: Display file verification
@@ -29,13 +30,13 @@
     - name: Copy tech-support log to TFTP
       cisco.ios.ios_command:
         commands:
-          - command: "copy flash:techsupport.txt tftp://{{ tftp_server }}/"
+          - command: "copy flash:{{ tech_support_filename }} tftp://{{ tftp_server }}/{{ tech_support_filename }}"
             prompt:
               - "Address or name of remote host"
               - "Destination filename"
             answer:
               - "{{ tftp_server }}"
-              - "techsupport.txt"
+              - "{{ tech_support_filename }}"
       vars:
         ansible_command_timeout: "{{ copy_timeout }}"
       register: copy_output
