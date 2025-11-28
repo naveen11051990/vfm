@@ -273,8 +273,14 @@
       ansible.builtin.debug:
         msg: "{{ compliance_report }}"
 
-    - name: Get management-service configuration
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "<show><deviceconfig><system><service/></system></deviceconfig></show>"
-      register: svc_cfg
+    - name: Flag if HTTP or Telnet are enabled
+      ansible.builtin.assert:
+        that:
+          - "'disable-http yes' in svc_cfg.stdout"
+          - "'disable-telnet yes' in svc_cfg.stdout"
+        fail_msg: >
+          Insecure management services enabled! Review config: {{ svc_cfg.stdout }}
+
+    - name: Report management service status
+      ansible.builtin.debug:
+        msg: "Management-services config: {{ svc_cfg.stdout }}"
