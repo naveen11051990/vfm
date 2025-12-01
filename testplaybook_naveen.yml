@@ -14,97 +14,15 @@
     - paloaltonetworks.panos
 
   tasks:
-    - name: Gather administrator accounts information
-      paloaltonetworks.panos.panos_administrator:
-        provider: "{{ device }}"
-        state: gathered
-      register: admin_accounts
+    - name: check adminstrator on the device
+      paloaltonetworks.panos.panos_op:
+        provider: '{{ device }}'
+        cmd: 'show mgt-config users'
+        register: admin_accounts
+
 
     - name: Display all administrator accounts
       ansible.builtin.debug:
         msg: "Administrator accounts: {{ admin_accounts.gathered }}"
 
-    - name: Check for administrators without RBAC (role_profile)
-      ansible.builtin.set_fact:
-        non_rbac_admins: "{{ admin_accounts.gathered | selectattr('role_profile', 'undefined') | list }}"
-        rbac_enabled_admins: "{{ admin_accounts.gathered | selectattr('role_profile', 'defined') | list }}"
-
-    - name: Display administrators with RBAC enabled
-      ansible.builtin.debug:
-        msg: "Administrators with RBAC (role_profile) enabled: {{ rbac_enabled_admins | map(attribute='admin_username') | list }}"
-
-    - name: Display administrators without RBAC
-      ansible.builtin.debug:
-        msg: "Administrators without RBAC (role_profile): {{ non_rbac_admins | map(attribute='admin_username') | list }}"
-
-    - name: Check for superuser/superuser_read_only accounts (should use RBAC)
-      ansible.builtin.set_fact:
-        superuser_accounts: "{{ admin_accounts.gathered | selectattr('superuser', 'defined') | selectattr('superuser', 'equalto', true) | list }}"
-        superuser_ro_accounts: "{{ admin_accounts.gathered | selectattr('superuser_read_only', 'defined') | selectattr('superuser_read_only', 'equalto', true) | list }}"
-
-    - name: Display superuser accounts
-      ansible.builtin.debug:
-        msg: "Superuser accounts (not using RBAC): {{ superuser_accounts | map(attribute='admin_username') | default([]) | list }}"
-      when: superuser_accounts | length > 0
-
-    - name: Display superuser read-only accounts
-      ansible.builtin.debug:
-        msg: "Superuser read-only accounts (not using RBAC): {{ superuser_ro_accounts | map(attribute='admin_username') | default([]) | list }}"
-      when: superuser_ro_accounts | length > 0
-
-    - name: Generate RBAC compliance summary
-      ansible.builtin.set_fact:
-        rbac_summary:
-          total_admins: "{{ admin_accounts.gathered | length }}"
-          rbac_enabled_count: "{{ rbac_enabled_admins | length }}"
-          non_rbac_count: "{{ non_rbac_admins | length }}"
-          superuser_count: "{{ superuser_accounts | length }}"
-          superuser_ro_count: "{{ superuser_ro_accounts | length }}"
-          rbac_compliance_percentage: "{{ ((rbac_enabled_admins | length | float / admin_accounts.gathered | length | float) * 100) | round(2) if admin_accounts.gathered | length > 0 else 0 }}"
-
-    - name: Display RBAC compliance summary
-      ansible.builtin.debug:
-        msg:
-          - "╔════════════════════════════════════════════════════════════╗"
-          - "║         RBAC COMPLIANCE SUMMARY FOR {{ inventory_hostname }}         ║"
-          - "╠════════════════════════════════════════════════════════════╣"
-          - "║ Total Administrators:           {{ '%2d' | format(rbac_summary.total_admins | int) }}                       ║"
-          - "║ RBAC Enabled (role_profile):    {{ '%2d' | format(rbac_summary.rbac_enabled_count | int) }}                       ║"
-          - "║ Non-RBAC (superuser/etc):       {{ '%2d' | format(rbac_summary.non_rbac_count | int) }}                       ║"
-          - "║ Compliance Percentage:          {{ '%5.1f' | format(rbac_summary.rbac_compliance_percentage | float) }}%                  ║"
-          - "╚════════════════════════════════════════════════════════════╝"
-
-    - name: Assert RBAC compliance (fail if less than 100%)
-      ansible.builtin.assert:
-        that:
-          - rbac_summary.rbac_compliance_percentage | float == 100.0
-        fail_msg: "RBAC compliance check FAILED: {{ rbac_summary.non_rbac_count }} administrator(s) not using role_profile"
-        success_msg: "RBAC compliance check PASSED: All administrators using role_profile"
-      when: rbac_summary.rbac_compliance_percentage | float < 100.0
-      ignore_errors: true
-
-    - name: Create compliance report file
-      ansible.builtin.copy:
-        content: |
-          RBAC Compliance Report for {{ inventory_hostname }}
-          Generated: {{ ansible_date_time.iso8601 }}
-          ================================================================
-
-          Total Administrators: {{ rbac_summary.total_admins }}
-          RBAC Enabled: {{ rbac_summary.rbac_enabled_count }}
-          Non-RBAC: {{ rbac_summary.non_rbac_count }}
-          Compliance: {{ rbac_summary.rbac_compliance_percentage }}%
-
-          Administrators with RBAC (role_profile):
-          {% for admin in rbac_enabled_admins %}
-          - {{ admin.admin_username }} (role_profile: {{ admin.role_profile }})
-          {% endfor %}
-
-          Administrators without RBAC:
-          {% for admin in non_rbac_admins %}
-          - {{ admin.admin_username }} {% if admin.superuser | default(false) %}(superuser){% elif admin.superuser_read_only | default(false) %}(superuser read-only){% elif admin.device_admin | default(false) %}(device admin){% elif admin.device_admin_read_only | default(false) %}(device admin read-only){% endif %}
-          {% endfor %}
-        dest: "/tmp/rbac_compliance_{{ inventory_hostname }}_{{ ansible_date_time.epoch }}.txt"
-      delegate_to: localhost
-
- 
+    
