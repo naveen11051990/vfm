@@ -1,6 +1,6 @@
 --- 
 - name: Check if RBAC Access is Enabled for Palo Alto Firewall Administrator Accounts
-  hosts: PA-HA
+  hosts: "PRODUCTIONFIREWALL"
   connection: local
   gather_facts: false
 
