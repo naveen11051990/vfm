@@ -1,5 +1,5 @@
 ---
-- name: Audit PAN-OS firewall — management interface service audit
+- name: Audit PAN‑OS firewall — check RBAC usage for admin accounts
   hosts: "PRODUCTIONFIREWALL"
   connection: local
   gather_facts: no
@@ -14,31 +14,49 @@
     - paloaltonetworks.panos
 
   tasks:
-    - name: Fetch system/service configuration via config-API
-      paloaltonetworks.panos.panos_config_element:
+    - name: Retrieve full config XML from firewall
+      paloaltonetworks.panos.panos_facts:
         provider: "{{ device }}"
-        xpath: /config/devices/entry[@name="localhost.localdomain"]/deviceconfig/system/service
-        state: present
-      register: svc_cfg
+        gather_subset:
+          - config
+      register: pan_cfg
 
-    - name: Debug — show service config XML
-      ansible.builtin.debug:
-        msg: |
-          Retrieved service configuration:
-          {{ svc_cfg.element | default('') }}
+    - name: Extract admin‑users portion of config XML
+      set_fact:
+        admin_users_xml: >-
+          {{
+            pan_cfg.ansible_net_config
+            | regex_search('(?s)<mgt-config>.*?<users>.*?</users>.*?</mgt-config>')
+            | default('')
+          }}
 
-    - name: Check management-interface services — flag if HTTP or Telnet enabled
+    - name: Fail if unable to fetch admin users config
       ansible.builtin.assert:
         that:
-          # check that HTTP and Telnet are disabled
-          - "'<disable-http>yes</disable-http>' in svc_cfg.element"
-          - "'<disable-telnet>yes</disable-telnet>' in svc_cfg.element"
-        fail_msg: |
-          management_interface_services_non-compliance:
-          HTTP and/or Telnet appear enabled on management interface!
-          Current config snapshot:
-          {{ svc_cfg.element | default('') }}
+          - admin_users_xml | length > 0
+        fail_msg: "Could not find admin‑users configuration in firewall config — RBAC config fetch failed or no admin accounts defined."
 
-    - name: PASS — management interface services seem secure
+    - name: Parse admin accounts and permissions into list
+      set_fact:
+        admin_accounts: >-
+          {{
+            (admin_users_xml
+             | regex_findall('(?s)<entry name="([^"]+)".*?<role‑based>.*?</role‑based>.*?</entry>')
+            ) | list
+          }}
+
+    - name: Warn about accounts not using role‑based privileges
       ansible.builtin.debug:
-        msg: "OK — Management-interface services appear compliant (HTTP & Telnet disabled)."
+        msg: |
+          WARNING: The following admin accounts do not use role‑based privileges and might have default/full access:
+          {%- for entry in (admin_users_xml | regex_findall('(?s)<entry name="([^"]+)".*?(?:(?!<role‑based>).)*?</entry>')) %}
+            - {{ entry }}
+          {%- endfor %}
+      when: (admin_users_xml | regex_search('(?s)<entry name="([^"]+)".*?(?:(?!<role‑based>).)*?</entry>')) is not none
+
+    - name: Report compliance status
+      ansible.builtin.debug:
+        msg: |
+          RBAC audit result:
+            - Admin accounts using role‑based privileges: {{ admin_accounts }}
+            - Total admin accounts found: {{ (admin_users_xml | regex_findall('(?s)<entry name="([^"]+)".*?</entry>')) | length }}
