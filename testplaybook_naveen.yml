@@ -25,4 +25,22 @@
       ansible.builtin.debug:
         var: users_config.stdout_xml
 
+    - name: Parse the config XML into data structure
+      set_fact:
+        admin_users: "{{ users_config.stdout_xml | from_xml }}"
+
+    - name: Filter users without role-based permissions
+      set_fact:
+        users_without_role_based: >-
+          {{
+            (admin_users.response.result.users.entry | default([]))
+            | rejectattr('permissions.role-based', 'defined')
+            | list
+          }}
+
+    - name: Show users missing role-based access
+      debug:
+        var: users_without_role_based
+
+
     
