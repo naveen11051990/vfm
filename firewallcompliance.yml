@@ -176,10 +176,11 @@
             | first | default('')
           }}
 
-    - name: Get management-service configuration
+    - name: Get management-service configuration (XML)
       paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
         cmd: "<show><deviceconfig><system><service/></system></deviceconfig></show>"
+        cmd_is_xml: true
       register: svc_cfg
 
     - name: Print rules without description
