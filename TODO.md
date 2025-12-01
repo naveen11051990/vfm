@@ -2,15 +2,17 @@
 
 ## Feature
 
-### HA Post-Upgrade Validation Parity
-
-- [ ] Repeat HA1 health, antivirus parity, and config-sync status checks after upgrade/downgrade completion to match the pre-check coverage.
-
 ### HA Backups Offload to TFTP
 
 - [ ] Capture the PAN-OS CLI requirements for exporting configuration and tech-support bundles to TFTP and mirror the successful Cisco flow (see `plans/feature_ha_tftp_backup_plan.md`).
 - [ ] Extend `ha_os_upgrade.yml` so every config backup and tech-support bundle is optionally copied to the configured TFTP target with clear failure handling.
 - [ ] Document the new TFTP variables/assumptions and add validation or dry-run coverage before rollout.
+
+### HA Downgrade TFTP Offload
+
+- [ ] Re-introduce optional TFTP offload for config backups and tech-support bundles in `ha_os_downgrade.yml`, aligned with the upgrade playbook behavior.
+- [ ] Add variables/validation for TFTP targets and failure handling in downgrade flow.
+- [ ] Document usage and differences from upgrade offload (if any).
 
 ## Fix
 
@@ -36,6 +38,14 @@
 - [x] Design downgrade workflow for HA pair (see `plans/feature_ha_os_downgrade_plan.md`)
 - [x] Implement `ha_os_downgrade.yml` playbook aligned with Palo Alto and Ansible docs
 - [x] Test downgrade procedure in a lab HA environment
+
+### HA Post-Upgrade Validation Parity
+
+- [x] Re-run HA1 control/active-passive assertions after upgrades and failback.
+- [x] Re-validate HA wiring (HA1 IP/netmask/port/peer) matches pre-upgrade discovery.
+- [x] Re-run HA readiness/config-sync health after re-enabling sync and sync-to-remote.
+- [x] Re-check antivirus/content version parity post-upgrade.
+- [x] Add consolidated post-check debug/summary output.
 
 ### Antivirus Parity After HA Upgrade
 
