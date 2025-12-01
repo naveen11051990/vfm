@@ -23,6 +23,6 @@
 
     - name: Display all administrator accounts
       ansible.builtin.debug:
-        msg: "Administrator accounts: {{ admin_accounts.gathered }}"
+        msg: "Administrator accounts: {{ admin_accounts.std_out }}"
 
     
