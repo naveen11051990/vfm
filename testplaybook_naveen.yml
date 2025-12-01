@@ -15,6 +15,23 @@
 
   tasks:
 
+    # ---------------------------------------------------
+    # Step 0: Initialize variables to prevent undefined errors
+    # ---------------------------------------------------
+    - name: Initialize RBAC variables
+      ansible.builtin.set_fact:
+        rbac_enabled_admins: []
+        non_rbac_admins: []
+        superuser_accounts: []
+        superuser_ro_accounts: []
+        total_admins: 0
+        rbac_enabled_count: 0
+        non_rbac_count: 0
+        rbac_compliance_percentage: 0
+
+    # ---------------------------------------------------
+    # Step 1: Gather administrator accounts
+    # ---------------------------------------------------
     - name: Gather administrator accounts information
       paloaltonetworks.panos.panos_administrator:
         provider: "{{ device }}"
@@ -25,55 +42,5 @@
       ansible.builtin.debug:
         var: admin_accounts.gathered
 
-    - name: Process administrator accounts for RBAC compliance
-      ansible.builtin.set_fact:
-        rbac_enabled_admins: >-
-          {{ admin_accounts.gathered 
-             | selectattr('role_profile', 'defined') 
-             | list 
-             if admin_accounts.gathered[0] is mapping else [] }}
-        non_rbac_admins: >-
-          {{ admin_accounts.gathered 
-             | selectattr('role_profile', 'undefined') 
-             | list 
-             if admin_accounts.gathered[0] is mapping else admin_accounts.gathered }}
-
-    - name: Display administrators with RBAC enabled
-      ansible.builtin.debug:
-        msg: >-
-          {% if admin_accounts.gathered[0] is mapping %}
-          {{ rbac_enabled_admins | map(attribute='name') | list }}
-          {% else %}
-          All RBAC-enabled admins cannot be determined (list of strings returned)
-          {% endif %}
-
-    - name: Display administrators without RBAC
-      ansible.builtin.debug:
-        msg: >-
-          {% if admin_accounts.gathered[0] is mapping %}
-          {{ non_rbac_admins | map(attribute='name') | list }}
-          {% else %}
-          {{ non_rbac_admins }}
-          {% endif %}
-
-    - name: Compute RBAC compliance
-      ansible.builtin.set_fact:
-        total_admins: "{{ admin_accounts.gathered | length }}"
-        rbac_enabled_count: "{{ rbac_enabled_admins | length if admin_accounts.gathered[0] is mapping else 0 }}"
-        non_rbac_count: "{{ non_rbac_admins | length if admin_accounts.gathered[0] is mapping else total_admins }}"
-        rbac_compliance_percentage: >-
-          {{ ((rbac_enabled_count | float / total_admins | float) * 100) | round(2) if total_admins > 0 else 0 }}
-
-    - name: Display RBAC compliance summary
-      ansible.builtin.debug:
-        msg:
-          - "RBAC COMPLIANCE SUMMARY FOR {{ inventory_hostname }}"
-          - "Total Administrators: {{ total_admins }}"
-          - "RBAC Enabled: {{ rbac_enabled_count }}"
-          - "Non-RBAC: {{ non_rbac_count }}"
-          - "Compliance: {{ rbac_compliance_percentage }}%"
-
-    - name: Assert RBAC compliance (fail if less than 100%)
-      ansible.builtin.assert:
-        that:
-          - rbac_compliance_percentage | float == 100.0
+    # ---------------------------------------------------
+    # Step 2: Process administrators based on RBAC a
