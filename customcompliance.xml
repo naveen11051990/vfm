@@ -1,0 +1,28 @@
+---
+- name: Audit Palo Alto Security Rules for Missing Profiles / Description / Decryption
+  hosts: "PRODUCTIONFIREWALL"
+  connection: local
+  gather_facts: no
+
+  vars:
+    device:
+      ip_address: "{{ ip_address }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+    
+  collections:
+    - paloaltonetworks.panos
+
+  tasks:
+   - name: Gather all security rules
+     paloaltonetworks.panos.panos_op:
+       provider: '{{ device }}'
+       cmd: 'show mgt-config users'
+     register: admin_users
+
+   - name: Display all administrator accounts
+      ansible.builtin.debug:
+        msg: "Administrator accounts: {{ admin_users.std_out }}"
+
+---
+
