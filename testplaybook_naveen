@@ -1,0 +1,39 @@
+---
+- name: Audit PAN-OS firewall — management interface service audit
+  hosts: "PRODUCTIONFIREWALL"
+  connection: local
+  gather_facts: no
+
+  vars:
+    device:
+      ip_address: "{{ ip_address }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+      # (add other provider params if needed: port, api_key, etc.)
+
+  collections:
+    - paloaltonetworks.panos
+
+  tasks:
+    - name: Fetch system/service configuration from PAN-OS via config API
+      paloaltonetworks.panos.panos_config_element:
+        provider: "{{ device }}"
+        xpath: /config/devices/entry[@name='localhost.localdomain']/deviceconfig/system/service
+        state: gathered
+      register: svc_cfg
+
+    - name: Show current management-service config (for visibility)
+      ansible.builtin.debug:
+        msg: "{{ svc_cfg.element | default('') }}"
+
+    - name: Check if HTTP or Telnet are enabled — flag non-compliance
+      ansible.builtin.assert:
+        that:
+          # Expect disable-http yes and disable-telnet yes to be present → meaning HTTP & Telnet disabled
+          - "'<disable-http>yes</disable-http>' in svc_cfg.element"
+          - "'<disable-telnet>yes</disable-telnet>' in svc_cfg.element"
+        fail_msg: |
+          management_interface_services_non-compliance:
+          HTTP and/or Telnet appear enabled on management interface!
+          Current config:
+/n{{ svc_cfg.element | default('') }}
