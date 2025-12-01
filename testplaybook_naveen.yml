@@ -14,10 +14,10 @@
     - paloaltonetworks.panos
 
   tasks:
-    - name: check adminstrator on the device
-      paloaltonetworks.panos.panos_op:
+    - name: Get facts
+      paloaltonetworks.panos.panos_facts:
         provider: '{{ device }}'
-        cmd: 'show admins all'
+        gather_subset: ['config']
       register: admin_accounts
 
 
