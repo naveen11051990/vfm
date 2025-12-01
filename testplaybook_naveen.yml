@@ -18,7 +18,7 @@
       paloaltonetworks.panos.panos_op:
         provider: '{{ device }}'
         cmd: 'show mgt-config users'
-        register: admin_accounts
+      register: admin_accounts
 
 
     - name: Display all administrator accounts
