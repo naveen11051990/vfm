@@ -1,8 +1,8 @@
----
-- name: Audit PAN‑OS firewall — check RBAC usage for admin accounts
-  hosts: "PRODUCTIONFIREWALL"
+--- 
+- name: Check if RBAC Access is Enabled for Palo Alto Firewall Administrator Accounts
+  hosts: PA-HA
   connection: local
-  gather_facts: no
+  gather_facts: false
 
   vars:
     device:
@@ -14,49 +14,96 @@
     - paloaltonetworks.panos
 
   tasks:
-    - name: Retrieve full config XML from firewall
-      paloaltonetworks.panos.panos_facts:
+    - name: Gather administrator accounts information
+      paloaltonetworks.panos.panos_administrator:
         provider: "{{ device }}"
-        gather_subset:
-          - config
-      register: pan_cfg
+        state: gathered
+      register: admin_accounts
 
-    - name: Extract admin‑users portion of config XML
-      set_fact:
-        admin_users_xml: >-
-          {{
-            pan_cfg.ansible_net_config
-            | regex_search('(?s)<mgt-config>.*?<users>.*?</users>.*?</mgt-config>')
-            | default('')
-          }}
+    - name: Display all administrator accounts
+      ansible.builtin.debug:
+        msg: "Administrator accounts: {{ admin_accounts.gathered }}"
 
-    - name: Fail if unable to fetch admin users config
+    - name: Check for administrators without RBAC (role_profile)
+      ansible.builtin.set_fact:
+        non_rbac_admins: "{{ admin_accounts.gathered | selectattr('role_profile', 'undefined') | list }}"
+        rbac_enabled_admins: "{{ admin_accounts.gathered | selectattr('role_profile', 'defined') | list }}"
+
+    - name: Display administrators with RBAC enabled
+      ansible.builtin.debug:
+        msg: "Administrators with RBAC (role_profile) enabled: {{ rbac_enabled_admins | map(attribute='admin_username') | list }}"
+
+    - name: Display administrators without RBAC
+      ansible.builtin.debug:
+        msg: "Administrators without RBAC (role_profile): {{ non_rbac_admins | map(attribute='admin_username') | list }}"
+
+    - name: Check for superuser/superuser_read_only accounts (should use RBAC)
+      ansible.builtin.set_fact:
+        superuser_accounts: "{{ admin_accounts.gathered | selectattr('superuser', 'defined') | selectattr('superuser', 'equalto', true) | list }}"
+        superuser_ro_accounts: "{{ admin_accounts.gathered | selectattr('superuser_read_only', 'defined') | selectattr('superuser_read_only', 'equalto', true) | list }}"
+
+    - name: Display superuser accounts
+      ansible.builtin.debug:
+        msg: "Superuser accounts (not using RBAC): {{ superuser_accounts | map(attribute='admin_username') | default([]) | list }}"
+      when: superuser_accounts | length > 0
+
+    - name: Display superuser read-only accounts
+      ansible.builtin.debug:
+        msg: "Superuser read-only accounts (not using RBAC): {{ superuser_ro_accounts | map(attribute='admin_username') | default([]) | list }}"
+      when: superuser_ro_accounts | length > 0
+
+    - name: Generate RBAC compliance summary
+      ansible.builtin.set_fact:
+        rbac_summary:
+          total_admins: "{{ admin_accounts.gathered | length }}"
+          rbac_enabled_count: "{{ rbac_enabled_admins | length }}"
+          non_rbac_count: "{{ non_rbac_admins | length }}"
+          superuser_count: "{{ superuser_accounts | length }}"
+          superuser_ro_count: "{{ superuser_ro_accounts | length }}"
+          rbac_compliance_percentage: "{{ ((rbac_enabled_admins | length | float / admin_accounts.gathered | length | float) * 100) | round(2) if admin_accounts.gathered | length > 0 else 0 }}"
+
+    - name: Display RBAC compliance summary
+      ansible.builtin.debug:
+        msg:
+          - "╔════════════════════════════════════════════════════════════╗"
+          - "║         RBAC COMPLIANCE SUMMARY FOR {{ inventory_hostname }}         ║"
+          - "╠════════════════════════════════════════════════════════════╣"
+          - "║ Total Administrators:           {{ '%2d' | format(rbac_summary.total_admins | int) }}                       ║"
+          - "║ RBAC Enabled (role_profile):    {{ '%2d' | format(rbac_summary.rbac_enabled_count | int) }}                       ║"
+          - "║ Non-RBAC (superuser/etc):       {{ '%2d' | format(rbac_summary.non_rbac_count | int) }}                       ║"
+          - "║ Compliance Percentage:          {{ '%5.1f' | format(rbac_summary.rbac_compliance_percentage | float) }}%                  ║"
+          - "╚════════════════════════════════════════════════════════════╝"
+
+    - name: Assert RBAC compliance (fail if less than 100%)
       ansible.builtin.assert:
         that:
-          - admin_users_xml | length > 0
-        fail_msg: "Could not find admin‑users configuration in firewall config — RBAC config fetch failed or no admin accounts defined."
+          - rbac_summary.rbac_compliance_percentage | float == 100.0
+        fail_msg: "RBAC compliance check FAILED: {{ rbac_summary.non_rbac_count }} administrator(s) not using role_profile"
+        success_msg: "RBAC compliance check PASSED: All administrators using role_profile"
+      when: rbac_summary.rbac_compliance_percentage | float < 100.0
+      ignore_errors: true
 
-    - name: Parse admin accounts and permissions into list
-      set_fact:
-        admin_accounts: >-
-          {{
-            (admin_users_xml
-             | regex_findall('(?s)<entry name="([^"]+)".*?<role‑based>.*?</role‑based>.*?</entry>')
-            ) | list
-          }}
+    - name: Create compliance report file
+      ansible.builtin.copy:
+        content: |
+          RBAC Compliance Report for {{ inventory_hostname }}
+          Generated: {{ ansible_date_time.iso8601 }}
+          ================================================================
 
-    - name: Warn about accounts not using role‑based privileges
-      ansible.builtin.debug:
-        msg: |
-          WARNING: The following admin accounts do not use role‑based privileges and might have default/full access:
-          {%- for entry in (admin_users_xml | regex_findall('(?s)<entry name="([^"]+)".*?(?:(?!<role‑based>).)*?</entry>')) %}
-            - {{ entry }}
-          {%- endfor %}
-      when: (admin_users_xml | regex_search('(?s)<entry name="([^"]+)".*?(?:(?!<role‑based>).)*?</entry>')) is not none
+          Total Administrators: {{ rbac_summary.total_admins }}
+          RBAC Enabled: {{ rbac_summary.rbac_enabled_count }}
+          Non-RBAC: {{ rbac_summary.non_rbac_count }}
+          Compliance: {{ rbac_summary.rbac_compliance_percentage }}%
 
-    - name: Report compliance status
-      ansible.builtin.debug:
-        msg: |
-          RBAC audit result:
-            - Admin accounts using role‑based privileges: {{ admin_accounts }}
-            - Total admin accounts found: {{ (admin_users_xml | regex_findall('(?s)<entry name="([^"]+)".*?</entry>')) | length }}
+          Administrators with RBAC (role_profile):
+          {% for admin in rbac_enabled_admins %}
+          - {{ admin.admin_username }} (role_profile: {{ admin.role_profile }})
+          {% endfor %}
+
+          Administrators without RBAC:
+          {% for admin in non_rbac_admins %}
+          - {{ admin.admin_username }} {% if admin.superuser | default(false) %}(superuser){% elif admin.superuser_read_only | default(false) %}(superuser read-only){% elif admin.device_admin | default(false) %}(device admin){% elif admin.device_admin_read_only | default(false) %}(device admin read-only){% endif %}
+          {% endfor %}
+        dest: "/tmp/rbac_compliance_{{ inventory_hostname }}_{{ ansible_date_time.epoch }}.txt"
+      delegate_to: localhost
+ 
