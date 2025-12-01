@@ -1,6 +1,7 @@
---- 
-- name: Check if RBAC Access is Enabled for Palo Alto Firewall Administrator Accounts
-  hosts: "PRODUCTIONFIREWALL"
+---
+
+- name: Get PAN-OS admin users config and filter non-role-based accounts  
+  hosts: PRODUCTIONFIREWALL
   connection: local
   gather_facts: false
 
@@ -14,33 +15,31 @@
     - paloaltonetworks.panos
 
   tasks:
-    - name: Retrieve admin users from config
+    - name: Fetch admin users config via XML API
       paloaltonetworks.panos.panos_type_cmd:
         provider: "{{ device }}"
         cmd: show
         xpath: "/config/mgt-config/users"
       register: users_config
 
-    - name: Display retrieved admin users XML
-      ansible.builtin.debug:
-        var: users_config.stdout_xml
+    - name: Ensure we got XML output
+      debug:
+        msg: "XML raw output: {{ users_config.stdout }}"
 
-    - name: Parse the config XML into data structure
-      set_fact:
-        admin_users: "{{ users_config.stdout_xml | from_xml }}"
+    - name: Parse XML into structured dict
+      ansible.builtin.set_fact:
+        admin_users_parsed: "{{ users_config.stdout | ansible.netcommon.parse_xml }}"
 
     - name: Filter users without role-based permissions
-      set_fact:
+      ansible.builtin.set_fact:
         users_without_role_based: >-
           {{
-            (admin_users.response.result.users.entry | default([]))
+            (admin_users_parsed.response.result.users.entry | default([]))
             | rejectattr('permissions.role-based', 'defined')
+            | map(attribute='@name')
             | list
           }}
 
     - name: Show users missing role-based access
       debug:
-        var: users_without_role_based
-
-
-    
+        msg: "Users without role-based permissions → {{ users_without_role_based }}"
