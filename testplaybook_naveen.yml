@@ -18,7 +18,7 @@
       paloaltonetworks.panos.panos_config_element:
         provider: "{{ device }}"
         xpath: /config/devices/entry[@name="localhost.localdomain"]/deviceconfig/system/service
-        state: gathered
+        state: present
       register: svc_cfg
 
     - name: Debug — show service config XML
