@@ -292,3 +292,7 @@
     - name: Report management service status
       ansible.builtin.debug:
         msg: "Management-services config: {{ svc_cfg.stdout }}"
+
+    - name: system-info
+      ansible.builtin.debug:
+        msg: "{{ system-info }}"
