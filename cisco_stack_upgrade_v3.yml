@@ -109,7 +109,7 @@
             backup_options:
                 dir_path: "/runner/backups"
                 # optionally you can define filename, else default will be used:
-                # filename: "{{ inventory_hostname }}_config_{{ ansible_date_time.iso8601 }}.cfg"
+                # filename: "{{ inventory_hostname }}_config_{{ timestamp }}.cfg"
         register: copy_out
 
       - name: Show the backup path
