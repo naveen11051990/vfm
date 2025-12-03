@@ -1,4 +1,6 @@
----  
+---
+- name: Create VR and Zones, then commit once
+  hosts: PRODUCTIONFIREWALL
   hosts: PRODUCTIONFIREWALL
   connection: local
   gather_facts: false
