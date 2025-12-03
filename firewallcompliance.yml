@@ -28,9 +28,9 @@
 
     - name: show system info
       paloaltonetworks.panos.panos_op:
-        provider: '{{ provider }}'
+        provider: '{{ device }}'
         cmd: 'show system info'
-      register: systeminfo
+      register: system_info
 
     - name: Gather all security rules
       paloaltonetworks.panos.panos_security_rule:
