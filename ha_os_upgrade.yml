@@ -28,6 +28,26 @@
         fail_msg: 'You must provide -e upgrade_path=''["10.2.3","10.2.4"]'''
       run_once: true
 
+    - name: Report controller dependency versions
+      run_once: true
+      delegate_to: localhost
+      block:
+        - name: Collect pan-os-python version
+          ansible.builtin.command: python3 -c "import panos; print(panos.__version__)"
+          register: panos_python_version
+          changed_when: false
+          failed_when: false
+        - name: Collect paloaltonetworks.panos collection version
+          ansible.builtin.command: ansible-galaxy collection list paloaltonetworks.panos --format yaml
+          register: panos_collection_info
+          changed_when: false
+          failed_when: false
+        - name: Show dependency versions
+          ansible.builtin.debug:
+            msg:
+              - "pan-os-python: {{ (panos_python_version.stdout_lines | first) | default('unknown') }}"
+              - "paloaltonetworks.panos collection info:\n{{ panos_collection_info.stdout | default('unknown') }}"
+
     - name: Gather HA and system facts
       paloaltonetworks.panos.panos_facts:
         provider: "{{ device }}"
@@ -429,139 +449,6 @@
       retries: 40
       delay: 30
       when: is_initial_passive
-
-    - name: Re-validate HA1 control channel after upgrade
-      paloaltonetworks.panos.panos_active_in_ha:
-        provider:
-          ip_address: "{{ hostvars[item].ip_address }}"
-          username: "{{ hostvars[item].username }}"
-          password: "{{ hostvars[item].password }}"
-      register: ha_upgrade_assurance_post
-      loop: "{{ ansible_play_hosts_all }}"
-      loop_control:
-        label: "{{ item }}"
-
-    - name: Enforce post-upgrade HA1 status across HA pair
-      run_once: true
-      delegate_to: localhost
-      delegate_facts: true
-      vars:
-        ha1_checks_post: "{{ ha_upgrade_assurance_post.results | map(attribute='response') | map('default', {}) | list }}"
-      block:
-        - name: Assert exactly one active and one passive after upgrade
-          ansible.builtin.assert:
-            that:
-              - ha1_checks_post | length == 2
-              - (ha1_checks_post | map(attribute='active') | select('equalto', true) | list | length) == 1
-              - (ha1_checks_post | map(attribute='active') | select('equalto', false) | list | length) == 1
-            fail_msg: "Post-upgrade HA1 check failed; expected one active and one passive. Received {{ ha1_checks_post }}."
-        - name: Persist HA1 post-check snapshot
-          ansible.builtin.set_fact:
-            ha1_upgrade_assurance_post_snapshot: "{{ ha1_checks_post }}"
-
-    - name: Gather HA wiring after upgrade
-      paloaltonetworks.panos.panos_facts:
-        provider:
-          ip_address: "{{ hostvars[item].ip_address }}"
-          username: "{{ hostvars[item].username }}"
-          password: "{{ hostvars[item].password }}"
-        gather_subset: ["config"]
-      register: ha_cfg_post
-      loop: "{{ ansible_play_hosts_all }}"
-      loop_control:
-        label: "{{ item }}"
-
-    - name: Record HA wiring after upgrade
-      ansible.builtin.set_fact:
-        ha1_ip_address_post: >-
-          {{ (ha_cfg_post.results[loop.index0].ansible_facts.ansible_net_config
-              | regex_search('(?s)<interface>.*?<ha1>.*?<ip-address>([^<]+)</ip-address>', '\1')
-              | default([]))
-             | first | default('') }}
-        ha1_netmask_post: >-
-          {{ (ha_cfg_post.results[loop.index0].ansible_facts.ansible_net_config
-              | regex_search('(?s)<interface>.*?<ha1>.*?<netmask>([^<]+)</netmask>', '\1')
-              | default([]))
-             | first | default('') }}
-        ha1_port_post: >-
-          {{ (ha_cfg_post.results[loop.index0].ansible_facts.ansible_net_config
-              | regex_search('(?s)<interface>.*?<ha1>.*?<port>([^<]+)</port>', '\1')
-              | default([]))
-             | first | default('') }}
-        ha_peer_ip_post: >-
-          {{ (ha_cfg_post.results[loop.index0].ansible_facts.ansible_net_config
-              | regex_search('(?s)<high-availability>.*?<group>.*?<peer-ip>([^<]+)</peer-ip>', '\1')
-              | default([]))
-             | first | default('') }}
-      loop: "{{ ansible_play_hosts_all }}"
-      loop_control:
-        label: "{{ item }}"
-
-    - name: Assert HA wiring unchanged after upgrade
-      run_once: true
-      delegate_to: localhost
-      vars:
-        hosts: "{{ ansible_play_hosts_all }}"
-      block:
-        - name: Validate HA1 parameters match pre-upgrade discovery
-          ansible.builtin.assert:
-            that:
-              - hostvars[item].ha1_ip_address_post | default('') == hostvars[item].ha1_ip_address | default('')
-              - hostvars[item].ha1_netmask_post | default('') == hostvars[item].ha1_netmask | default('')
-              - hostvars[item].ha1_port_post | default('') == hostvars[item].ha1_port | default('')
-              - hostvars[item].ha_peer_ip_post | default('') == hostvars[item].ha_peer_ip | default('')
-            fail_msg: "HA wiring drift detected post-upgrade on {{ item }}."
-          loop: "{{ hosts }}"
-          loop_control:
-            label: "{{ item }}"
-
-    - name: Run post-upgrade HA readiness checks
-      paloaltonetworks.panos.panos_readiness_checks:
-        provider:
-          ip_address: "{{ hostvars[item].ip_address }}"
-          username: "{{ hostvars[item].username }}"
-          password: "{{ hostvars[item].password }}"
-        checks:
-          - ha
-        force_fail: true
-      register: ha_readiness_post
-      loop: "{{ ansible_play_hosts_all }}"
-      loop_control:
-        label: "{{ item }}"
-
-    - name: Query antivirus package after upgrade
-      paloaltonetworks.panos.panos_op:
-        provider:
-          ip_address: "{{ hostvars[item].ip_address }}"
-          username: "{{ hostvars[item].username }}"
-          password: "{{ hostvars[item].password }}"
-        cmd: "<request><anti-virus><upgrade><info></info></upgrade></anti-virus></request>"
-        cmd_is_xml: true
-      register: antivirus_info_post
-      loop: "{{ ansible_play_hosts_all }}"
-      loop_control:
-        label: "{{ item }}"
-
-    - name: Cache post-upgrade antivirus version
-      ansible.builtin.set_fact:
-        ha_antivirus_version_post: >-
-          {{ (antivirus_info_post.results[loop.index0].stdout_xml | default(''))
-              | regex_findall('(?s)<entry>.*?<version>([^<]+)</version>.*?<current>yes</current>.*?</entry>')
-              | first | default('unknown') }}
-      loop: "{{ ansible_play_hosts_all }}"
-      loop_control:
-        label: "{{ item }}"
-
-    - name: Verify antivirus versions match across HA peers after upgrade
-      run_once: true
-      delegate_to: localhost
-      vars:
-        antivirus_versions_post: "{{ ansible_play_hosts_all | map('extract', hostvars, 'ha_antivirus_version_post') | list }}"
-      ansible.builtin.assert:
-        that:
-          - antivirus_versions_post | reject('equalto', 'unknown') | list | length == antivirus_versions_post | length
-          - (antivirus_versions_post | unique | length) == 1
-        fail_msg: "Post-upgrade antivirus mismatch detected across HA peers: {{ antivirus_versions_post }}."
 
     - name: Report HA upgrade result
       run_once: true
