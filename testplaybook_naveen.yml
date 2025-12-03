@@ -1,5 +1,5 @@
 ---
-- name: PAN-OS firewall readiness & compliance check
+- name: PAN-OS firewall readiness & compliance report
   hosts: PRODUCTIONFIREWALL
   connection: local
   gather_facts: false
@@ -15,30 +15,29 @@
     - paloaltonetworks.panos
 
   tasks:
-    - name: Run readiness checks (NTP sync, HA, content version, config sync)
+    - name: Run readiness checks (NTP sync, HA, content version)
       panos_readiness_checks:
         provider: "{{ device }}"
         checks:
           - ntp_sync
-          - ha            # check HA status & config sync
+          - ha
           - content_version
         force_fail: false
       register: readiness
       ignore_errors: yes
-      
+
     - name: Debug readiness check results
-      ansible.builtin.debug:
+      debug:
         var: readiness.response
 
-    - name: Evaluate compliance
-      ansible.builtin.assert:
-        that:
-          - readiness.response.ntp_sync.state | default(False)
-          - readiness.response.ha.state | default(False)
-          - readiness.response.content_version.state | default(False)
-        fail_msg: >-
-          NON-COMPLIANT: One or more readiness checks failed:
-          NTP sync: {{ readiness.response.ntp_sync.reason }},
-          HA/config sync: {{ readiness.response.ha.reason }},
-          Content version: {{ readiness.response.content_version.reason }}
-        success_msg: "COMPLIANT: All checks passed (NTP sync, HA, content version)."
+    - name: Build compliance status message
+      set_fact:
+        compliance_status: |
+          Host: {{ inventory_hostname }}
+            NTP sync        : {{ readiness.response.ntp_sync.state | default(false) | ternary('PASS','FAIL') }} ({{ readiness.response.ntp_sync.reason | default('') }})
+            HA / config sync: {{ readiness.response.ha.state | default(false) | ternary('PASS','FAIL') }} ({{ readiness.response.ha.reason | default('') }})
+            Content version : {{ readiness.response.content_version.state | default(false) | ternary('PASS','FAIL') }} ({{ readiness.response.content_version.reason | default('') }})
+
+    - name: Show compliance status
+      debug:
+        msg: "{{ compliance_status }}"
