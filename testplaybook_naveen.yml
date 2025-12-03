@@ -1,22 +1,4 @@
----
-
-- name: Get PAN-OS admin users config and filter non-role-based accounts  
-  hosts: PRODUCTIONFIREWALL
-  connection: local
-  gather_facts: false
-
-  vars:
-    device:
-      ip_address: "{{ ip_address }}"
-      username: "{{ username }}"
-      password: "{{ password }}"
-
-  collections:
-    - paloaltonetworks.panos
-
-  tasks:
-    ---
-- name: Get PAN-OS HA status and assert compliance
+---  
   hosts: PRODUCTIONFIREWALL
   connection: local
   gather_facts: false
