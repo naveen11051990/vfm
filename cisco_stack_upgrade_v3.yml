@@ -66,9 +66,10 @@
       - name: Clean package files switch all
         cisco.ios.ios_command:
             commands:
-                - "request platform software package clean switch all"
+                - "request platform software package clean switch all force"
         vars:
             ansible_command_timeout: 1800
+        ignore_errors: yes
       - name: Copy image from TFTP to flash using Mgmt-vrf
         cisco.ios.ios_command:
             commands:
