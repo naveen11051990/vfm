@@ -4,7 +4,7 @@
   gather_facts: yes
   vars:
       ios_image_bin: "{{ ios_image_filename }}"
-      timestamp: "{{ lookup('pipe', 'date +%s') }}"
+      timestamp: "{{ now(utc=true,fmt='%s') }}"
   tasks:
       - name: Pre-check | Version
         cisco.ios.ios_command:
