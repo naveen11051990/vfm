@@ -113,8 +113,8 @@
 
     - name: Run readiness checks (NTP sync, HA, content version)
       panos_readiness_checks:
-        checks:
         provider: "{{ device }}"
+        checks:
           - ntp_sync
           - ha
           - content_version
