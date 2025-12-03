@@ -101,15 +101,6 @@
             | list
           }}
 
-    - name: Filter rules without URL filtering profile
-      set_fact:
-        rules_no_url_filter: >-
-          {{
-            sec_rules.rules
-            | selectattr('url_filtering', 'equalto', None)
-            | list
-          }}
-
     - name: Find security rules where logging is not enabled
       set_fact:
         rules_without_logging: >-
@@ -130,6 +121,18 @@
         force_fail: false
       register: readiness
       ignore_errors: yes
+
+    - name: Debug readiness check results
+      debug:
+        var: readiness.response
+
+    - name: Build compliance status message
+      set_fact:
+        compliance_status: |
+          Host: {{ inventory_hostname }}
+            NTP sync        : {{ readiness.response.ntp_sync.state | default(false) | ternary('PASS','FAIL') }} ({{ readiness.response.ntp_sync.reason | default('') }})
+            HA / config sync: {{ readiness.response.ha.state | default(false) | ternary('PASS','FAIL') }} ({{ readiness.response.ha.reason | default('') }})
+            Content version : {{ readiness.response.content_version.state | default(false) | ternary('PASS','FAIL') }} ({{ readiness.response.content_version.reason | default('') }})
 
 
     - name: Print rules without description
@@ -196,18 +199,6 @@
           {% else %}
           (All rules have logging on at least at start or end.)
           {% endfor %}
-
-    - name: Debug readiness check results
-      debug:
-        var: readiness.response
-
-    - name: Build compliance status message
-      set_fact:
-        compliance_status: |
-          Host: {{ inventory_hostname }}
-            NTP sync        : {{ readiness.response.ntp_sync.state | default(false) | ternary('PASS','FAIL') }} ({{ readiness.response.ntp_sync.reason | default('') }})
-            HA / config sync: {{ readiness.response.ha.state | default(false) | ternary('PASS','FAIL') }} ({{ readiness.response.ha.reason | default('') }})
-            Content version : {{ readiness.response.content_version.state | default(false) | ternary('PASS','FAIL') }} ({{ readiness.response.content_version.reason | default('') }})
 
     - name: Show compliance status
       debug:
