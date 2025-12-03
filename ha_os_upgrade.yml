@@ -52,25 +52,21 @@
           ha_initial_role: "{{ (ha_facts.ansible_facts.ansible_net_ha_localstate | default('unknown')) | lower }}"
           ha_group_id: "{{ ha_facts.ansible_facts.ansible_net_ha_group_id | default('1') }}"
 
-    - name: Debug - Extract HA section from config
-      ansible.builtin.debug:
-        msg: "{{ ha_cfg.ansible_facts.ansible_net_config | regex_search('(?s)<high-availability>.*?</high-availability>') }}"
-
     - name: Discover HA interface wiring from running config
       ansible.builtin.set_fact:
         ha1_ip_address: >-
           {{ (ha_cfg.ansible_facts.ansible_net_config
-              | regex_findall('(?s)<interface>.*?<ha1>.*?<ip-address>([^<]+)</ip-address>')
+              | regex_findall('(?s)<high-availability>.*?<interface>.*?<ha1>.*?<ip-address>([^<]+)</ip-address>')
               | default([''], true))
              | first }}
         ha1_netmask: >-
           {{ (ha_cfg.ansible_facts.ansible_net_config
-              | regex_findall('(?s)<interface>.*?<ha1>.*?<netmask>([^<]+)</netmask>')
+              | regex_findall('(?s)<high-availability>.*?<interface>.*?<ha1>.*?<netmask>([^<]+)</netmask>')
               | default([''], true))
              | first }}
         ha1_port: >-
           {{ (ha_cfg.ansible_facts.ansible_net_config
-              | regex_findall('(?s)<interface>.*?<ha1>.*?<port>([^<]+)</port>')
+              | regex_findall('(?s)<high-availability>.*?<interface>.*?<ha1>.*?<port>([^<]+)</port>')
               | default([''], true))
              | first }}
         ha_peer_ip: >-
@@ -479,20 +475,24 @@
       ansible.builtin.set_fact:
         ha1_ip_address_post: >-
           {{ (ha_cfg_post.results[loop.index0].ansible_facts.ansible_net_config
-              | regex_findall('(?s)<interface>.*?<ha1>.*?<ip-address>([^<]+)</ip-address>'))
-             | first | default('') }}
+              | regex_findall('(?s)<high-availability>.*?<interface>.*?<ha1>.*?<ip-address>([^<]+)</ip-address>')
+              | default([''], true))
+             | first }}
         ha1_netmask_post: >-
           {{ (ha_cfg_post.results[loop.index0].ansible_facts.ansible_net_config
-              | regex_findall('(?s)<interface>.*?<ha1>.*?<netmask>([^<]+)</netmask>'))
-             | first | default('') }}
+              | regex_findall('(?s)<high-availability>.*?<interface>.*?<ha1>.*?<netmask>([^<]+)</netmask>')
+              | default([''], true))
+             | first }}
         ha1_port_post: >-
           {{ (ha_cfg_post.results[loop.index0].ansible_facts.ansible_net_config
-              | regex_findall('(?s)<interface>.*?<ha1>.*?<port>([^<]+)</port>'))
-             | first | default('') }}
+              | regex_findall('(?s)<high-availability>.*?<interface>.*?<ha1>.*?<port>([^<]+)</port>')
+              | default([''], true))
+             | first }}
         ha_peer_ip_post: >-
           {{ (ha_cfg_post.results[loop.index0].ansible_facts.ansible_net_config
-              | regex_findall('(?s)<high-availability>.*?<group>.*?<peer-ip>([^<]+)</peer-ip>'))
-             | first | default('') }}
+              | regex_findall('(?s)<high-availability>.*?<group>.*?<peer-ip>([^<]+)</peer-ip>')
+              | default([''], true))
+             | first }}
       loop: "{{ ansible_play_hosts_all }}"
       loop_control:
         label: "{{ item }}"
