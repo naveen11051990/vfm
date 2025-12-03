@@ -30,7 +30,7 @@
       paloaltonetworks.panos.panos_op:
         provider: '{{ provider }}'
         cmd: 'show system info'
-      register: system-info
+      register: systeminfo
 
     - name: Gather all security rules
       paloaltonetworks.panos.panos_security_rule:
