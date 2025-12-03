@@ -1,35 +1,43 @@
 ---
-- name: Create VR and Zones, then commit once
-  hosts: PRODUCTIONFIREWALL
+- name: PAN-OS firewall readiness & compliance check
   hosts: PRODUCTIONFIREWALL
   connection: local
   gather_facts: false
 
   vars:
-    device:
+    provider:
       ip_address: "{{ ip_address }}"
       username: "{{ username }}"
       password: "{{ password }}"
+      # port: 443  # optional
 
   collections:
     - paloaltonetworks.panos
 
   tasks:
-    - name: Get facts (including HA info)
-      paloaltonetworks.panos.panos_facts:
-        provider: '{{ device }}'
-        gather_subset: ['ha']
-      register: ha_status
+    - name: Run readiness checks (NTP sync, HA, content version, config sync)
+      panos_readiness_checks:
+        provider: "{{ device }}"
+        checks:
+          - ntp_sync
+          - ha            # check HA status & config sync
+          - content_version
+        force_fail: false
+      register: readiness
 
-    - name: output data for ha
-      debug:
-        var: ha_status
+    - name: Debug readiness check results
+      ansible.builtin.debug:
+        var: readiness.response
 
-    - name: Check compliance — HA must be enabled
+    - name: Evaluate compliance
       ansible.builtin.assert:
         that:
-          - ha_status.ansible_net_ha_enabled is defined
-          - ha_status.ansible_net_ha_enabled | bool
-        success_msg: "COMPLIANT: HA is enabled"
-        fail_msg: "NON-COMPLIANT: HA is NOT enabled"
-
+          - readiness.response.ntp_sync.state | default(False)
+          - readiness.response.ha.state | default(False)
+          - readiness.response.content_version.state | default(False)
+        fail_msg: >-
+          NON-COMPLIANT: One or more readiness checks failed:
+          NTP sync: {{ readiness.response.ntp_sync.reason }},
+          HA/config sync: {{ readiness.response.ha.reason }},
+          Content version: {{ readiness.response.content_version.reason }}
+        success_msg: "COMPLIANT: All checks passed (NTP sync, HA, content version)."
