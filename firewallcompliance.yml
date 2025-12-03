@@ -295,4 +295,4 @@
 
     - name: system-info
       ansible.builtin.debug:
-        msg: "{{ system-info }}"
+        msg: "{{ system_info }}"
