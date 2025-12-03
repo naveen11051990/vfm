@@ -15,31 +15,12 @@
     - paloaltonetworks.panos
 
   tasks:
-    - name: Fetch admin users config via XML API
-      paloaltonetworks.panos.panos_type_cmd:
-        provider: "{{ device }}"
-        cmd: show
-        xpath: "/config/mgt-config/users"
-      register: users_config
+    - name: Get facts
+      paloaltonetworks.panos.panos_facts:
+        provider: '{{ device }}'
+        gather_subset: ['ha']
+      register: ha_status
 
-    - name: Ensure we got XML output
+    - name: output data for ha
       debug:
-        msg: "XML raw output: {{ users_config.stdout }}"
-
-    - name: Parse XML into structured dict
-      ansible.builtin.set_fact:
-        admin_users_parsed: "{{ users_config.stdout | ansible.netcommon.parse_xml }}"
-
-    - name: Filter users without role-based permissions
-      ansible.builtin.set_fact:
-        users_without_role_based: >-
-          {{
-            (admin_users_parsed.response.result.users.entry | default([]))
-            | rejectattr('permissions.role-based', 'defined')
-            | map(attribute='@name')
-            | list
-          }}
-
-    - name: Show users missing role-based access
-      debug:
-        msg: "Users without role-based permissions → {{ users_without_role_based }}"
+        var: ha_status
