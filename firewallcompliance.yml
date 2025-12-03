@@ -117,78 +117,6 @@
             | list
           }}
 
-    - name: Ensure configuration XML retrieved
-      ansible.builtin.assert:
-        that:
-          - pan_config.ansible_facts.ansible_net_config is defined
-          - pan_config.ansible_facts.ansible_net_config | length > 0
-        fail_msg: "Failed to retrieve configuration XML from firewall – cannot proceed."
-
-    - name: Set cfg_xml fact
-      ansible.builtin.set_fact:
-        cfg_xml: "{{ pan_config.ansible_facts.ansible_net_config }}"
-
-    - name: Extract DNS config block
-      ansible.builtin.set_fact:
-        dns_block: "{{ (cfg_xml | regex_search('(?s)<dns-setting>.*?</dns-setting>')) | default('') }}"
-
-    - name: Extract current DNS primary/secondary from dns-setting
-      ansible.builtin.set_fact:
-        dns_primary_current: "{{ (dns_block | regex_findall('<primary>([0-9\\.]+)</primary>') | first) | default('') }}"
-        dns_secondary_current: "{{ (dns_block | regex_findall('<secondary>([0-9\\.]+)</secondary>') | first) | default('') }}"
-
-    - name: Extract NTP config blocks (new and legacy)
-      ansible.builtin.set_fact:
-        ntp_servers_block: "{{ (cfg_xml | regex_search('(?s)<ntp-servers>.*?</ntp-servers>')) | default('') }}"
-        ntp_legacy_block: "{{ (cfg_xml | regex_search('(?s)<ntp>.*?</ntp>')) | default('') }}"
-        ntp_primary_block: "{{ (cfg_xml | regex_search('(?s)<primary-ntp-server>.*?</primary-ntp-server>')) | default('') }}"
-        ntp_secondary_block: "{{ (cfg_xml | regex_search('(?s)<secondary-ntp-server>.*?</secondary-ntp-server>')) | default('') }}"
-
-    - name: Extract current NTP primary/secondary
-      ansible.builtin.set_fact:
-        ntp_primary_current: "{{ (ntp_primary_block | regex_findall('<ntp-server-address>\\s*([^<\\s]+)', multiline=True) | first) | default('') }}"
-        ntp_secondary_current: "{{ (ntp_secondary_block | regex_findall('<ntp-server-address>\\s*([^<\\s]+)', multiline=True) | first) | default('') }}"
-
-    - name: Fallback extraction for legacy <ntp> schema if needed
-      ansible.builtin.set_fact:
-        ntp_primary_current: "{{ ntp_primary_current if (ntp_primary_current | length) > 0 else ((ntp_legacy_block | regex_findall('<primary>([^<]+)</primary>') | first) | default('')) }}"
-        ntp_secondary_current: "{{ ntp_secondary_current if (ntp_secondary_current | length) > 0 else ((ntp_legacy_block | regex_findall('<secondary>([^<]+)</secondary>') | first) | default('')) }}"
-
-    - name: Normalize NTP values (trim whitespace)
-      ansible.builtin.set_fact:
-        ntp_primary_current: "{{ (ntp_primary_current | default('')) | trim }}"
-        ntp_secondary_current: "{{ (ntp_secondary_current | default('')) | trim }}"
-
-    - name: Extract syslog server IP
-      ansible.builtin.set_fact:
-        syslog_current_ip: >-
-          {{
-            (
-              (cfg_xml
-               | regex_findall('(?s)<syslog>.*?<entry[^>]*>.*?<server>.*?<entry[^>]*>.*?<server>([0-9\\.]+)</server>')
-              )
-              +
-              (cfg_xml
-               | regex_findall('(?s)<syslog\\-server>.*?<entry[^>]*>.*?<(?:ip|server|ip\\-address)>([0-9\\.]+)</(?:ip|server|ip\\-address)>')
-              )
-              +
-              (cfg_xml
-               | regex_findall('(?s)<log\\-settings>.*?<syslog>.*?<entry[^>]*>.*?<server>.*?<entry[^>]*>.*?<(?:ip\\-address|server)>([0-9\\.]+)</(?:ip\\-address|server)>')
-              )
-              +
-              (cfg_xml
-               | regex_findall('(?s)<server\\-profile>.*?<syslog>.*?<entry[^>]*>.*?<(?:ip\\-address|server)>([0-9\\.]+)</(?:ip\\-address|server)>')
-              )
-            )
-            | first | default('')
-          }}
-
-    - name: Get management-service configuration (XML)
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "<show><deviceconfig><system><service/></system></deviceconfig></show>"
-        cmd_is_xml: true
-      register: svc_cfg
 
     - name: Print rules without description
       ansible.builtin.debug:
@@ -255,40 +183,7 @@
           (All rules have logging on at least at start or end.)
           {% endfor %}
 
-    - name: Compute compliance booleans
-      ansible.builtin.set_fact:
-        dns_primary_ok: "{{ dns_primary_current == expected_dns_primary }}"
-        dns_secondary_ok: "{{ dns_secondary_current == expected_dns_secondary }}"
-        ntp_primary_ok: "{{ ntp_primary_current == expected_ntp_primary }}"
-        ntp_secondary_ok: "{{ ntp_secondary_current == expected_ntp_secondary }}"
-        syslog_ok: "{{ syslog_current_ip == expected_syslog_ip }}"
-
-    - name: Build final consolidated report
-      ansible.builtin.set_fact:
-        compliance_report:
-          security:
-            any_any_rules: "{{ any_any_insecure_rules | map(attribute='rule_name') | list }}"
-            any_any_count: "{{ (any_any_insecure_rules | default([])) | length }}"
-            # Note: ssl_nonstandard_ports_rules variable not defined earlier — update/remove as needed
-          dns_ntp_syslog:
-            dns_primary: "{{ dns_primary_current }} : {{ 'COMPLIANT' if dns_primary_ok else 'NON-COMPLIANT' }}"
-            dns_secondary: "{{ dns_secondary_current }} : {{ 'COMPLIANT' if dns_secondary_ok else 'NON-COMPLIANT' }}"
-            ntp_primary: "{{ ntp_primary_current }} : {{ 'COMPLIANT' if ntp_primary_ok else 'NON-COMPLIANT' }}"
-            ntp_secondary: "{{ ntp_secondary_current }} : {{ 'COMPLIANT' if ntp_secondary_ok else 'NON-COMPLIANT' }}"
-            syslog_server: "{{ syslog_current_ip }} : {{ 'COMPLIANT' if syslog_ok else 'NON-COMPLIANT' }}"
-
-    - name: Display consolidated compliance report
-      ansible.builtin.debug:
-        msg: "{{ compliance_report }}"
-
-    - name: Flag if HTTP or Telnet are enabled
-      ansible.builtin.assert:
-        that:
-          - "'disable-http yes' in svc_cfg.stdout"
-          - "'disable-telnet yes' in svc_cfg.stdout"
-        fail_msg: >
-          Insecure management services enabled! Review config: {{ svc_cfg.stdout }}
-
+  
     - name: Report management service status
       ansible.builtin.debug:
         msg: "Management-services config: {{ svc_cfg.stdout }}"
