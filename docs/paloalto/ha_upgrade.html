@@ -1,0 +1,317 @@
+<!DOCTYPE html><html><head>
+      <title>ha_upgrade</title>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/katex.min.css">
+      
+      
+      <script src="https://cdn.jsdelivr.net/npm/mermaid@11.12.1/dist/mermaid.min.js"></script>
+      
+      
+      <style>
+      code[class*=language-],pre[class*=language-]{color:#333;background:0 0;font-family:Consolas,"Liberation Mono",Menlo,Courier,monospace;text-align:left;white-space:pre;word-spacing:normal;word-break:normal;word-wrap:normal;line-height:1.4;-moz-tab-size:8;-o-tab-size:8;tab-size:8;-webkit-hyphens:none;-moz-hyphens:none;-ms-hyphens:none;hyphens:none}pre[class*=language-]{padding:.8em;overflow:auto;border-radius:3px;background:#f5f5f5}:not(pre)>code[class*=language-]{padding:.1em;border-radius:.3em;white-space:normal;background:#f5f5f5}.token.blockquote,.token.comment{color:#969896}.token.cdata{color:#183691}.token.doctype,.token.macro.property,.token.punctuation,.token.variable{color:#333}.token.builtin,.token.important,.token.keyword,.token.operator,.token.rule{color:#a71d5d}.token.attr-value,.token.regex,.token.string,.token.url{color:#183691}.token.atrule,.token.boolean,.token.code,.token.command,.token.constant,.token.entity,.token.number,.token.property,.token.symbol{color:#0086b3}.token.prolog,.token.selector,.token.tag{color:#63a35c}.token.attr-name,.token.class,.token.class-name,.token.function,.token.id,.token.namespace,.token.pseudo-class,.token.pseudo-element,.token.url-reference .token.variable{color:#795da3}.token.entity{cursor:help}.token.title,.token.title .token.punctuation{font-weight:700;color:#1d3e81}.token.list{color:#ed6a43}.token.inserted{background-color:#eaffea;color:#55a532}.token.deleted{background-color:#ffecec;color:#bd2c00}.token.bold{font-weight:700}.token.italic{font-style:italic}.language-json .token.property{color:#183691}.language-markup .token.tag .token.punctuation{color:#333}.language-css .token.function,code.language-css{color:#0086b3}.language-yaml .token.atrule{color:#63a35c}code.language-yaml{color:#183691}.language-ruby .token.function{color:#333}.language-markdown .token.url{color:#795da3}.language-makefile .token.symbol{color:#795da3}.language-makefile .token.variable{color:#183691}.language-makefile .token.builtin{color:#0086b3}.language-bash .token.keyword{color:#0086b3}pre[data-line]{position:relative;padding:1em 0 1em 3em}pre[data-line] .line-highlight-wrapper{position:absolute;top:0;left:0;background-color:transparent;display:block;width:100%}pre[data-line] .line-highlight{position:absolute;left:0;right:0;padding:inherit 0;margin-top:1em;background:hsla(24,20%,50%,.08);background:linear-gradient(to right,hsla(24,20%,50%,.1) 70%,hsla(24,20%,50%,0));pointer-events:none;line-height:inherit;white-space:pre}pre[data-line] .line-highlight:before,pre[data-line] .line-highlight[data-end]:after{content:attr(data-start);position:absolute;top:.4em;left:.6em;min-width:1em;padding:0 .5em;background-color:hsla(24,20%,50%,.4);color:#f4f1ef;font:bold 65%/1.5 sans-serif;text-align:center;vertical-align:.3em;border-radius:999px;text-shadow:none;box-shadow:0 1px #fff}pre[data-line] .line-highlight[data-end]:after{content:attr(data-end);top:auto;bottom:.4em}html body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,freesans,sans-serif;font-size:16px;line-height:1.6;color:#333;background-color:#fff;overflow:initial;box-sizing:border-box;word-wrap:break-word}html body>:first-child{margin-top:0}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{line-height:1.2;margin-top:1em;margin-bottom:16px;color:#000}html body h1{font-size:2.25em;font-weight:300;padding-bottom:.3em}html body h2{font-size:1.75em;font-weight:400;padding-bottom:.3em}html body h3{font-size:1.5em;font-weight:500}html body h4{font-size:1.25em;font-weight:600}html body h5{font-size:1.1em;font-weight:600}html body h6{font-size:1em;font-weight:600}html body h1,html body h2,html body h3,html body h4,html body h5{font-weight:600}html body h5{font-size:1em}html body h6{color:#5c5c5c}html body strong{color:#000}html body del{color:#5c5c5c}html body a:not([href]){color:inherit;text-decoration:none}html body a{color:#08c;text-decoration:none}html body a:hover{color:#00a3f5;text-decoration:none}html body img{max-width:100%}html body>p{margin-top:0;margin-bottom:16px;word-wrap:break-word}html body>ol,html body>ul{margin-bottom:16px}html body ol,html body ul{padding-left:2em}html body ol.no-list,html body ul.no-list{padding:0;list-style-type:none}html body ol ol,html body ol ul,html body ul ol,html body ul ul{margin-top:0;margin-bottom:0}html body li{margin-bottom:0}html body li.task-list-item{list-style:none}html body li>p{margin-top:0;margin-bottom:0}html body .task-list-item-checkbox{margin:0 .2em .25em -1.8em;vertical-align:middle}html body .task-list-item-checkbox:hover{cursor:pointer}html body blockquote{margin:16px 0;font-size:inherit;padding:0 15px;color:#5c5c5c;background-color:#f0f0f0;border-left:4px solid #d6d6d6}html body blockquote>:first-child{margin-top:0}html body blockquote>:last-child{margin-bottom:0}html body hr{height:4px;margin:32px 0;background-color:#d6d6d6;border:0 none}html body table{margin:10px 0 15px 0;border-collapse:collapse;border-spacing:0;display:block;width:100%;overflow:auto;word-break:normal;word-break:keep-all}html body table th{font-weight:700;color:#000}html body table td,html body table th{border:1px solid #d6d6d6;padding:6px 13px}html body dl{padding:0}html body dl dt{padding:0;margin-top:16px;font-size:1em;font-style:italic;font-weight:700}html body dl dd{padding:0 16px;margin-bottom:16px}html body code{font-family:Menlo,Monaco,Consolas,'Courier New',monospace;font-size:.85em;color:#000;background-color:#f0f0f0;border-radius:3px;padding:.2em 0}html body code::after,html body code::before{letter-spacing:-.2em;content:'\00a0'}html body pre>code{padding:0;margin:0;word-break:normal;white-space:pre;background:0 0;border:0}html body .highlight{margin-bottom:16px}html body .highlight pre,html body pre{padding:1em;overflow:auto;line-height:1.45;border:#d6d6d6;border-radius:3px}html body .highlight pre{margin-bottom:0;word-break:normal}html body pre code,html body pre tt{display:inline;max-width:initial;padding:0;margin:0;overflow:initial;line-height:inherit;word-wrap:normal;background-color:transparent;border:0}html body pre code:after,html body pre code:before,html body pre tt:after,html body pre tt:before{content:normal}html body blockquote,html body dl,html body ol,html body p,html body pre,html body ul{margin-top:0;margin-bottom:16px}html body kbd{color:#000;border:1px solid #d6d6d6;border-bottom:2px solid #c7c7c7;padding:2px 4px;background-color:#f0f0f0;border-radius:3px}@media print{html body{background-color:#fff}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{color:#000;page-break-after:avoid}html body blockquote{color:#5c5c5c}html body pre{page-break-inside:avoid}html body table{display:table}html body img{display:block;max-width:100%;max-height:100%}html body code,html body pre{word-wrap:break-word;white-space:pre}}.markdown-preview{width:100%;height:100%;box-sizing:border-box}.markdown-preview ul{list-style:disc}.markdown-preview ul ul{list-style:circle}.markdown-preview ul ul ul{list-style:square}.markdown-preview ol{list-style:decimal}.markdown-preview ol ol,.markdown-preview ul ol{list-style-type:lower-roman}.markdown-preview ol ol ol,.markdown-preview ol ul ol,.markdown-preview ul ol ol,.markdown-preview ul ul ol{list-style-type:lower-alpha}.markdown-preview .newpage,.markdown-preview .pagebreak{page-break-before:always}.markdown-preview pre.line-numbers{position:relative;padding-left:3.8em;counter-reset:linenumber}.markdown-preview pre.line-numbers>code{position:relative}.markdown-preview pre.line-numbers .line-numbers-rows{position:absolute;pointer-events:none;top:1em;font-size:100%;left:0;width:3em;letter-spacing:-1px;border-right:1px solid #999;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.markdown-preview pre.line-numbers .line-numbers-rows>span{pointer-events:none;display:block;counter-increment:linenumber}.markdown-preview pre.line-numbers .line-numbers-rows>span:before{content:counter(linenumber);color:#999;display:block;padding-right:.8em;text-align:right}.markdown-preview .mathjax-exps .MathJax_Display{text-align:center!important}.markdown-preview:not([data-for=preview]) .code-chunk .code-chunk-btn-group{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .status{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .output-div{margin-bottom:16px}.markdown-preview .md-toc{padding:0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link div,.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}.markdown-preview .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}.scrollbar-style::-webkit-scrollbar{width:8px}.scrollbar-style::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}.scrollbar-style::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode]){position:relative;width:100%;height:100%;top:0;left:0;margin:0;padding:0;overflow:auto}html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{position:relative;top:0;min-height:100vh}@media screen and (min-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em calc(50% - 457px + 2em)}}@media screen and (max-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{font-size:14px!important;padding:1em}}@media print{html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{display:none}}html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{position:fixed;bottom:8px;left:8px;font-size:28px;cursor:pointer;color:inherit;z-index:99;width:32px;text-align:center;opacity:.4}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] #sidebar-toc-btn{opacity:1}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc{position:fixed;top:0;left:0;width:300px;height:100%;padding:32px 0 48px 0;font-size:14px;box-shadow:0 0 4px rgba(150,150,150,.33);box-sizing:border-box;overflow:auto;background-color:inherit}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar{width:8px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc a{text-decoration:none}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc{padding:0 16px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link div,html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{left:300px;width:calc(100% - 300px);padding:2em calc(50% - 457px - 300px / 2);margin:0;box-sizing:border-box}@media screen and (max-width:1274px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{width:100%}}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .markdown-preview{left:50%;transform:translateX(-50%)}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .md-sidebar-toc{display:none}
+/* Please visit the URL below for more information: */
+/*   https://shd101wyy.github.io/markdown-preview-enhanced/#/customize-css */
+
+      </style>
+      <!-- The content below will be included at the end of the <head> element. --><script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script></head><body for="html-export">
+    
+    
+      <div class="crossnote markdown-preview  ">
+      
+<div class="mermaid">flowchart TD
+    Start([Start: PAN-OS HA Upgrade]) --&gt; ValidatePath{Validate&lt;br/&gt;upgrade_path&lt;br/&gt;Provided?}
+    
+    ValidatePath --&gt;|No| End1([End - Failed])
+    ValidatePath --&gt;|Yes| GatherHA[Gather HA and System Facts]
+    
+    GatherHA --&gt; GatherConfig[Gather Full Running Configuration]
+    
+    GatherConfig --&gt; RecordSnapshot[Record HA Snapshot&lt;br/&gt;Hostname, Serial, Version, HA Mode]
+    
+    RecordSnapshot --&gt; DiscoverWiring[Discover HA Interface Wiring&lt;br/&gt;HA1 IP, Netmask, Port, Peer IP]
+    
+    DiscoverWiring --&gt; ValidateWiring{HA Wiring&lt;br/&gt;Discovered?}
+    ValidateWiring --&gt;|No| End2([End - Failed])
+    ValidateWiring --&gt;|Yes| ValidateHA1[Validate HA1 Control Channel&lt;br/&gt;via Upgrade Assurance]
+    
+    ValidateHA1 --&gt; RecordHA1[Record HA1 Pre-check Result]
+    
+    RecordHA1 --&gt; EnforceHA1{Exactly One&lt;br/&gt;Active &amp; One&lt;br/&gt;Passive?}
+    EnforceHA1 --&gt;|No| End3([End - Failed])
+    EnforceHA1 --&gt;|Yes| ConsolidateTopology[Consolidate HA Topology View]
+    
+    ConsolidateTopology --&gt; ValidateTopology{HA Pair&lt;br/&gt;Active/Passive&lt;br/&gt;&amp; Healthy?}
+    ValidateTopology --&gt;|No| End4([End - Failed])
+    ValidateTopology --&gt;|Yes| ShortCircuit{Upgrade Path&lt;br/&gt;Advances&lt;br/&gt;PAN-OS?}
+    
+    ShortCircuit --&gt;|No, Already Current| End5([End - Skipped])
+    ShortCircuit --&gt;|Yes| MarkRoles[Mark Initial HA Role Flags]
+    
+    MarkRoles --&gt; ContentUpdate[/Include: Content &amp; Antivirus Update/]
+    ContentUpdate --&gt; ContentUpdateTask
+    
+    %% Content and Antivirus Update Subgraph
+    subgraph ContentUpdateTask["📋 Content &amp; Antivirus Update Tasks"]
+        direction TB
+        CU_Start[Check Device Ready] --&gt; CU_Refresh[Refresh Content Update Index]
+        CU_Refresh --&gt; CU_Download[Download Latest Content Update]
+        CU_Download --&gt; CU_ExtractJob[Extract Download Job ID]
+        CU_ExtractJob --&gt; CU_HasJob{Job ID&lt;br/&gt;Exists?}
+        CU_HasJob --&gt;|No| CU_Install
+        CU_HasJob --&gt;|Yes| CU_WaitDL[Wait for Download Job&lt;br/&gt;Retries: 300, Delay: 10s]
+        CU_WaitDL --&gt; CU_DLStatus{Status&lt;br/&gt;FIN?}
+        CU_DLStatus --&gt;|FAIL| CU_End1([Failed])
+        CU_DLStatus --&gt;|No, Retry| CU_WaitDL
+        CU_DLStatus --&gt;|FIN| CU_Install[Install Latest Content Update]
+        
+        CU_Install --&gt; CU_ExtractInstJob[Extract Install Job ID]
+        CU_ExtractInstJob --&gt; CU_HasInstJob{Job ID&lt;br/&gt;Exists?}
+        CU_HasInstJob --&gt;|No| CU_WaitReady
+        CU_HasInstJob --&gt;|Yes| CU_WaitInst[Wait for Install Job&lt;br/&gt;Retries: 300, Delay: 10s]
+        CU_WaitInst --&gt; CU_InstStatus{Status&lt;br/&gt;FIN?}
+        CU_InstStatus --&gt;|FAIL| CU_End2([Failed])
+        CU_InstStatus --&gt;|No, Retry| CU_WaitInst
+        CU_InstStatus --&gt;|FIN| CU_WaitReady[Wait for Device Readiness&lt;br/&gt;Retries: 60, Delay: 15s]
+        
+        CU_WaitReady --&gt; AV_Refresh[Refresh Antivirus Update Index]
+        AV_Refresh --&gt; AV_Download[Download Latest Antivirus Update]
+        AV_Download --&gt; AV_ExtractJob[Extract Download Job ID]
+        AV_ExtractJob --&gt; AV_HasJob{Job ID&lt;br/&gt;Exists?}
+        AV_HasJob --&gt;|No| AV_Install
+        AV_HasJob --&gt;|Yes| AV_WaitDL[Wait for Download Job&lt;br/&gt;Retries: 300, Delay: 10s]
+        AV_WaitDL --&gt; AV_DLStatus{Status&lt;br/&gt;FIN?}
+        AV_DLStatus --&gt;|FAIL| AV_End1([Failed])
+        AV_DLStatus --&gt;|No, Retry| AV_WaitDL
+        AV_DLStatus --&gt;|FIN| AV_Install[Install Latest Antivirus Update]
+        
+        AV_Install --&gt; AV_ExtractInstJob[Extract Install Job ID]
+        AV_ExtractInstJob --&gt; AV_HasInstJob{Job ID&lt;br/&gt;Exists?}
+        AV_HasInstJob --&gt;|No| AV_Query
+        AV_HasInstJob --&gt;|Yes| AV_WaitInst[Wait for Install Job&lt;br/&gt;Retries: 300, Delay: 10s]
+        AV_WaitInst --&gt; AV_InstStatus{Status&lt;br/&gt;FIN?}
+        AV_InstStatus --&gt;|FAIL| AV_End2([Failed])
+        AV_InstStatus --&gt;|No, Retry| AV_WaitInst
+        AV_InstStatus --&gt;|FIN| AV_Query[Query Installed Antivirus Info]
+        
+        AV_Query --&gt; AV_Cache[Cache Antivirus Version Fact]
+        AV_Cache --&gt; CU_Exit[/Return to Main Playbook/]
+    end
+    
+    CU_Exit --&gt; BackupConfig[Backup Running Configuration&lt;br/&gt;to /runner/backups]
+    
+    BackupConfig --&gt; CaptureTech[Capture Tech-Support Bundle]
+    
+    CaptureTech --&gt; VerifyReadiness[Verify HA Readiness&lt;br/&gt;Includes Config-Sync Check]
+    
+    VerifyReadiness --&gt; ReadyOK{HA Ready?}
+    ReadyOK --&gt;|No| End6([End - Failed])
+    ReadyOK --&gt;|Yes| DisableSync[Disable Config Sync]
+    
+    DisableSync --&gt; CommitDisable[Commit: Config Sync Disabled]
+    
+    CommitDisable --&gt; ReCollectHA[Re-collect HA Facts]
+    
+    ReCollectHA --&gt; VerifyState{HA State&lt;br/&gt;Valid?}
+    VerifyState --&gt;|No| End7([End - Failed])
+    VerifyState --&gt;|Yes| VerifyAV{Antivirus&lt;br/&gt;Versions&lt;br/&gt;Match?}
+    
+    VerifyAV --&gt;|No| End8([End - Failed])
+    VerifyAV --&gt;|Yes| Orchestrate[Orchestrate Passive-First Upgrade]
+    
+    Orchestrate --&gt; WaitPassiveCommit[Wait for Running Commits&lt;br/&gt;on Passive to Finish&lt;br/&gt;Retries: 120, Delay: 5s]
+    
+    WaitPassiveCommit --&gt; UpgradePassive[/Upgrade Passive Firewall&lt;br/&gt;Loop: upgrade_path/]
+    UpgradePassive --&gt; UpgradePassiveTask
+    
+    %% Upgrade Step Subgraph for Passive
+    subgraph UpgradePassiveTask["📋 Upgrade Step Tasks - Passive"]
+        direction TB
+        UP_Download[Download PAN-OS Version&lt;br/&gt;Retries: 3, Delay: 60s]
+        UP_Download --&gt; UP_DLOk{Download&lt;br/&gt;Success?}
+        UP_DLOk --&gt;|Failed After 3| UP_End1([Failed])
+        UP_DLOk --&gt;|Success| UP_Install[Install PAN-OS Version&lt;br/&gt;No Restart]
+        
+        UP_Install --&gt; UP_Restart[Restart Device to Apply Version&lt;br/&gt;Async: 45s, Poll: 0]
+        UP_Restart --&gt; UP_WaitStop[Wait for Port 443 to Stop&lt;br/&gt;Timeout: 300s]
+        UP_WaitStop --&gt; UP_StopOK{Port&lt;br/&gt;Stopped?}
+        UP_StopOK --&gt;|Timeout| UP_End2([Failed])
+        UP_StopOK --&gt;|Success| UP_WaitStart[Wait for Port 443 to Start&lt;br/&gt;Timeout: 900s]
+        
+        UP_WaitStart --&gt; UP_StartOK{Port&lt;br/&gt;Started?}
+        UP_StartOK --&gt;|Timeout| UP_End3([Failed])
+        UP_StartOK --&gt;|Success| UP_WaitReady[Wait for Device Readiness&lt;br/&gt;Retries: 100, Delay: 15s]
+        
+        UP_WaitReady --&gt; UP_ReadyOK{Device&lt;br/&gt;Ready?}
+        UP_ReadyOK --&gt;|Failed| UP_End4([Failed])
+        UP_ReadyOK --&gt;|Success| UP_Verify[Verify Installed Version]
+        
+        UP_Verify --&gt; UP_Assert{Version&lt;br/&gt;Match?}
+        UP_Assert --&gt;|No| UP_End5([Failed: Version Mismatch])
+        UP_Assert --&gt;|Yes| UP_Exit[/Return to Main Playbook/]
+    end
+    
+    UP_Exit --&gt; SuspendActive[Suspend Original Active&lt;br/&gt;to Trigger Failover]
+    
+    SuspendActive --&gt; WaitPassiveActive[Wait for Upgraded Passive&lt;br/&gt;to Become Active&lt;br/&gt;Retries: 40, Delay: 15s]
+    
+    WaitPassiveActive --&gt; PassiveActiveOK{Passive Now&lt;br/&gt;Active?}
+    PassiveActiveOK --&gt;|Failed| End9([End - Failed])
+    PassiveActiveOK --&gt;|Success| WaitPassiveReady[Wait for Upgraded Passive&lt;br/&gt;Readiness as Active&lt;br/&gt;Retries: 60, Delay: 15s]
+    
+    WaitPassiveReady --&gt; PassiveReadyOK{Ready as&lt;br/&gt;Active?}
+    PassiveReadyOK --&gt;|Failed| End10([End - Failed])
+    PassiveReadyOK --&gt;|Success| WaitActiveCommit[Wait for Running Commits&lt;br/&gt;on Original Active&lt;br/&gt;Retries: 120, Delay: 5s]
+    
+    WaitActiveCommit --&gt; UpgradeActive[/Upgrade Originally Active Firewall&lt;br/&gt;Loop: upgrade_path/]
+    UpgradeActive --&gt; UpgradeActiveTask
+    
+    %% Upgrade Step Subgraph for Active (same structure)
+    subgraph UpgradeActiveTask["📋 Upgrade Step Tasks - Active"]
+        direction TB
+        UA_Download[Download PAN-OS Version&lt;br/&gt;Retries: 3, Delay: 60s]
+        UA_Download --&gt; UA_DLOk{Download&lt;br/&gt;Success?}
+        UA_DLOk --&gt;|Failed After 3| UA_End1([Failed])
+        UA_DLOk --&gt;|Success| UA_Install[Install PAN-OS Version&lt;br/&gt;No Restart]
+        
+        UA_Install --&gt; UA_Restart[Restart Device to Apply Version&lt;br/&gt;Async: 45s, Poll: 0]
+        UA_Restart --&gt; UA_WaitStop[Wait for Port 443 to Stop&lt;br/&gt;Timeout: 300s]
+        UA_WaitStop --&gt; UA_StopOK{Port&lt;br/&gt;Stopped?}
+        UA_StopOK --&gt;|Timeout| UA_End2([Failed])
+        UA_StopOK --&gt;|Success| UA_WaitStart[Wait for Port 443 to Start&lt;br/&gt;Timeout: 900s]
+        
+        UA_WaitStart --&gt; UA_StartOK{Port&lt;br/&gt;Started?}
+        UA_StartOK --&gt;|Timeout| UA_End3([Failed])
+        UA_StartOK --&gt;|Success| UA_WaitReady[Wait for Device Readiness&lt;br/&gt;Retries: 100, Delay: 15s]
+        
+        UA_WaitReady --&gt; UA_ReadyOK{Device&lt;br/&gt;Ready?}
+        UA_ReadyOK --&gt;|Failed| UA_End4([Failed])
+        UA_ReadyOK --&gt;|Success| UA_Verify[Verify Installed Version]
+        
+        UA_Verify --&gt; UA_Assert{Version&lt;br/&gt;Match?}
+        UA_Assert --&gt;|No| UA_End5([Failed: Version Mismatch])
+        UA_Assert --&gt;|Yes| UA_Exit[/Return to Main Playbook/]
+    end
+    
+    UA_Exit --&gt; ReturnFunctional[Return Suspended Firewall&lt;br/&gt;to Functional State]
+    
+    ReturnFunctional --&gt; ReEnableSync[Re-enable Config Sync]
+    
+    ReEnableSync --&gt; CommitEnable[Commit: Config Sync Enabled]
+    
+    CommitEnable --&gt; SyncConfig[Force Running-Config Sync&lt;br/&gt;from Initial Active to Peer]
+    
+    SyncConfig --&gt; CheckRoles[Check Current HA Roles&lt;br/&gt;After Upgrades]
+    
+    CheckRoles --&gt; DeriveActive[Derive Current Active Host]
+    
+    DeriveActive --&gt; NeedFailback{Original Active&lt;br/&gt;is Active?}
+    NeedFailback --&gt;|Yes| WaitOriginalActive
+    NeedFailback --&gt;|No| SuspendCurrent[Suspend Current Active&lt;br/&gt;to Fail Back]
+    
+    SuspendCurrent --&gt; WaitFailback[Wait for Original Active&lt;br/&gt;to Become Active&lt;br/&gt;Retries: 40, Delay: 30s]
+    
+    WaitFailback --&gt; FailbackOK{Failback&lt;br/&gt;Success?}
+    FailbackOK --&gt;|Failed| End11([End - Failed])
+    FailbackOK --&gt;|Success| ReturnFunctional2[Return Suspended to Functional]
+    
+    ReturnFunctional2 --&gt; WaitOriginalActive[Wait for Original Active&lt;br/&gt;Role to Return&lt;br/&gt;Retries: 40, Delay: 30s]
+    
+    WaitOriginalActive --&gt; WaitOriginalPassive[Wait for Original Passive&lt;br/&gt;Role to Return&lt;br/&gt;Retries: 40, Delay: 30s]
+    
+    WaitOriginalPassive --&gt; ReValidateHA1[Re-validate HA1 Control Channel&lt;br/&gt;After Upgrade]
+    
+    ReValidateHA1 --&gt; EnforcePostHA1{One Active &amp;&lt;br/&gt;One Passive?}
+    EnforcePostHA1 --&gt;|No| End12([End - Failed])
+    EnforcePostHA1 --&gt;|Yes| GatherWiringPost[Gather HA Wiring After Upgrade]
+    
+    GatherWiringPost --&gt; RecordWiringPost[Record HA Wiring After Upgrade]
+    
+    RecordWiringPost --&gt; AssertWiring{HA Wiring&lt;br/&gt;Unchanged?}
+    AssertWiring --&gt;|No| End13([End - Failed:&lt;br/&gt;Wiring Drift])
+    AssertWiring --&gt;|Yes| PostReadiness[Run Post-Upgrade HA&lt;br/&gt;Readiness Checks]
+    
+    PostReadiness --&gt; ReadinessOK{HA Ready?}
+    ReadinessOK --&gt;|No| End14([End - Failed])
+    ReadinessOK --&gt;|Yes| QueryAVPost[Query Antivirus Package&lt;br/&gt;After Upgrade]
+    
+    QueryAVPost --&gt; CacheAVPost[Cache Post-Upgrade&lt;br/&gt;Antivirus Version]
+    
+    CacheAVPost --&gt; VerifyAVPost{Antivirus&lt;br/&gt;Versions&lt;br/&gt;Match?}
+    VerifyAVPost --&gt;|No| End15([End - Failed])
+    VerifyAVPost --&gt;|Yes| ReportSuccess[Report HA Upgrade Result]
+    
+    ReportSuccess --&gt; End16([End - Success])
+    
+    %% Styling
+    classDef successNode fill:#90EE90,stroke:#006400,stroke-width:2px
+    classDef failNode fill:#FFB6C6,stroke:#8B0000,stroke-width:2px
+    classDef decisionNode fill:#FFE4B5,stroke:#FF8C00,stroke-width:2px
+    classDef processNode fill:#B0E0E6,stroke:#4682B4,stroke-width:2px
+    classDef taskNode fill:#E6E6FA,stroke:#6A5ACD,stroke-width:2px
+    classDef criticalNode fill:#FFE4E1,stroke:#FF6347,stroke-width:3px
+    
+    class End16 successNode
+    class End1,End2,End3,End4,End6,End7,End8,End9,End10,End11,End12,End13,End14,End15 failNode
+    class End5 successNode
+    class ValidatePath,ValidateWiring,EnforceHA1,ValidateTopology,ShortCircuit,ReadyOK,VerifyState,VerifyAV,PassiveActiveOK,PassiveReadyOK,NeedFailback,FailbackOK,EnforcePostHA1,AssertWiring,ReadinessOK,VerifyAVPost decisionNode
+    class CU_HasJob,CU_DLStatus,CU_HasInstJob,CU_InstStatus,AV_HasJob,AV_DLStatus,AV_HasInstJob,AV_InstStatus decisionNode
+    class UP_DLOk,UP_StopOK,UP_StartOK,UP_ReadyOK,UP_Assert decisionNode
+    class UA_DLOk,UA_StopOK,UA_StartOK,UA_ReadyOK,UA_Assert decisionNode
+    class SuspendActive,WaitPassiveActive,WaitPassiveReady,SuspendCurrent,WaitFailback criticalNode
+    class CU_End1,CU_End2,AV_End1,AV_End2 failNode
+    class UP_End1,UP_End2,UP_End3,UP_End4,UP_End5 failNode
+    class UA_End1,UA_End2,UA_End3,UA_End4,UA_End5 failNode
+</div>
+      </div>
+      
+      
+    
+    
+    <script type="module">
+// TODO: If ZenUML gets integrated into mermaid in the future,
+//      we can remove the following lines.
+
+
+var MERMAID_CONFIG = ({"startOnLoad":false});
+if (typeof MERMAID_CONFIG !== 'undefined') {
+  MERMAID_CONFIG.startOnLoad = false
+  MERMAID_CONFIG.cloneCssStyles = false
+  MERMAID_CONFIG.theme = "default"
+}
+
+mermaid.initialize(MERMAID_CONFIG || {})
+if (typeof(window['Reveal']) !== 'undefined') {
+  function mermaidRevealHelper(event) {
+    var currentSlide = event.currentSlide
+    var diagrams = currentSlide.querySelectorAll('.mermaid')
+    for (var i = 0; i < diagrams.length; i++) {
+      var diagram = diagrams[i]
+      if (!diagram.hasAttribute('data-processed')) {
+        mermaid.init(null, diagram, ()=> {
+          Reveal.slide(event.indexh, event.indexv)
+        })
+      }
+    }
+  }
+  Reveal.addEventListener('slidetransitionend', mermaidRevealHelper)
+  Reveal.addEventListener('ready', mermaidRevealHelper)
+  await mermaid.run({
+    nodes: document.querySelectorAll('.mermaid')
+  })
+} else {
+  await mermaid.run({
+    nodes: document.querySelectorAll('.mermaid')
+  })
+}
+</script>
+    
+    
+    
+  
+    </body></html>
