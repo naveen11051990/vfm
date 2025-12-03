@@ -70,7 +70,7 @@
              | first }}
         ha1_port: >-
           {{ (ha_section
-              | regex_findall('<ha1[^>]*>.*?<port>([^<]+)</port>')
+              | regex_findall('<port>([^<]+)</port>')
               | default([''], true))
              | first }}
         ha_peer_ip: >-
@@ -496,7 +496,7 @@
              | first }}
         ha1_port_post: >-
           {{ (hostvars[item].ha_section_post
-              | regex_findall('<ha1[^>]*>.*?<port>([^<]+)</port>')
+              | regex_findall('<port>([^<]+)</port>')
               | default([''], true))
              | first }}
         ha_peer_ip_post: >-
