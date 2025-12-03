@@ -4,6 +4,7 @@
   gather_facts: yes
   vars:
       ios_image_bin: "{{ ios_image_filename }}"
+      timestamp: "{{ lookup('pipe', 'date +%s') }}"
   tasks:
       - name: Pre-check | Version
         cisco.ios.ios_command:
@@ -28,14 +29,14 @@
       - name: Generate tech-support log
         cisco.ios.ios_command:
             commands:
-                - "show tech-support | redirect flash:techsupport_{{ ansible_date_time.epoch }}.txt"
+                - "show tech-support | redirect flash:techsupport_{{ timestamp }}.txt"
         vars:
             ansible_command_timeout: 300
         register: tech_output
       - name: Verify tech-support file was created
         cisco.ios.ios_command:
             commands:
-                - "dir flash: | include techsupport_{{ ansible_date_time.epoch }}.txt"
+                - "dir flash: | include techsupport_{{ timestamp }}.txt"
         register: file_check
       - name: Display file verification
         debug:
@@ -47,9 +48,9 @@
       - name: Copy tech-support log to TFTP
         cisco.ios.ios_command:
             commands:
-                - command: "copy flash:techsupport_{{ ansible_date_time.epoch }}.txt tftp://192.168.29.208/techsupport_{{ ansible_date_time.epoch }}.txt vrf Mgmt-vrf"
+                - command: "copy flash:techsupport_{{ timestamp }}.txt tftp://192.168.29.208/techsupport_{{ timestamp }}.txt vrf Mgmt-vrf"
                   prompt: "Destination filename"
-                  answer: "techsupport_{{ ansible_date_time.epoch }}.txt"
+                  answer: "techsupport_{{ timestamp }}.txt"
         vars:
             ansible_command_timeout: 300
         register: copy_output
