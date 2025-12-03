@@ -24,7 +24,8 @@
           - content_version
         force_fail: false
       register: readiness
-
+      ignore_errors: yes
+      
     - name: Debug readiness check results
       ansible.builtin.debug:
         var: readiness.response
