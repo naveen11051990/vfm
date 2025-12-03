@@ -1,6 +1,6 @@
 ---
 - name: Detect security rules missing required security profiles
-  hosts: PRODUCTIONFIREWALL    # change to your inventory group or host
+  hosts: PRODUCTIONFIREWALL   # replace with your inventory group or host
   connection: local
   gather_facts: false
 
@@ -9,6 +9,7 @@
       ip_address: "{{ ip_address }}"
       username: "{{ username }}"
       password: "{{ password }}"
+    # List of profile-fields you consider mandatory
     required_profiles:
       - group_profile
       - antivirus
@@ -25,15 +26,19 @@
       paloaltonetworks.panos.panos_security_rule:
         provider: "{{ device }}"
         state: gathered
-        gathered_filter: "*"   # mandatory to fetch rules. :contentReference[oaicite:2]{index=2}
+        gathered_filter: "*"       # wildcard to fetch all rules :contentReference[oaicite:2]{index=2}
       register: sec_rules
+
+    - name: Debug — dump what was returned for inspection
+      ansible.builtin.debug:
+        var: sec_rules
 
     - name: Initialize list for non-compliant rules
       ansible.builtin.set_fact:
         rules_missing_profiles: []
 
     - name: Identify rules missing one or more required profiles
-      loop: "{{ sec_rules.rules }}"
+      loop: "{{ sec_rules.gathered }}"
       vars:
         r: "{{ item }}"
       when: >
@@ -52,11 +57,4 @@
           Security rules missing required profiles:
           {% if rules_missing_profiles %}
             {% for r in rules_missing_profiles %}
-            - {{ r.rule_name | default(r.name) }}:
-              {% for p in required_profiles %}
-                * {{ p }} = {{ (r[p] | default('None')) }}
-              {% endfor %}
-            {% endfor %}
-          {% else %}
-            All security rules have at least one of the defined security profiles.
-          {% endif %}
+            - {{ r.rule_name | de_
