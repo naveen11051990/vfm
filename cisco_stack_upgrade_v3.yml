@@ -3,175 +3,175 @@
   hosts: cisco_stack_switch
   gather_facts: no
   vars:
-    ios_image_bin: "{{ ios_image_filename }}"
+      ios_image_bin: "{{ ios_image_filename }}"
   tasks:
-    - name: Pre-check | Version
-      cisco.ios.ios_command:
-        commands:
-          - show version
-      register: pre_version
-    - name: Pre-check | Stack health
-      cisco.ios.ios_command:
-        commands:
-          - show switch
-          - show switch stack-ports
-      register: pre_stack
-    - name: Pre-check | Install state
-      cisco.ios.ios_command:
-        commands:
-          - show install summary
-      register: pre_install_state
-    - name: Ping TFTP server via Mgmt-vrf
-      cisco.ios.ios_command:
-        commands:
-          - ping vrf Mgmt-vrf 192.168.29.208
-    - name: Generate tech-support log
-      cisco.ios.ios_command:
-        commands:
-          - "show tech-support | redirect flash:techsupport.txt"
-      vars:
-        ansible_command_timeout: 300
-      register: tech_output
-    - name: Verify tech-support file was created
-      cisco.ios.ios_command:
-        commands:
-          - "dir flash: | include techsupport.txt"
-      register: file_check
-    - name: Display file verification
-      debug:
-        var: file_check.stdout_lines
-    - name: Suppress file prompts for copy
-      cisco.ios.ios_config:
-        lines:
-          - file prompt quiet
-    - name: Copy tech-support log to TFTP
-      cisco.ios.ios_command:
-        commands:
-          - command: "copy flash:techsupport.txt tftp://192.168.29.208/techsupport.txt vrf Mgmt-vrf"
-            prompt: "Destination filename"
-            answer: "techsupport.txt"
-      vars:
-        ansible_command_timeout: 300
-      register: copy_output
-    - name: Show transfer result
-      debug:
-        var: copy_output.stdout_lines
-    - name: Restore default file prompt behavior
-      cisco.ios.ios_config:
-        lines:
-          - no file prompt quiet
-    - name: Clean package files switch all
-      cisco.ios.ios_command:
-        commands:
-          - "request platform software package clean switch all"
-      vars:
-        ansible_command_timeout: 900
-    - name: Copy image from TFTP to flash using Mgmt-vrf
-      cisco.ios.ios_command:
-        commands:
-          - command: "copy tftp://192.168.29.208/{{ ios_image_bin }} flash:{{ ios_image_bin }} vrf Mgmt-vrf"
-            prompt: Destination filename
-            answer: "{{ ios_image_bin }}"
-      register: copy_output
-      vars:
-        ansible_command_timeout: 600
-    - name: Show copy output
-      debug:
-        var: copy_output.stdout_lines
-    - name: Verify image exists in flash
-      cisco.ios.ios_command:
-        commands:
-          - "dir flash:{{ ios_image_bin }}"
-      register: dir_output
-    - name: Show dir result
-      debug:
-        var: dir_output.stdout_lines
-    - name: Set boot variable to packages.conf (Install mode)
-      cisco.ios.ios_config:
-        lines:
-          - no boot system
-          - boot system flash:packages.conf
-    - name: Disable ignore startup-config on 9300
-      cisco.ios.ios_config:
-        lines:
-          - no system ignore startupconfig switch all
-          - no boot manual
-    - name: Save running-config
-      cisco.ios.ios_command:
-        commands:
-          - write memory
-      vars:
-        ansible_command_timeout: 120
-    - name: Config backup before upgrade
-      cisco.ios.ios_config:
-        backup: yes
-        backup_options:
-          dir_path: "/runner/backups"
-          # optionally you can define filename, else default will be used:
-          # filename: "{{ inventory_hostname }}_config_{{ ansible_date_time.iso8601 }}.cfg"
-      register: copy_out
+      - name: Pre-check | Version
+        cisco.ios.ios_command:
+            commands:
+                - show version
+        register: pre_version
+      - name: Pre-check | Stack health
+        cisco.ios.ios_command:
+            commands:
+                - show switch
+                - show switch stack-ports
+        register: pre_stack
+      - name: Pre-check | Install state
+        cisco.ios.ios_command:
+            commands:
+                - show install summary
+        register: pre_install_state
+      - name: Ping TFTP server via Mgmt-vrf
+        cisco.ios.ios_command:
+            commands:
+                - ping vrf Mgmt-vrf 192.168.29.208
+      - name: Generate tech-support log
+        cisco.ios.ios_command:
+            commands:
+                - "show tech-support | redirect flash:techsupport_{{ ansible_date_time.epoch }}.txt"
+        vars:
+            ansible_command_timeout: 300
+        register: tech_output
+      - name: Verify tech-support file was created
+        cisco.ios.ios_command:
+            commands:
+                - "dir flash: | include techsupport_{{ ansible_date_time.epoch }}.txt"
+        register: file_check
+      - name: Display file verification
+        debug:
+            var: file_check.stdout_lines
+      - name: Suppress file prompts for copy
+        cisco.ios.ios_config:
+            lines:
+                - file prompt quiet
+      - name: Copy tech-support log to TFTP
+        cisco.ios.ios_command:
+            commands:
+                - command: "copy flash:techsupport_{{ ansible_date_time.epoch }}.txt tftp://192.168.29.208/techsupport_{{ ansible_date_time.epoch }}.txt vrf Mgmt-vrf"
+                  prompt: "Destination filename"
+                  answer: "techsupport_{{ ansible_date_time.epoch }}.txt"
+        vars:
+            ansible_command_timeout: 300
+        register: copy_output
+      - name: Show transfer result
+        debug:
+            var: copy_output.stdout_lines
+      - name: Restore default file prompt behavior
+        cisco.ios.ios_config:
+            lines:
+                - no file prompt quiet
+      - name: Clean package files switch all
+        cisco.ios.ios_command:
+            commands:
+                - "request platform software package clean switch all"
+        vars:
+            ansible_command_timeout: 900
+      - name: Copy image from TFTP to flash using Mgmt-vrf
+        cisco.ios.ios_command:
+            commands:
+                - command: "copy tftp://192.168.29.208/{{ ios_image_bin }} flash:{{ ios_image_bin }} vrf Mgmt-vrf"
+                  prompt: Destination filename
+                  answer: "{{ ios_image_bin }}"
+        register: copy_output
+        vars:
+            ansible_command_timeout: 600
+      - name: Show copy output
+        debug:
+            var: copy_output.stdout_lines
+      - name: Verify image exists in flash
+        cisco.ios.ios_command:
+            commands:
+                - "dir flash:{{ ios_image_bin }}"
+        register: dir_output
+      - name: Show dir result
+        debug:
+            var: dir_output.stdout_lines
+      - name: Set boot variable to packages.conf (Install mode)
+        cisco.ios.ios_config:
+            lines:
+                - no boot system
+                - boot system flash:packages.conf
+      - name: Disable ignore startup-config on 9300
+        cisco.ios.ios_config:
+            lines:
+                - no system ignore startupconfig switch all
+                - no boot manual
+      - name: Save running-config
+        cisco.ios.ios_command:
+            commands:
+                - write memory
+        vars:
+            ansible_command_timeout: 120
+      - name: Config backup before upgrade
+        cisco.ios.ios_config:
+            backup: yes
+            backup_options:
+                dir_path: "/runner/backups"
+                # optionally you can define filename, else default will be used:
+                # filename: "{{ inventory_hostname }}_config_{{ ansible_date_time.iso8601 }}.cfg"
+        register: copy_out
 
-    - name: Show the backup path
-      debug:
-        var: copy_out.backup_path
-    - name: Run install add/activate/commit to convert to install mode
-      cisco.ios.ios_command:
-        commands:
-          - command: "install add file flash:{{ ios_image_bin }} activate commit"
-            prompt:
-              - Do you want to proceed
-              - This operation requires a reload
-              - Proceed with reload
-            answer:
-              - y
-              - y
-              - y
-      register: install_output
-      vars:
-        ansible_command_timeout: 1200
-    - name: Wait for device to become reachable after reload
-      wait_for_connection:
-        timeout: 900
-        delay: 30
-        sleep: 5
-    - name: Verify device is back (show version)
-      cisco.ios.ios_command:
-        commands:
-          - show version
-      register: boot_output
-    - name: Show boot verification
-      debug:
-        var: boot_output.stdout_lines
-    - name: Post-check | Stack health
-      cisco.ios.ios_command:
-        commands:
-          - show switch
-          - show switch stack-ports
-      register: post_stack
-    - name: Check interfaces
-      cisco.ios.ios_command:
-        commands:
-          - show interfaces status
-          - show ip interface brief
-      register: interface_check
-    - name: Check licenses
-      cisco.ios.ios_command:
-        commands:
-          - show license summary
-      register: license_check
-    - name: Check CPU and memory
-      cisco.ios.ios_command:
-        commands:
-          - show processes cpu sorted
-          - show processes memory sorted
-      register: resource_check
-    - name: Post-check | Environment, Power, EtherChannel
-      cisco.ios.ios_command:
-        commands:
-          - show environment all
-          - show power inline
-          - show etherchannel summary
-      register: postcheck_output
-    - name: Display Post-check Output
-      debug:
-        var: postcheck_output.stdout_lines
+      - name: Show the backup path
+        debug:
+            var: copy_out.backup_path
+      - name: Run install add/activate/commit to convert to install mode
+        cisco.ios.ios_command:
+            commands:
+                - command: "install add file flash:{{ ios_image_bin }} activate commit"
+                  prompt:
+                      - Do you want to proceed
+                      - This operation requires a reload
+                      - Proceed with reload
+                  answer:
+                      - y
+                      - y
+                      - y
+        register: install_output
+        vars:
+            ansible_command_timeout: 1200
+      - name: Wait for device to become reachable after reload
+        wait_for_connection:
+            timeout: 900
+            delay: 30
+            sleep: 5
+      - name: Verify device is back (show version)
+        cisco.ios.ios_command:
+            commands:
+                - show version
+        register: boot_output
+      - name: Show boot verification
+        debug:
+            var: boot_output.stdout_lines
+      - name: Post-check | Stack health
+        cisco.ios.ios_command:
+            commands:
+                - show switch
+                - show switch stack-ports
+        register: post_stack
+      - name: Check interfaces
+        cisco.ios.ios_command:
+            commands:
+                - show interfaces status
+                - show ip interface brief
+        register: interface_check
+      - name: Check licenses
+        cisco.ios.ios_command:
+            commands:
+                - show license summary
+        register: license_check
+      - name: Check CPU and memory
+        cisco.ios.ios_command:
+            commands:
+                - show processes cpu sorted
+                - show processes memory sorted
+        register: resource_check
+      - name: Post-check | Environment, Power, EtherChannel
+        cisco.ios.ios_command:
+            commands:
+                - show environment all
+                - show power inline
+                - show etherchannel summary
+        register: postcheck_output
+      - name: Display Post-check Output
+        debug:
+            var: postcheck_output.stdout_lines
