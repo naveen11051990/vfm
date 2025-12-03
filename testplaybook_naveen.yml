@@ -1,6 +1,6 @@
 ---
-- name: PAN-OS firewall readiness & compliance report
-  hosts: PRODUCTIONFIREWALL
+- name: Detect unused security policies on PAN-OS firewall
+  hosts: PRODUCTIONFIREWALL     # adjust per your inventory / host group
   connection: local
   gather_facts: false
 
@@ -9,35 +9,61 @@
       ip_address: "{{ ip_address }}"
       username: "{{ username }}"
       password: "{{ password }}"
-      # port: 443  # optional
+      # port: 443   # optional if default
+
+    vsys_name: "vsys1"   # change if your firewall uses a different vsys
 
   collections:
     - paloaltonetworks.panos
 
   tasks:
-    - name: Run readiness checks (NTP sync, HA, content version)
-      panos_readiness_checks:
+    - name: Fetch rule hit-count for all security rules
+      paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
-        checks:
-          - ntp_sync
-          - ha
-          - content_version
-        force_fail: false
-      register: readiness
-      ignore_errors: yes
+        cmd: |
+          <show>
+            <rule-hit-count>
+              <vsys>
+                <vsys-name>
+                  <entry name='{{ vsys_name }}'>
+                    <rule-base>
+                      <entry name='security'>
+                        <rules>
+                          <all/>
+                        </rules>
+                      </entry>
+                    </rule-base>
+                  </entry>
+                </vsys-name>
+              </vsys>
+            </rule-hit-count>
+          </show>
+      register: hitcount_raw
+      failed_when: false
 
-    - name: Debug readiness check results
-      debug:
-        var: readiness.response
+    - name: Parse hit-count XML output
+      ansible.builtin.set_fact:
+        hitcount_struct: "{{ hitcount_raw.stdout | from_xml }}"
 
-    - name: Build compliance status message
-      set_fact:
-        compliance_status: |
-          Host: {{ inventory_hostname }}
-            NTP sync        : {{ readiness.response.ntp_sync.state | default(false) | ternary('PASS','FAIL') }} ({{ readiness.response.ntp_sync.reason | default('') }})
-            HA / config sync: {{ readiness.response.ha.state | default(false) | ternary('PASS','FAIL') }} ({{ readiness.response.ha.reason | default('') }})
-            Content version : {{ readiness.response.content_version.state | default(false) | ternary('PASS','FAIL') }} ({{ readiness.response.content_version.reason | default('') }})
+    - name: Extract unused rules (zero hits)
+      ansible.builtin.set_fact:
+        unused_rules: >-
+          {{
+            hitcount_struct.response.result['rule-hit-count'].vsys.entry.rule-base.entry.security.rules.entry
+            | rejectattr('hit-count','int')
+            | selectattr('hit-count','equalto','0')
+            | map(attribute='@name')
+            | list
+          }}
 
-    - name: Show compliance status
-      debug:
-        msg: "{{ compliance_status }}"
+    - name: Display unused security rules
+      ansible.builtin.debug:
+        msg: |
+          Unused security rules (hit-count = 0) in {{ vsys_name }}:
+          {% if unused_rules %}
+            {% for r in unused_rules %}
+            - {{ r }}
+            {% endfor %}
+          {% else %}
+            No rules with zero hit count found.
+          {% endif %}
