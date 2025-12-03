@@ -4,8 +4,10 @@
   gather_facts: yes
   vars:
       ios_image_bin: "{{ ios_image_filename }}"
-      timestamp: "{{ now(utc=true,fmt='%s') }}"
   tasks:
+      - name: Generate timestamp for tech-support file
+        set_fact:
+          timestamp: "{{ now(utc=true,fmt='%s') }}"
       - name: Pre-check | Version
         cisco.ios.ios_command:
             commands:
@@ -108,10 +110,7 @@
             backup: yes
             backup_options:
                 dir_path: "/runner/backups"
-                # optionally you can define filename, else default will be used:
-                # filename: "{{ inventory_hostname }}_config_{{ timestamp }}.cfg"
         register: copy_out
-
       - name: Show the backup path
         debug:
             var: copy_out.backup_path
