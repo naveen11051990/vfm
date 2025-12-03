@@ -1,6 +1,6 @@
 ---
 - name: Detect security rules missing required security profiles
-  hosts: PRODUCTIONFIREWALL  # change this to your inventory / host name
+  hosts: PRODUCTIONFIREWALL   # adjust inventory group / host
   connection: local
   gather_facts: false
 
@@ -25,48 +25,48 @@
       paloaltonetworks.panos.panos_security_rule:
         provider: "{{ device }}"
         state: gathered
-        gathered_filter: "*"        # wildcard to fetch all rules :contentReference[oaicite:3]{index=3}
+        gathered_filter: "*"  
       register: sec_rules
 
-    - name: Debug – show gathered data keys
-      ansible.builtin.debug:
-        msg: "{{ sec_rules.keys() }}"
+    - name: Debug – show top-level keys returned
+      debug:
+        msg: "{{ sec_rules.keys() | list }}"
 
-    - name: Ensure we have rules list
+    - name: Assert we got a rule list
       ansible.builtin.assert:
         that:
           - sec_rules.gathered is defined
-        fail_msg: "No security rules returned — verify connectivity / credentials / firewall config"
+        fail_msg: "No rules returned — verify credentials, device connectivity and PAN-OS permission."
 
     - name: Initialize list for rules missing profiles
       ansible.builtin.set_fact:
         rules_missing_profiles: []
 
-    - name: Iterate and collect rules missing any required profile
+    - name: Loop through rules and capture those missing at least one required profile
       loop: "{{ sec_rules.gathered }}"
       vars:
         r: "{{ item }}"
       when: >
-        (r.group_profile is not defined) or (r.group_profile | length == 0) or
-        (r.antivirus      is not defined) or (r.antivirus      | length == 0) or
-        (r.vulnerability  is not defined) or (r.vulnerability  | length == 0) or
-        (r.spyware        is not defined) or (r.spyware        | length == 0) or
-        (r.url_filtering  is not defined) or (r.url_filtering  | length == 0) or
-        (r.file_blocking  is not defined) or (r.file_blocking  | length == 0)
+        (r.group_profile   is not defined) or (r.group_profile   | length == 0) or
+        (r.antivirus       is not defined) or (r.antivirus       | length == 0) or
+        (r.vulnerability   is not defined) or (r.vulnerability   | length == 0) or
+        (r.spyware         is not defined) or (r.spyware         | length == 0) or
+        (r.url_filtering   is not defined) or (r.url_filtering   | length == 0) or
+        (r.file_blocking   is not defined) or (r.file_blocking   | length == 0)
       set_fact:
         rules_missing_profiles: "{{ rules_missing_profiles + [ r ] }}"
 
-    - name: Report security rules missing at least one required profile
-      ansible.builtin.debug:
+    - name: Report security rules missing profile(s)
+      debug:
         msg: |
-          Security rules missing required profiles:
+          Security rules missing one or more required profiles:
           {% if rules_missing_profiles %}
             {% for r in rules_missing_profiles %}
-            - {{ r.rule_name | default(r.name) }}:
+            - {{ r.rule_name | default(r.name | default('NO_NAME')) }}:
               {% for p in required_profiles %}
-              * {{ p }} = {{ (r[p] | default('None')) }}
+                * {{ p }} = {{ (r[p] | default('')) }}
               {% endfor %}
             {% endfor %}
           {% else %}
-            All security rules have at least one of the required security profiles defined.
+            All rules have all required profiles defined (or at least non-empty values).
           {% endif %}
