@@ -63,13 +63,19 @@
         cisco.ios.ios_config:
             lines:
                 - no file prompt quiet
+      - name: Check for inactive packages to clean
+        cisco.ios.ios_command:
+            commands:
+                - "show install inactive"
+        register: inactive_packages
       - name: Clean package files switch all
         cisco.ios.ios_command:
             commands:
-                - "request platform software package clean switch all force"
+                - command: "request platform software package clean switch all"
+                  prompt: "Do you want to proceed"
+                  answer: "y"
         vars:
             ansible_command_timeout: 1800
-        ignore_errors: yes
       - name: Copy image from TFTP to flash using Mgmt-vrf
         cisco.ios.ios_command:
             commands:
