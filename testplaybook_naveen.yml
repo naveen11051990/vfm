@@ -1,6 +1,6 @@
 ---
 - name: Detect unused security policies on PAN-OS firewall
-  hosts: firewalls     # adjust as per your inventory
+  hosts: PRODUCTIONFIREWALL     # adjust as per your inventory
   connection: local
   gather_facts: false
 
