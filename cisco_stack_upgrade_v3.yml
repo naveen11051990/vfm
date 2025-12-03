@@ -1,7 +1,7 @@
 ---
 - name: Full Cisco 9300 Upgrade via TFTP (Mgmt-vrf)
   hosts: cisco_stack_switch
-  gather_facts: no
+  gather_facts: yes
   vars:
       ios_image_bin: "{{ ios_image_filename }}"
   tasks:
