@@ -5,7 +5,7 @@
   gather_facts: false
 
   vars:
-    provider:
+    device:
       ip_address: "{{ ip_address }}"
       username: "{{ username }}"
       password: "{{ password }}"
