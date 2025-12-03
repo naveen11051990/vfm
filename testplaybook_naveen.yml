@@ -1,15 +1,15 @@
 ---
 - name: Check for security rules missing required security profiles
-  hosts: PRODUCTIONFIREWALL   # change to your inventory or host/group
+  hosts: PRODUCTIONFIREWALL   # change to your inventory group or host
   connection: local
   gather_facts: false
 
   vars:
-    device:
+    provider:
       ip_address: "{{ ip_address }}"
       username: "{{ username }}"
       password: "{{ password }}"
-    # Define which profile-fields you consider “required”
+    # List of profile-fields to enforce
     required_profiles:
       - group_profile
       - antivirus
@@ -26,26 +26,10 @@
       paloaltonetworks.panos.panos_security_rule:
         provider: "{{ device }}"
         state: gathered
+        gathered_filter: "*"              # ← mandatory to gather all rules 
       register: sec_rules
 
-    - name: Filter rules missing any required profile
-      set_fact:
-        rules_missing_profiles: >-
-          {{
-            sec_rules.rules
-            | select(
-                # custom test: returns true if ANY required profile is missing or empty
-                lambda r:
-                  required_profiles | select(
-                    'search',
-                    # for each profile: treat missing or empty as match
-                    '^.*$'
-                  ) | list  # dummy, real logic below
-              )
-            | list
-          }}
-
-    - name: Filter rules missing profiles - correct approach
+    - name: Filter rules missing one or more required profiles
       set_fact:
         rules_missing_profiles: >-
           {{
@@ -53,31 +37,4 @@
             | select(
                 lambda r:
                   (
-                    (r.group_profile | default('') | length == 0) or
-                    (r.antivirus      | default('') | length == 0) or
-                    (r.vulnerability  | default('') | length == 0) or
-                    (r.spyware        | default('') | length == 0) or
-                    (r.url_filtering  | default('') | length == 0) or
-                    (r.file_blocking  | default('') | length == 0)
-                  )
-              )
-            | list
-          }}
-
-    - name: Show rules missing one or more security profiles
-      debug:
-        msg: |
-          Security rules missing required profiles:
-          {% if rules_missing_profiles %}
-            {% for r in rules_missing_profiles %}
-            - {{ r.rule_name | default(r.name) }}:
-              group_profile={{ r.group_profile | default('') }},
-              antivirus={{ r.antivirus | default('') }},
-              vulnerability={{ r.vulnerability | default('') }},
-              spyware={{ r.spyware | default('') }},
-              url_filtering={{ r.url_filtering | default('') }},
-              file_blocking={{ r.file_blocking | default('') }}
-            {% endfor %}
-          {% else %}
-            All security rules have at least one of the required security profiles.
-          {% endif %}
+                    (r.group_profile | default('')_
