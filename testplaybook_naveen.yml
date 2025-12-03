@@ -1,17 +1,15 @@
 ---
-- name: Detect unused security policies on PAN-OS firewall
-  hosts: PRODUCTIONFIREWALL     # update per your inventory
+- name: Detect unused security policies on PAN-OS firewall (defensive)
+  hosts: PRODUCTIONFIREWALL
   connection: local
   gather_facts: false
 
   vars:
-    provider:
+    device:
       ip_address: "{{ ip_address }}"
       username: "{{ username }}"
       password: "{{ password }}"
-      # port: 443 # optional
-
-    vsys_name: "vsys1"   # change if your firewall uses a different VSYS
+    vsys_name: "vsys1"
 
   collections:
     - paloaltonetworks.panos
@@ -19,7 +17,7 @@
   tasks:
     - name: Fetch rule hit-count for all security rules
       paloaltonetworks.panos.panos_op:
-        provider: "{{ provider }}"
+        provider: "{{ device }}"
         cmd: |
           <show>
             <rule-hit-count>
@@ -41,30 +39,47 @@
       register: hitcount_raw
       failed_when: false
 
-    - name: Convert XML output to dict
-      ansible.builtin.set_fact:
-        hitcount_struct: "{{ hitcount_raw.stdout | ansible.utils.from_xml }}"
+    - name: Check for returned data
+      ansible.builtin.debug:
+        msg: >
+          raw result keys: {{ hitcount_raw.keys() | list }}
 
-    - name: Extract rules with zero hit count
+    - name: Set parsed_hitcount based on available output
+      ansible.builtin.set_fact:
+        parsed_hitcount: >-
+          {%- if hitcount_raw.stdout_xml is defined and hitcount_raw.stdout_xml | length > 0 -%}
+            {{ hitcount_raw.stdout_xml | ansible.utils.from_xml }}
+          {%- elif hitcount_raw.stdout is defined and hitcount_raw.stdout | length > 0 -%}
+            {{ hitcount_raw.stdout | from_json }}
+          {%- else -%}
+            {}
+          {%- endif -%}
+
+    - name: Determine unused rules if hit-count data present
       ansible.builtin.set_fact:
         unused_rules: >-
-          {{
-            hitcount_struct.response.result['rule-hit-count'].vsys.entry
-            | map(attribute='entry.rule-base.entry.security.rules.entry')
-            | flatten
-            | selectattr('hit-count','equalto','0')
-            | map(attribute='@name')
-            | list
-          }}
+          {%- if parsed_hitcount.response is defined and parsed_hitcount.response.result is defined -%}
+            {{
+              parsed_hitcount.response.result['rule-hit-count'].vsys.entry
+              | map(attribute='entry.rule-base.entry.security.rules.entry')
+              | flatten
+              | selectattr('hit-count','equalto','0')
+              | map(attribute='@name')
+              | list
+            }}
+          {%- else -%}
+            []
+          {%- endif -%}
 
-    - name: Report unused security rules
+    - name: Report unused security rules (or warning if no data)
       ansible.builtin.debug:
-        msg: |
-          Unused security rules (zero hits) in VSYS "{{ vsys_name }}":
+        msg: >-
           {% if unused_rules %}
-            {% for r in unused_rules %}
-            - {{ r }}
-            {% endfor %}
+            Unused security rules (hit-count = 0): {{ unused_rules }}
           {% else %}
-            No unused rules found (or no hit-count data available).
+            {% if parsed_hitcount == {} %}
+              WARNING: No hit-count data returned — cannot determine unused rules.
+            {% else %}
+              No unused rules found (or hit-count data present, but all > 0).
+            {% endif %}
           {% endif %}
