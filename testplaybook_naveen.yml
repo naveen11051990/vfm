@@ -1,6 +1,6 @@
 ---
-- name: Check for security rules missing required security profiles
-  hosts: PRODUCTIONFIREWALL   # change to your inventory group or host
+- name: Detect security rules missing required security profiles
+  hosts: PRODUCTIONFIREWALL    # change to your inventory group or host
   connection: local
   gather_facts: false
 
@@ -9,7 +9,6 @@
       ip_address: "{{ ip_address }}"
       username: "{{ username }}"
       password: "{{ password }}"
-    # List of profile-fields to enforce
     required_profiles:
       - group_profile
       - antivirus
@@ -26,15 +25,38 @@
       paloaltonetworks.panos.panos_security_rule:
         provider: "{{ device }}"
         state: gathered
-        gathered_filter: "*"              # ← mandatory to gather all rules 
+        gathered_filter: "*"   # mandatory to fetch rules. :contentReference[oaicite:2]{index=2}
       register: sec_rules
 
-    - name: Filter rules missing one or more required profiles
+    - name: Initialize list for non-compliant rules
+      ansible.builtin.set_fact:
+        rules_missing_profiles: []
+
+    - name: Identify rules missing one or more required profiles
+      loop: "{{ sec_rules.rules }}"
+      vars:
+        r: "{{ item }}"
+      when: >
+        (r.group_profile   | default('') | length == 0) or
+        (r.antivirus       | default('') | length == 0) or
+        (r.vulnerability   | default('') | length == 0) or
+        (r.spyware         | default('') | length == 0) or
+        (r.url_filtering   | default('') | length == 0) or
+        (r.file_blocking   | default('') | length == 0)
       set_fact:
-        rules_missing_profiles: >-
-          {{
-            sec_rules.rules
-            | select(
-                lambda r:
-                  (
-                    (r.group_profile | default('')_
+        rules_missing_profiles: "{{ rules_missing_profiles + [ r ] }}"
+
+    - name: Report rules missing required profile(s)
+      ansible.builtin.debug:
+        msg: |
+          Security rules missing required profiles:
+          {% if rules_missing_profiles %}
+            {% for r in rules_missing_profiles %}
+            - {{ r.rule_name | default(r.name) }}:
+              {% for p in required_profiles %}
+                * {{ p }} = {{ (r[p] | default('None')) }}
+              {% endfor %}
+            {% endfor %}
+          {% else %}
+            All security rules have at least one of the defined security profiles.
+          {% endif %}
