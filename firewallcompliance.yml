@@ -101,6 +101,15 @@
             | list
           }}
 
+    - name: Filter rules without URL filtering profile
+      set_fact:
+        rules_no_url_filter: >-
+          {{
+            sec_rules.rules
+            | selectattr('url_filtering', 'equalto', None)
+            | list
+          }}
+
     - name: Find security rules where logging is not enabled
       set_fact:
         rules_without_logging: >-
