@@ -52,6 +52,19 @@
           ha_initial_role: "{{ (ha_facts.ansible_facts.ansible_net_ha_localstate | default('unknown')) | lower }}"
           ha_group_id: "{{ ha_facts.ansible_facts.ansible_net_ha_group_id | default('1') }}"
 
+    - name: Debug - Extract and display HA section
+      ansible.builtin.debug:
+        var: ha_cfg.ansible_facts.ansible_net_config
+      when: false
+
+    - name: Debug - Show HA section
+      ansible.builtin.set_fact:
+        ha_section: "{{ ha_cfg.ansible_facts.ansible_net_config | regex_search('(?s)<high-availability>.*?</high-availability>') | default('NOT FOUND') }}"
+
+    - name: Display HA section
+      ansible.builtin.debug:
+        msg: "{{ ha_section }}"
+
     - name: Discover HA interface wiring from running config
       ansible.builtin.set_fact:
         ha1_ip_address: >-
