@@ -52,21 +52,9 @@
           ha_initial_role: "{{ (ha_facts.ansible_facts.ansible_net_ha_localstate | default('unknown')) | lower }}"
           ha_group_id: "{{ ha_facts.ansible_facts.ansible_net_ha_group_id | default('1') }}"
 
-    - name: Debug - Check config type and length
+    - name: Debug - Extract HA section from config
       ansible.builtin.debug:
-        msg: "Config type: {{ ha_cfg.ansible_facts.ansible_net_config | type_debug }}, Length: {{ ha_cfg.ansible_facts.ansible_net_config | length }}"
-
-    - name: Debug - Show first 2000 chars of config
-      ansible.builtin.debug:
-        msg: "{{ ha_cfg.ansible_facts.ansible_net_config[:2000] }}"
-
-    - name: Debug - Search for any 'high-availability' text
-      ansible.builtin.debug:
-        msg: "Found HA config: {{ 'high-availability' in ha_cfg.ansible_facts.ansible_net_config }}"
-
-    - name: Debug - Search for any 'interface' text
-      ansible.builtin.debug:
-        msg: "Found interface config: {{ 'interface' in ha_cfg.ansible_facts.ansible_net_config }}"
+        msg: "{{ ha_cfg.ansible_facts.ansible_net_config | regex_search('(?s)<high-availability>.*?</high-availability>') }}"
 
     - name: Discover HA interface wiring from running config
       ansible.builtin.set_fact:
