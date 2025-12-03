@@ -1,6 +1,6 @@
 ---
-- name: Detect unused security policies on PAN-OS firewall (defensive)
-  hosts: PRODUCTIONFIREWALL
+- name: Check for security rules missing required security profiles
+  hosts: PRODUCTIONFIREWALL   # change to your inventory or host/group
   connection: local
   gather_facts: false
 
@@ -9,77 +9,75 @@
       ip_address: "{{ ip_address }}"
       username: "{{ username }}"
       password: "{{ password }}"
-    vsys_name: "vsys1"
+    # Define which profile-fields you consider “required”
+    required_profiles:
+      - group_profile
+      - antivirus
+      - vulnerability
+      - spyware
+      - url_filtering
+      - file_blocking
 
   collections:
     - paloaltonetworks.panos
 
   tasks:
-    - name: Fetch rule hit-count for all security rules
-      paloaltonetworks.panos.panos_op:
+    - name: Gather all security rules
+      paloaltonetworks.panos.panos_security_rule:
         provider: "{{ device }}"
-        cmd: |
-          <show>
-            <rule-hit-count>
-              <vsys>
-                <vsys-name>
-                  <entry name='{{ vsys_name }}'>
-                    <rule-base>
-                      <entry name='security'>
-                        <rules>
-                          <all/>
-                        </rules>
-                      </entry>
-                    </rule-base>
-                  </entry>
-                </vsys-name>
-              </vsys>
-            </rule-hit-count>
-          </show>
-      register: hitcount_raw
-      failed_when: false
+        state: gathered
+      register: sec_rules
 
-    - name: Check for returned data
-      ansible.builtin.debug:
-        msg: >
-          raw result keys: {{ hitcount_raw.keys() | list }}
+    - name: Filter rules missing any required profile
+      set_fact:
+        rules_missing_profiles: >-
+          {{
+            sec_rules.rules
+            | select(
+                # custom test: returns true if ANY required profile is missing or empty
+                lambda r:
+                  required_profiles | select(
+                    'search',
+                    # for each profile: treat missing or empty as match
+                    '^.*$'
+                  ) | list  # dummy, real logic below
+              )
+            | list
+          }}
 
-    - name: Set parsed_hitcount based on available output
-      ansible.builtin.set_fact:
-        parsed_hitcount: >-
-          {%- if hitcount_raw.stdout_xml is defined and hitcount_raw.stdout_xml | length > 0 -%}
-            {{ hitcount_raw.stdout_xml | ansible.utils.from_xml }}
-          {%- elif hitcount_raw.stdout is defined and hitcount_raw.stdout | length > 0 -%}
-            {{ hitcount_raw.stdout | from_json }}
-          {%- else -%}
-            {}
-          {%- endif -%}
+    - name: Filter rules missing profiles - correct approach
+      set_fact:
+        rules_missing_profiles: >-
+          {{
+            sec_rules.rules
+            | select(
+                lambda r:
+                  (
+                    (r.group_profile | default('') | length == 0) or
+                    (r.antivirus      | default('') | length == 0) or
+                    (r.vulnerability  | default('') | length == 0) or
+                    (r.spyware        | default('') | length == 0) or
+                    (r.url_filtering  | default('') | length == 0) or
+                    (r.file_blocking  | default('') | length == 0)
+                  )
+              )
+            | list
+          }}
 
-    - name: Determine unused rules if hit-count data present
-      ansible.builtin.set_fact:
-        unused_rules: >-
-          {%- if parsed_hitcount.response is defined and parsed_hitcount.response.result is defined -%}
-            {{
-              parsed_hitcount.response.result['rule-hit-count'].vsys.entry
-              | map(attribute='entry.rule-base.entry.security.rules.entry')
-              | flatten
-              | selectattr('hit-count','equalto','0')
-              | map(attribute='@name')
-              | list
-            }}
-          {%- else -%}
-            []
-          {%- endif -%}
-
-    - name: Report unused security rules (or warning if no data)
-      ansible.builtin.debug:
-        msg: >-
-          {% if unused_rules %}
-            Unused security rules (hit-count = 0): {{ unused_rules }}
+    - name: Show rules missing one or more security profiles
+      debug:
+        msg: |
+          Security rules missing required profiles:
+          {% if rules_missing_profiles %}
+            {% for r in rules_missing_profiles %}
+            - {{ r.rule_name | default(r.name) }}:
+              group_profile={{ r.group_profile | default('') }},
+              antivirus={{ r.antivirus | default('') }},
+              vulnerability={{ r.vulnerability | default('') }},
+              spyware={{ r.spyware | default('') }},
+              url_filtering={{ r.url_filtering | default('') }},
+              file_blocking={{ r.file_blocking | default('') }}
+            {% endfor %}
           {% else %}
-            {% if parsed_hitcount == {} %}
-              WARNING: No hit-count data returned — cannot determine unused rules.
-            {% else %}
-              No unused rules found (or hit-count data present, but all > 0).
-            {% endif %}
+            All security rules have at least one of the required security profiles.
           {% endif %}
