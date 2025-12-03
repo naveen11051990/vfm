@@ -15,7 +15,23 @@
     - paloaltonetworks.panos
 
   tasks:
-    - name: Get facts
+    ---
+- name: Get PAN-OS HA status and assert compliance
+  hosts: PRODUCTIONFIREWALL
+  connection: local
+  gather_facts: false
+
+  vars:
+    device:
+      ip_address: "{{ ip_address }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+
+  collections:
+    - paloaltonetworks.panos
+
+  tasks:
+    - name: Get facts (including HA info)
       paloaltonetworks.panos.panos_facts:
         provider: '{{ device }}'
         gather_subset: ['ha']
@@ -24,3 +40,12 @@
     - name: output data for ha
       debug:
         var: ha_status
+
+    - name: Check compliance — HA must be enabled
+      ansible.builtin.assert:
+        that:
+          - ha_status.ansible_net_ha_enabled is defined
+          - ha_status.ansible_net_ha_enabled | bool
+        success_msg: "COMPLIANT: HA is enabled"
+        fail_msg: "NON-COMPLIANT: HA is NOT enabled"
+
