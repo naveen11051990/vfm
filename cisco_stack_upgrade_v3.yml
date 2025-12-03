@@ -2,6 +2,8 @@
 - name: Full Cisco 9300 Upgrade via TFTP (Mgmt-vrf)
   hosts: cisco_stack_switch
   gather_facts: no
+  vars:
+    ios_image_bin: "{{ ios_image_filename }}"
   tasks:
     - name: Pre-check | Version
       cisco.ios.ios_command:
@@ -67,10 +69,9 @@
     - name: Copy image from TFTP to flash using Mgmt-vrf
       cisco.ios.ios_command:
         commands:
-          - command: copy tftp://192.168.29.208/cat9k_iosxe.17.13.01.SPA.bin
-              flash:cat9k_iosxe.17.13.01.SPA.bin vrf Mgmt-vrf
+          - command: "copy tftp://192.168.29.208/{{ ios_image_bin }} flash:{{ ios_image_bin }} vrf Mgmt-vrf"
             prompt: Destination filename
-            answer: cat9k_iosxe.17.13.01.SPA.bin
+            answer: "{{ ios_image_bin }}"
       register: copy_output
       vars:
         ansible_command_timeout: 600
@@ -80,7 +81,7 @@
     - name: Verify image exists in flash
       cisco.ios.ios_command:
         commands:
-          - dir flash:cat9k_iosxe.17.13.01.SPA.bin
+          - "dir flash:{{ ios_image_bin }}"
       register: dir_output
     - name: Show dir result
       debug:
@@ -116,7 +117,7 @@
     - name: Run install add/activate/commit to convert to install mode
       cisco.ios.ios_command:
         commands:
-          - command: install add file flash:cat9k_iosxe.17.13.01.SPA.bin activate commit
+          - command: "install add file flash:{{ ios_image_bin }} activate commit"
             prompt:
               - Do you want to proceed
               - This operation requires a reload
