@@ -1,71 +1,38 @@
 ---
-- name: FortiGate Pre-Upgrade Backup + Firmware Upgrade via FortiManager
-  hosts: fortigate_devices   # inventory group or host list for FortiGate(s) you want to upgrade
+- name: FortiGate HA Pre-Upgrade Backup
+  hosts: fortigates
   gather_facts: no
-  vars:
-    vdom: "root"
-    ansible_httpapi_use_ssl: true
-    ansible_httpapi_validate_certs: false
-    ansible_httpapi_port: 443
-    # Provide your FortiGate API credentials or access token
-    fortios_access_token: "{{ lookup('env','FGT_API_TOKEN') }}"
-    # Provide FortiManager details (if needed in inventory) or define separately
-    fmg_host: "fortimanager.mydomain.local"
-    fmg_adom: "Root"            # adjust as per your ADOM naming
-    fmg_devprof: "FGT_Devices"  # device profile name in FMG (adjust)
-    firmware_image: "FGT-VM64-KVM-v7.2.6.out"   # example firmware file name
-
   tasks:
     - name: Backup current FortiGate configuration (global) before upgrade
       fortinet.fortios.fortios_system_config_backup_restore:
-        access_token: "{{ fortios_access_token }}"
+        username: "{{ ansible_user }}"
+        password: "{{ ansible_password }}"
         vdom: "{{ vdom }}"
-        # backup flag: true indicates backup
         backup: yes
-        filename: "backup_{{ inventory_hostname }}_{{ ansible_date_time.iso8601 }}.conf"
+        filename: "backup_{{ inventory_hostname }}_pre_upgrade_{{ ansible_date_time.iso8601 }}.conf"
       register: cfg_backup
 
-    - name: (Optional) Save backup content locally on Ansible controller
+    - name: Save backup content locally on Ansible controller
       copy:
         content: "{{ cfg_backup }}"
         dest: "./backups/{{ inventory_hostname }}_pre_upgrade_{{ ansible_date_time.iso8601 }}.conf"
 
-    - name: Add/Ensure FortiGate is managed by FortiManager (if not already)
-      # Optional: only if you want to ensure central management settings
-      fortinet.fortios.fortios_system_fortimanager:
-        vdom: "{{ vdom }}"
-        system_fortimanager:
-          central_management: "enable"
-          central_mgmt_auto_backup: "enable"
-          central_mgmt_schedule_config_restore: "disable"
-          central_mgmt_schedule_script_restore: "disable"
-          ip: "{{ fmg_host }}"
-          ipsec: "enable"
-      when: false  # <-- set to true if you need to (re)configure FMG settings
-
-- name: Trigger Firmware upgrade via FortiManager
-  hosts: fortimanager   # inventory host for your FortiManager
+- name: Trigger Firmware upgrade of HA cluster via FortiManager
+  hosts: fortimanager
   gather_facts: no
   collections:
     - fortinet.fortimanager
   vars:
-    ansible_httpapi_use_ssl: true
-    ansible_httpapi_validate_certs: false
-    ansible_httpapi_port: 443
-    adom: "{{ fmg_adom }}"
-    devprof: "{{ fmg_devprof }}"
-    firmware_file: "{{ firmware_image }}"
+    adom: "Root"                   # adjust as per your ADOM name
+    devprof: "FGT_Devices"         # adjust as per your device profile
+    firmware_file: "FGT-VM64-KVM-v7.2.6.out"   # adjust as per your target firmware
+    target_device: "fgt-fw1"       # FMG’s device name for the HA cluster
   tasks:
-    - name: Upload firmware image to FortiManager (if not already)
-      # (Optional step) — depends on whether image is already on FMG
-      # You may need to use fmgr API module to upload. Implementation skipped.
-
-    - name: Push firmware upgrade to FortiGate via FortiManager
+    - name: Push firmware upgrade to FortiGate HA cluster
       fmgr_um_image_upgrade_ext:
         adom: "{{ adom }}"
-        device: "{{ inventory_hostname }}"
+        device: "{{ target_device }}"
         image: "{{ firmware_file }}"
-        # Other parameters optionally: schedule, force, backup-before-upgrade etc.
       register: upgrade_result
 
     - name: Show result of firmware upgrade push
