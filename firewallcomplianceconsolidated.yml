@@ -145,7 +145,7 @@
           (None found)
           {% endfor %}
 
-        msg: |
+        
           Insecure any-any rules:
           {% for rule in any_any_insecure_rules %}
           - {{ rule.rule_name | default(rule.name) }}
@@ -153,7 +153,7 @@
           (None found)
           {% endfor %}
 
-        msg: |
+        
           Security rules where user based policies are enabled:
           {% for rule in user_based_rules %}
           - {{ rule.rule_name | default(rule.name) }} → source_user: {{ rule.source_user }}
@@ -161,7 +161,7 @@
           (No user-based security rules found)
           {% endfor %}
 
-        msg: |
+        
           Decryption rules (action = decrypt or decrypt-and-forward):
           {% for rule in decrypt_rules %}
           - {{ rule.name }} → action: {{ rule.action }}, decryption_type: {{ rule.decryption_type }}
@@ -169,7 +169,7 @@
           (No decrypt rules found)
           {% endfor %}
 
-        msg: |
+        
           Security rules missing one or more mandatory profiles:
           {% for rule in rules_missing_profiles %}
           - {{ rule.rule_name | default(rule.name) }}:
@@ -182,7 +182,7 @@
           (All rules have at least one of the required profiles or a profile group.)
           {% endfor %}
 
-        msg: |
+        
           The following security rules do NOT have logging enabled (neither start nor end):
           {% for rule in rules_without_logging %}
           - {{ rule.rule_name | default(rule.name) }}: log_start={{ rule.log_start }}, log_end={{ rule.log_end }}
