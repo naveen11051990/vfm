@@ -1,4 +1,5 @@
 ---
+# Play 1: Backup FortiGate HA configuration before upgrade
 - name: Backup FortiGate HA configuration before upgrade
   hosts: fortigates
   gather_facts: false
@@ -20,6 +21,7 @@
         content: "{{ cfg_backup }}"
         dest: "./backups/{{ inventory_hostname }}_pre_upgrade_{{ ansible_date_time.iso8601 }}.conf"
 
+# Play 2: Trigger firmware upgrade on FortiGate HA via FortiManager
 - name: Trigger firmware upgrade on FortiGate HA via FortiManager
   hosts: fortimanager
   gather_facts: false
@@ -30,7 +32,7 @@
     adom: "Root"                # adjust as per your ADOM name
     devprof: "FGT_Devices"      # adjust as per your FMG device profile
     firmware_file: "FGT-VM64-KVM-v7.2.6.out"  # adjust to your firmware image
-    target_device: "fgt-fw1"    # the FMG-managed device name (HA cluster)
+    target_device: "fgt-fw1"    # the FMG-managed device name for HA cluster
   tasks:
     - name: Push firmware upgrade to FortiGate HA cluster
       fmgr_um_image_upgrade_ext:
