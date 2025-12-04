@@ -1,32 +1,36 @@
 ---
-- name: FortiGate HA Pre-Upgrade Backup
+- name: Backup FortiGate HA configuration before upgrade
   hosts: fortigates
-  gather_facts: no
+  gather_facts: false
+  connection: httpapi
+  collections:
+    - fortinet.fortios
+  vars:
+    vdom: "root"
   tasks:
-    - name: Backup current FortiGate configuration (global) before upgrade
+    - name: Backup current FortiGate configuration (global)
       fortinet.fortios.fortios_system_config_backup_restore:
-        username: "{{ ansible_user }}"
-        password: "{{ ansible_password }}"
         vdom: "{{ vdom }}"
         backup: yes
         filename: "backup_{{ inventory_hostname }}_pre_upgrade_{{ ansible_date_time.iso8601 }}.conf"
       register: cfg_backup
 
-    - name: Save backup content locally on Ansible controller
+    - name: Save backup locally on Ansible controller
       copy:
         content: "{{ cfg_backup }}"
         dest: "./backups/{{ inventory_hostname }}_pre_upgrade_{{ ansible_date_time.iso8601 }}.conf"
 
-- name: Trigger Firmware upgrade of HA cluster via FortiManager
+- name: Trigger firmware upgrade on FortiGate HA via FortiManager
   hosts: fortimanager
-  gather_facts: no
+  gather_facts: false
+  connection: httpapi
   collections:
     - fortinet.fortimanager
   vars:
-    adom: "Root"                   # adjust as per your ADOM name
-    devprof: "FGT_Devices"         # adjust as per your device profile
-    firmware_file: "FGT-VM64-KVM-v7.2.6.out"   # adjust as per your target firmware
-    target_device: "fgt-fw1"       # FMG’s device name for the HA cluster
+    adom: "Root"                # adjust as per your ADOM name
+    devprof: "FGT_Devices"      # adjust as per your FMG device profile
+    firmware_file: "FGT-VM64-KVM-v7.2.6.out"  # adjust to your firmware image
+    target_device: "fgt-fw1"    # the FMG-managed device name (HA cluster)
   tasks:
     - name: Push firmware upgrade to FortiGate HA cluster
       fmgr_um_image_upgrade_ext:
