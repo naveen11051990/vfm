@@ -18,6 +18,12 @@
 
 ## Rework
 
+### HA OS Upgrade Module Cleanup
+
+- [ ] Draft implementation plan (see `plans/rework_ha_os_upgrade_module_cleanup_plan.md`).
+- [ ] Replace content and antivirus handling with official modules (no regex/job-id parsing).
+- [ ] Toggle HA config sync and pre/post commit waits using official modules, minimizing XML/regex parsing.
+
 # DONE
 
 ### HA Config Sync Guardrails
