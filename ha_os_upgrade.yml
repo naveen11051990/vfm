@@ -197,11 +197,12 @@
           - ha
         force_fail: true
 
-    - name: Disable config sync using HA module
-      paloaltonetworks.panos.panos_ha:
+    - name: Disable config sync (HA module not reliable with existing HA2 wiring)
+      paloaltonetworks.panos.panos_type_cmd:
         provider: "{{ device }}"
-        ha_config_sync: false
-        state: present
+        cmd: set
+        xpath: "/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/group/configuration-synchronization"
+        element: "<enabled>no</enabled>"
 
     - name: Commit HA change (config sync disabled)
       paloaltonetworks.panos.panos_commit_firewall:
@@ -327,11 +328,12 @@
               password: "{{ hostvars[active_host].password }}"
             cmd: "request high-availability state functional"
 
-    - name: Re-enable config sync using HA module
-      paloaltonetworks.panos.panos_ha:
+    - name: Re-enable config sync
+      paloaltonetworks.panos.panos_type_cmd:
         provider: "{{ device }}"
-        ha_config_sync: true
-        state: present
+        cmd: set
+        xpath: "/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/group/configuration-synchronization"
+        element: "<enabled>yes</enabled>"
 
     - name: Commit HA change (config sync enabled)
       paloaltonetworks.panos.panos_commit_firewall:
