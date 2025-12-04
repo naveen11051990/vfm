@@ -340,12 +340,6 @@
         provider: "{{ device }}"
         description: "Re-enable HA config sync after OS upgrade"
 
-    - name: Force running-config sync from initial active back to peer
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "<request><high-availability><sync-to-remote><type>running-config</type></sync-to-remote></high-availability></request>"
-        cmd_is_xml: true
-      when: inventory_hostname == hostvars['localhost'].ha_active_host
 
     - name: Ensure original active regains active role if needed
       run_once: true
@@ -431,16 +425,6 @@
       delay: 30
       when: is_initial_passive
 
-    - name: Force config sync from current active after failback
-      run_once: true
-      paloaltonetworks.panos.panos_op:
-        provider:
-          ip_address: "{{ hostvars[current_active_host | default(hostvars['localhost'].ha_active_host, true)].ip_address }}"
-          username: "{{ hostvars[current_active_host | default(hostvars['localhost'].ha_active_host, true)].username }}"
-          password: "{{ hostvars[current_active_host | default(hostvars['localhost'].ha_active_host, true)].password }}"
-        cmd: "<request><high-availability><sync-to-remote><type>running-config</type></sync-to-remote></high-availability></request>"
-        cmd_is_xml: true
-      when: current_active_host | default('') | length > 0
 
     - name: Wait for configuration synchronization to complete on both peers
       paloaltonetworks.panos.panos_op:
