@@ -22,12 +22,61 @@
   delay: 15
   no_log: true
 
-- name: Install latest anti-virus update via official module
-  paloaltonetworks.panos.panos_dynamic_updates:
+- name: Refresh antivirus update index
+  paloaltonetworks.panos.panos_op:
     provider: "{{ device }}"
-    update_type: anti-virus
-    sync_to_peer: true
-  register: antivirus_update
+    cmd: "request anti-virus upgrade check"
+
+- name: Download latest antivirus update
+  paloaltonetworks.panos.panos_op:
+    provider: "{{ device }}"
+    cmd: "request anti-virus upgrade download latest"
+  register: antivirus_download
+
+- name: Extract job ID for antivirus download
+  ansible.builtin.set_fact:
+    antivirus_download_jobid: "{{ antivirus_download.stdout_xml | default('') | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}"
+
+- name: Wait for antivirus download job to complete
+  paloaltonetworks.panos.panos_op:
+    provider: "{{ device }}"
+    cmd: "<show><jobs><id>{{ antivirus_download_jobid }}</id></jobs></show>"
+    cmd_is_xml: true
+  register: antivirus_download_result
+  until: antivirus_download_result.stdout_xml is search('<status>FIN</status>')
+  retries: 300
+  delay: 10
+  failed_when: antivirus_download_result.stdout_xml is search('<result>FAIL</result>')
+  when: antivirus_download_jobid | length > 0
+  no_log: true
+
+- name: Install latest antivirus update
+  paloaltonetworks.panos.panos_op:
+    provider: "{{ device }}"
+    cmd: "request anti-virus upgrade install version latest"
+  register: antivirus_install
+
+- name: Extract job ID for antivirus install
+  ansible.builtin.set_fact:
+    antivirus_install_jobid: "{{ antivirus_install.stdout_xml | default('') | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}"
+
+- name: Wait for antivirus install job to complete
+  paloaltonetworks.panos.panos_op:
+    provider: "{{ device }}"
+    cmd: "<show><jobs><id>{{ antivirus_install_jobid }}</id></jobs></show>"
+    cmd_is_xml: true
+  register: antivirus_install_result
+  until: >
+    antivirus_install_result.stdout_xml is search('<status>FIN</status>') or
+    antivirus_install_result.stdout_xml is search('<status>FAIL</status>')
+  retries: 300
+  delay: 10
+  failed_when: >
+    (antivirus_install_result.stdout_xml is search('<status>FIN</status>') and
+     antivirus_install_result.stdout_xml is search('<result>FAIL</result>')) or
+    antivirus_install_result.stdout_xml is search('<status>FAIL</status>')
+  when: antivirus_install_jobid | length > 0
+  no_log: true
 
 - name: Wait for device readiness after anti-virus install
   paloaltonetworks.panos.panos_check:
@@ -38,6 +87,16 @@
   delay: 15
   no_log: true
 
+- name: Query installed antivirus package information
+  paloaltonetworks.panos.panos_op:
+    provider: "{{ device }}"
+    cmd: "<request><anti-virus><upgrade><info></info></upgrade></anti-virus></request>"
+    cmd_is_xml: true
+  register: antivirus_info_raw
+
 - name: Cache antivirus version fact
   ansible.builtin.set_fact:
-    ha_antivirus_version: "{{ antivirus_update.anti_virus | default('unknown') }}"
+    ha_antivirus_version: >-
+      {{ (antivirus_info_raw.stdout_xml | default(''))
+          | regex_findall('(?s)<entry>.*?<version>([^<]+)</version>.*?<current>yes</current>.*?</entry>')
+          | first | default('unknown') }}
