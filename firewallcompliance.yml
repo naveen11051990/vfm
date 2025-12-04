@@ -158,7 +158,7 @@
     - name: Security rules where user based policies are enabled
       ansible.builtin.debug:
         msg: |
-          Security rules with specific source_user:
+          Security rules where user based policies are enabled:
           {% for rule in user_based_rules %}
           - {{ rule.rule_name | default(rule.name) }} → source_user: {{ rule.source_user }}
           {% else %}
