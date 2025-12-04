@@ -135,7 +135,7 @@
             Content version : {{ readiness.response.content_version.state | default(false) | ternary('PASS','FAIL') }} ({{ readiness.response.content_version.reason | default('') }})
 
 
-    - name: Rules without description
+    - name: Consolidated compliance report
       ansible.builtin.debug:
         msg: |
           The following security rules are missing descriptions:
