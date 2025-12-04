@@ -190,8 +190,7 @@
           (All rules have logging on at least at start or end.)
           {% endfor %}
 
-    - name: NTP HA and Content updates validation
-      debug:
-        msg: "{{ compliance_status }}"
+           NTP sync, HA and Content update status:
+           {{ compliance_status }}"
 
   
