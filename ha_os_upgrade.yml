@@ -427,6 +427,7 @@
 
 
 
+
     - name: Re-validate HA1 control channel after upgrade
       paloaltonetworks.panos.panos_active_in_ha:
         provider:
