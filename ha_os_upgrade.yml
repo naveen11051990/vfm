@@ -423,13 +423,17 @@
         description: "Re-enable HA config sync after OS upgrade"
 
     - name: Force running-config sync from original active back to peer
+      run_once: true
       paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
+        provider:
+          ip_address: "{{ hostvars[hostvars['localhost'].ha_active_host].ip_address }}"
+          username: "{{ hostvars[hostvars['localhost'].ha_active_host].username }}"
+          password: "{{ hostvars[hostvars['localhost'].ha_active_host].password }}"
         cmd: "request high-availability sync-to-remote running-config"
       register: ha_sync_job
-      when: inventory_hostname == hostvars['localhost'].ha_active_host
 
     - name: Wait for HA sync job to complete on peer
+      run_once: true
       paloaltonetworks.panos.panos_op:
         provider:
           ip_address: "{{ hostvars[hostvars['localhost'].ha_passive_host].ip_address }}"
@@ -441,7 +445,6 @@
       retries: 60
       delay: 5
       until: peer_jobs.stdout_xml | regex_findall('<description>HA Sync Config[^<]*</description>') | length == 0
-      when: inventory_hostname == hostvars['localhost'].ha_active_host
 
     - name: Re-validate HA1 control channel after upgrade
       paloaltonetworks.panos.panos_active_in_ha:
