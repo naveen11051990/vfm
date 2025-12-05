@@ -436,24 +436,17 @@
       when: inventory_hostname == hostvars['localhost'].ha_active_host
 
     - name: Wait for HA sync job to complete on peer
-      block:
-        - name: Query peer job queue for HA sync completion
-          paloaltonetworks.panos.panos_op:
-            provider:
-              ip_address: "{{ hostvars[hostvars['localhost'].ha_passive_host].ip_address }}"
-              username: "{{ hostvars[hostvars['localhost'].ha_passive_host].username }}"
-              password: "{{ hostvars[hostvars['localhost'].ha_passive_host].password }}"
-            cmd: "<show><jobs><all></all></jobs></show>"
-            cmd_is_xml: true
-          register: peer_jobs
-
-        - name: Check if HA Sync Config job is still running
-          ansible.builtin.set_fact:
-            ha_sync_still_running: "{{ peer_jobs.stdout_xml | regex_findall('<description>HA Sync Config[^<]*</description>') | length > 0 }}"
-
+      paloaltonetworks.panos.panos_op:
+        provider:
+          ip_address: "{{ hostvars[hostvars['localhost'].ha_passive_host].ip_address }}"
+          username: "{{ hostvars[hostvars['localhost'].ha_passive_host].username }}"
+          password: "{{ hostvars[hostvars['localhost'].ha_passive_host].password }}"
+        cmd: "<show><jobs><all></all></jobs></show>"
+        cmd_is_xml: true
+      register: peer_jobs
       retries: 60
       delay: 5
-      until: not ha_sync_still_running
+      until: peer_jobs.stdout_xml | regex_findall('<description>HA Sync Config[^<]*</description>') | length == 0
       when: inventory_hostname == hostvars['localhost'].ha_active_host
 
     - name: Re-validate HA1 control channel after upgrade
