@@ -1,0 +1,488 @@
+---
+- name: PAN-OS HA Upgrade Playbook v2
+  hosts: "{{ hosts | default('PA-HA') }}"
+  connection: local
+  gather_facts: false
+
+  vars:
+    device:
+      ip_address: "{{ ip_address }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+
+    backup_directory: "{{ lookup('env', 'PANOS_BACKUP_DIR') | default('/runner/backups', true) }}"
+
+  collections:
+    - paloaltonetworks.panos
+
+  tasks:
+    # ========================================================================
+    # Identify Active-Passive Peers
+    # ========================================================================
+    - name: Gather HA and system facts from all peers
+      paloaltonetworks.panos.panos_facts:
+        provider: "{{ device }}"
+        gather_subset: ["system", "ha"]
+      register: ha_facts
+
+    - name: Record HA runtime snapshot for this device
+      ansible.builtin.set_fact:
+        ha_runtime:
+          inventory_hostname: "{{ inventory_hostname }}"
+          hostname: "{{ ha_facts.ansible_facts.ansible_net_hostname }}"
+          ha_enabled: "{{ (ha_facts.ansible_facts.ansible_net_ha_enabled | default(false)) | bool }}"
+          ha_mode: "{{ (ha_facts.ansible_facts.ansible_net_ha_localmode | default('unknown')) | lower }}"
+          ha_role: "{{ (ha_facts.ansible_facts.ansible_net_ha_localstate | default('unknown')) | lower }}"
+
+    - name: Validate HA1 control channel via Upgrade Assurance
+      paloaltonetworks.panos.panos_active_in_ha:
+        provider: "{{ device }}"
+      register: ha_check
+
+    - name: Consolidate HA topology view (run_once)
+      run_once: true
+      delegate_to: localhost
+      delegate_facts: true
+      vars:
+        ha_topology: "{{ ansible_play_hosts_all | map('extract', hostvars, 'ha_runtime') | list }}"
+      block:
+        - name: Validate HA pair configuration
+          ansible.builtin.assert:
+            that:
+              - ha_topology | length == 2
+              - (ha_topology | map(attribute='ha_enabled') | min)
+              - (ha_topology | map(attribute='ha_mode') | unique) == ['active-passive']
+              - (ha_topology | selectattr('ha_role', 'equalto', 'active') | list | length) == 1
+              - (ha_topology | selectattr('ha_role', 'equalto', 'passive') | list | length) == 1
+            fail_msg: "Playbook requires exactly two nodes in active/passive HA configuration"
+
+        - name: Set HA host variables
+          ansible.builtin.set_fact:
+            ha_active_host: "{{ (ha_topology | selectattr('ha_role', 'equalto', 'active') | first).inventory_hostname }}"
+            ha_passive_host: "{{ (ha_topology | selectattr('ha_role', 'equalto', 'passive') | first).inventory_hostname }}"
+            ha_topology_snapshot: "{{ ha_topology }}"
+
+    - name: Mark original HA roles per device
+      ansible.builtin.set_fact:
+        is_original_active: "{{ ha_runtime.ha_role == 'active' }}"
+        is_original_passive: "{{ ha_runtime.ha_role == 'passive' }}"
+
+    # ========================================================================
+    # Check if Configs are Synced
+    # ========================================================================
+    - name: Verify HA readiness and config sync on both peers
+      paloaltonetworks.panos.panos_readiness_checks:
+        provider: "{{ device }}"
+        checks:
+          - ha
+        force_fail: true
+
+    # ========================================================================
+    # Configuration Backup (Both Peers)
+    # ========================================================================
+    - name: Generate timestamp for backups
+      ansible.builtin.set_fact:
+        backup_timestamp: "{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}"
+      run_once: true
+
+    - name: Backup running configuration
+      paloaltonetworks.panos.panos_export:
+        provider: "{{ device }}"
+        category: configuration
+        filename: "{{ backup_directory }}/{{ inventory_hostname }}-running-config-{{ backup_timestamp }}.xml"
+        create_directory: true
+
+    # ========================================================================
+    # Tech-Support Backup (Both Peers)
+    # ========================================================================
+    - name: Capture tech-support bundle before upgrade
+      paloaltonetworks.panos.panos_export:
+        provider: "{{ device }}"
+        category: tech-support
+        filename: "{{ backup_directory }}/{{ inventory_hostname }}-tech-support-{{ backup_timestamp }}.tgz"
+        create_directory: true
+
+    # ========================================================================
+    # Disable Config Sync
+    # ========================================================================
+    - name: Disable HA config synchronization
+      paloaltonetworks.panos.panos_type_cmd:
+        provider: "{{ device }}"
+        cmd: set
+        xpath: "/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/group/configuration-synchronization"
+        element: "<enabled>no</enabled>"
+
+    - name: Commit HA configuration change (config sync disabled)
+      paloaltonetworks.panos.panos_commit_firewall:
+        provider: "{{ device }}"
+        description: "Disable HA config sync before upgrade"
+
+    - name: Verify HA state after disabling config sync
+      paloaltonetworks.panos.panos_facts:
+        provider: "{{ device }}"
+        gather_subset: ["ha"]
+      register: ha_post_disable
+
+    - name: Assert HA still healthy after config sync disabled
+      ansible.builtin.assert:
+        that:
+          - ha_post_disable.ansible_facts.ansible_net_ha_enabled | bool
+          - (ha_post_disable.ansible_facts.ansible_net_ha_localmode | lower) == 'active-passive'
+        fail_msg: "HA configuration degraded after disabling config sync"
+
+    # ========================================================================
+    # Perform Content and Antivirus Upgrade (Both Peers)
+    # ========================================================================
+
+    # Pre-flight readiness check
+    - name: Ensure device is ready before content upgrade
+      paloaltonetworks.panos.panos_check:
+        provider: "{{ device }}"
+      register: ready_check
+      until: ready_check is not failed and ready_check.msg == 'Device is ready.'
+      retries: 10
+      delay: 10
+
+    # Content update task
+    - name: Install latest content update
+      paloaltonetworks.panos.panos_dynamic_updates:
+        provider: "{{ device }}"
+        update_type: content
+        # IMPORTANT: sync_to_peer is set to false because we explicitly disabled
+        # HA config sync in Task 5 to prevent synchronization issues during upgrade.
+        # Each peer will be updated individually to ensure consistency.
+        # If sync_to_peer were true, the content update would attempt to sync to
+        # the peer, but since config sync is disabled, this could cause inconsistencies.
+        sync_to_peer: false
+      register: content_update
+
+    - name: Wait for device readiness after content install
+      paloaltonetworks.panos.panos_check:
+        provider: "{{ device }}"
+      register: ready_after_content
+      until: ready_after_content is not failed and ready_after_content.msg == 'Device is ready.'
+      retries: 60
+      delay: 15
+      no_log: true
+
+    # Antivirus update task
+    - name: Refresh antivirus update index
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "request anti-virus upgrade check"
+
+    - name: Download latest antivirus update
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "request anti-virus upgrade download latest"
+      register: antivirus_download
+
+    - name: Extract job ID for antivirus download
+      ansible.builtin.set_fact:
+        antivirus_download_jobid: "{{ antivirus_download.stdout_xml | default('') | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}"
+
+    - name: Wait for antivirus download job to complete
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<show><jobs><id>{{ antivirus_download_jobid }}</id></jobs></show>"
+        cmd_is_xml: true
+      register: antivirus_download_result
+      until: antivirus_download_result.stdout_xml is search('<status>FIN</status>')
+      retries: 300
+      delay: 10
+      failed_when: antivirus_download_result.stdout_xml is search('<result>FAIL</result>')
+      when: antivirus_download_jobid | length > 0
+      no_log: true
+
+    - name: Install latest antivirus update
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "request anti-virus upgrade install version latest"
+      register: antivirus_install
+
+    - name: Extract job ID for antivirus install
+      ansible.builtin.set_fact:
+        antivirus_install_jobid: "{{ antivirus_install.stdout_xml | default('') | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}"
+
+    - name: Wait for antivirus install job to complete
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<show><jobs><id>{{ antivirus_install_jobid }}</id></jobs></show>"
+        cmd_is_xml: true
+      register: antivirus_install_result
+      until: >
+        antivirus_install_result.stdout_xml is search('<status>FIN</status>') or
+        antivirus_install_result.stdout_xml is search('<status>FAIL</status>')
+      retries: 300
+      delay: 10
+      failed_when: >
+        (antivirus_install_result.stdout_xml is search('<status>FIN</status>') and
+         antivirus_install_result.stdout_xml is search('<result>FAIL</result>')) or
+        antivirus_install_result.stdout_xml is search('<status>FAIL</status>')
+      when: antivirus_install_jobid | length > 0
+      no_log: true
+
+    - name: Wait for device readiness after antivirus install
+      paloaltonetworks.panos.panos_check:
+        provider: "{{ device }}"
+      register: ready_after_antivirus
+      until: ready_after_antivirus is not failed and ready_after_antivirus.msg == 'Device is ready.'
+      retries: 60
+      delay: 15
+      no_log: true
+
+    - name: Query installed antivirus package information
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<request><anti-virus><upgrade><info></info></upgrade></anti-virus></request>"
+        cmd_is_xml: true
+      register: antivirus_info_raw
+
+    - name: Cache antivirus version fact
+      ansible.builtin.set_fact:
+        ha_antivirus_version: >-
+          {{ (antivirus_info_raw.stdout_xml | default(''))
+              | regex_findall('(?s)<entry>.*?<version>([^<]+)</version>.*?<current>yes</current>.*?</entry>')
+              | first | default('unknown') }}
+
+    # ========================================================================
+    # Orchestrated Upgrade Block (Passive First, Then Active)
+    # ========================================================================
+    - name: Orchestrate passive-first upgrade sequence (controller-driven)
+      run_once: true
+      vars:
+        passive_host: "{{ hostvars['localhost'].ha_passive_host }}"
+        active_host: "{{ hostvars['localhost'].ha_active_host }}"
+      block:
+        # Perform Passive Upgrade
+        - name: Wait for passive device readiness before upgrade
+          paloaltonetworks.panos.panos_check:
+            provider:
+              ip_address: "{{ hostvars[passive_host].ip_address }}"
+              username: "{{ hostvars[passive_host].username }}"
+              password: "{{ hostvars[passive_host].password }}"
+          register: passive_ready
+          until: passive_ready is not failed and passive_ready.msg == 'Device is ready.'
+          retries: 60
+          delay: 10
+
+        - name: Upgrade passive firewall through upgrade path
+          ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
+          loop: "{{ upgrade_path }}"
+          loop_control:
+            label: "{{ item }}"
+          vars:
+            version_item: "{{ item }}"
+            device:
+              ip_address: "{{ hostvars[passive_host].ip_address }}"
+              username: "{{ hostvars[passive_host].username }}"
+              password: "{{ hostvars[passive_host].password }}"
+
+        # Failover to Upgraded Passive
+        - name: Suspend original active device to trigger failover
+          paloaltonetworks.panos.panos_op:
+            provider:
+              ip_address: "{{ hostvars[active_host].ip_address }}"
+              username: "{{ hostvars[active_host].username }}"
+              password: "{{ hostvars[active_host].password }}"
+            cmd: "request high-availability state suspend"
+
+        - name: Wait for upgraded passive to become active
+          paloaltonetworks.panos.panos_facts:
+            provider:
+              ip_address: "{{ hostvars[passive_host].ip_address }}"
+              username: "{{ hostvars[passive_host].username }}"
+              password: "{{ hostvars[passive_host].password }}"
+            gather_subset: ["ha"]
+          register: passive_ha_after_failover
+          until: (passive_ha_after_failover.ansible_facts.ansible_net_ha_localstate | lower) == 'active'
+          retries: 40
+          delay: 15
+
+        - name: Wait for upgraded passive (now active) device readiness
+          paloaltonetworks.panos.panos_check:
+            provider:
+              ip_address: "{{ hostvars[passive_host].ip_address }}"
+              username: "{{ hostvars[passive_host].username }}"
+              password: "{{ hostvars[passive_host].password }}"
+          register: new_active_ready
+          until: new_active_ready is not failed and new_active_ready.msg == 'Device is ready.'
+          retries: 60
+          delay: 15
+
+        # Perform Active Upgrade
+        - name: Wait for original active device readiness
+          paloaltonetworks.panos.panos_check:
+            provider:
+              ip_address: "{{ hostvars[active_host].ip_address }}"
+              username: "{{ hostvars[active_host].username }}"
+              password: "{{ hostvars[active_host].password }}"
+          register: active_ready
+          until: active_ready is not failed and active_ready.msg == 'Device is ready.'
+          retries: 60
+          delay: 10
+
+        - name: Upgrade originally active firewall through upgrade path
+          ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
+          loop: "{{ upgrade_path }}"
+          loop_control:
+            label: "{{ item }}"
+          vars:
+            version_item: "{{ item }}"
+            device:
+              ip_address: "{{ hostvars[active_host].ip_address }}"
+              username: "{{ hostvars[active_host].username }}"
+              password: "{{ hostvars[active_host].password }}"
+
+        - name: Return original active device to functional state
+          paloaltonetworks.panos.panos_op:
+            provider:
+              ip_address: "{{ hostvars[active_host].ip_address }}"
+              username: "{{ hostvars[active_host].username }}"
+              password: "{{ hostvars[active_host].password }}"
+            cmd: "request high-availability state functional"
+
+        # Failback to Original Active
+        - name: Check current HA roles after all upgrades
+          paloaltonetworks.panos.panos_facts:
+            provider:
+              ip_address: "{{ hostvars[item].ip_address }}"
+              username: "{{ hostvars[item].username }}"
+              password: "{{ hostvars[item].password }}"
+            gather_subset: ["ha"]
+          loop: "{{ [active_host, passive_host] }}"
+          register: final_ha_view
+
+        - name: Derive current active host
+          ansible.builtin.set_fact:
+            current_active_host: >-
+              {{ (final_ha_view.results
+                    | selectattr('ansible_facts.ansible_net_ha_localstate', 'defined')
+                    | selectattr('ansible_facts.ansible_net_ha_localstate', 'equalto', 'active')
+                    | map(attribute='item') | list | first | default('')) }}
+
+        - name: Suspend current active to fail back to original
+          paloaltonetworks.panos.panos_op:
+            provider:
+              ip_address: "{{ hostvars[current_active_host].ip_address }}"
+              username: "{{ hostvars[current_active_host].username }}"
+              password: "{{ hostvars[current_active_host].password }}"
+            cmd: "request high-availability state suspend"
+          when:
+            - current_active_host is defined
+            - current_active_host | length > 0
+            - current_active_host != active_host
+
+        - name: Wait for original active to reclaim active role
+          paloaltonetworks.panos.panos_facts:
+            provider:
+              ip_address: "{{ hostvars[active_host].ip_address }}"
+              username: "{{ hostvars[active_host].username }}"
+              password: "{{ hostvars[active_host].password }}"
+            gather_subset: ["ha"]
+          register: final_active_after_failback
+          until: (final_active_after_failback.ansible_facts.ansible_net_ha_localstate | lower) == 'active'
+          retries: 40
+          delay: 30
+          when:
+            - current_active_host is defined
+            - current_active_host | length > 0
+            - current_active_host != active_host
+
+        - name: Return suspended device to functional state
+          paloaltonetworks.panos.panos_op:
+            provider:
+              ip_address: "{{ hostvars[current_active_host].ip_address }}"
+              username: "{{ hostvars[current_active_host].username }}"
+              password: "{{ hostvars[current_active_host].password }}"
+            cmd: "request high-availability state functional"
+          when:
+            - current_active_host is defined
+            - current_active_host | length > 0
+            - current_active_host != active_host
+
+    # ========================================================================
+    # Enable Config Sync
+    # ========================================================================
+    - name: Re-enable HA config synchronization
+      paloaltonetworks.panos.panos_type_cmd:
+        provider: "{{ device }}"
+        cmd: set
+        xpath: "/config/devices/entry[@name='localhost.localdomain']/deviceconfig/high-availability/group/configuration-synchronization"
+        element: "<enabled>yes</enabled>"
+
+    - name: Commit HA configuration change (config sync enabled)
+      paloaltonetworks.panos.panos_commit_firewall:
+        provider: "{{ device }}"
+        description: "Re-enable HA config sync after upgrade"
+
+    # ========================================================================
+    # Confirm Correct Active-Passive Peers
+    # ========================================================================
+    - name: Verify original active role restored (if applicable)
+      paloaltonetworks.panos.panos_facts:
+        provider: "{{ device }}"
+        gather_subset: ["ha"]
+      register: final_ha_state
+      until: (final_ha_state.ansible_facts.ansible_net_ha_localstate | lower) == 'active'
+      retries: 40
+      delay: 30
+      when: is_original_active
+
+    - name: Verify original passive role restored (if applicable)
+      paloaltonetworks.panos.panos_facts:
+        provider: "{{ device }}"
+        gather_subset: ["ha"]
+      register: final_ha_state
+      until: (final_ha_state.ansible_facts.ansible_net_ha_localstate | lower) == 'passive'
+      retries: 40
+      delay: 30
+      when: is_original_passive
+
+    - name: Re-validate HA1 control channel after upgrade
+      paloaltonetworks.panos.panos_active_in_ha:
+        provider:
+          ip_address: "{{ hostvars[item].ip_address }}"
+          username: "{{ hostvars[item].username }}"
+          password: "{{ hostvars[item].password }}"
+      register: ha_post_check
+      loop: "{{ ansible_play_hosts_all }}"
+      loop_control:
+        label: "{{ item }}"
+
+    - name: Enforce post-upgrade HA1 status across HA pair
+      run_once: true
+      delegate_to: localhost
+      vars:
+        ha1_checks_post: "{{ ha_post_check.results | map(attribute='response') | map('default', {}) | list }}"
+      block:
+        - name: Assert exactly one active and one passive after upgrade
+          ansible.builtin.assert:
+            that:
+              - ha1_checks_post | length == 2
+              - (ha1_checks_post | map(attribute='active') | select('equalto', true) | list | length) == 1
+              - (ha1_checks_post | map(attribute='active') | select('equalto', false) | list | length) == 1
+            fail_msg: "Post-upgrade HA1 check failed; expected one active and one passive. Received {{ ha1_checks_post }}."
+
+    - name: Run post-upgrade HA readiness checks on both peers
+      paloaltonetworks.panos.panos_readiness_checks:
+        provider:
+          ip_address: "{{ hostvars[item].ip_address }}"
+          username: "{{ hostvars[item].username }}"
+          password: "{{ hostvars[item].password }}"
+        checks:
+          - ha
+        force_fail: true
+      loop: "{{ ansible_play_hosts_all }}"
+      loop_control:
+        label: "{{ item }}"
+
+    - name: Report upgrade completion
+      run_once: true
+      ansible.builtin.debug:
+        msg: |
+          HA upgrade completed successfully.
+          Original active host ({{ hostvars['localhost'].ha_active_host }}) is active.
+          Original passive host ({{ hostvars['localhost'].ha_passive_host }}) is passive.
+          Configuration backups saved to {{ backup_directory }}.
+          All devices passed post-upgrade validation.
