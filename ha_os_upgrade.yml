@@ -435,6 +435,11 @@
       register: ha_sync_job
       when: inventory_hostname == hostvars['localhost'].ha_active_host
 
+    - name: DEBUG - Print full sync job response
+      ansible.builtin.debug:
+        var: ha_sync_job
+      when: inventory_hostname == hostvars['localhost'].ha_active_host
+
     - name: Extract running-config sync job ID
       ansible.builtin.set_fact:
         ha_sync_jobid: >-
