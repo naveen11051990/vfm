@@ -1,0 +1,40 @@
+---
+- name: Upgrade FortiGate HA firewall firmware
+  hosts: 192.168.29.146
+  connection: local
+  gather_facts: no
+
+  vars:
+    # Target FortiGate HA IP (management / cluster VIP)
+    fortigate_host: "192.168.29.146"
+    fortigate_username: "admin"
+    fortigate_password: "YOURPASSWORD"
+    vdom: "root"
+    ssl_verify: false
+    # Path to local firmware image
+    firmware_file: "/path/to/FGT-XXXXXX-buildXXXX-FORTINET.out"
+    # Whether to format boot partition (use with caution)
+    format_partition: no
+
+  tasks:
+    - name: Upload and install firmware on FortiGate HA
+      fortinet.fortios.fortios_system_firmware_upgrade:
+        host: "{{ fortigate_host }}"
+        username: "{{ fortigate_username }}"
+        password: "{{ fortigate_password }}"
+        vdom: "{{ vdom }}"
+        ssl_verify: "{{ ssl_verify }}"
+        system_firmware:
+          filename: "{{ firmware_file }}"
+          format_partition: "{{ format_partition }}"
+          source: "upload"
+      register: upgrade_result
+
+    - name: Show firmware upgrade result
+      debug:
+        msg: "Firmware upgrade status: {{ upgrade_result.meta.results.status }}"
+
+    - name: Optional — Notify if upgrade succeeded
+      when: upgrade_result.meta.results.status == "success"
+      debug:
+        msg: "Firmware upload succeeded. FortiGate will reboot. Ensure HA sync completes."
