@@ -10,6 +10,8 @@
       username: "{{ username }}"
       password: "{{ password }}"
 
+    ha_health_vsys: "vsys1"
+
     backup_directory: "{{ lookup('env', 'PANOS_BACKUP_DIR') | default('/runner/backups', true) }}"
     backup_filename: "{{ backup_directory }}/{{ inventory_hostname | default('pa-fw') }}-running-config.xml"
 
@@ -328,6 +330,86 @@
               password: "{{ hostvars[active_host].password }}"
             cmd: "request high-availability state functional"
 
+    - name: Fail back to original active after upgrades
+      run_once: true
+      vars:
+        original_active: "{{ hostvars['localhost'].ha_active_host }}"
+        original_passive: "{{ hostvars['localhost'].ha_passive_host }}"
+      block:
+        - name: Refresh HA roles after upgrades
+          paloaltonetworks.panos.panos_facts:
+            provider:
+              ip_address: "{{ hostvars[item].ip_address }}"
+              username: "{{ hostvars[item].username }}"
+              password: "{{ hostvars[item].password }}"
+            gather_subset: ["ha"]
+          loop: "{{ [original_active, original_passive] }}"
+          register: post_upgrade_ha_view
+
+        - name: Capture current active host
+          ansible.builtin.set_fact:
+            current_active_host: >-
+              {{ (post_upgrade_ha_view.results
+                    | selectattr('ansible_facts.ansible_net_ha_localstate', 'defined')
+                    | selectattr('ansible_facts.ansible_net_ha_localstate', 'equalto', 'active')
+                    | map(attribute='item') | list | first | default('')) }}
+
+        - name: Suspend current active to trigger failback to original active
+          paloaltonetworks.panos.panos_op:
+            provider:
+              ip_address: "{{ hostvars[current_active_host].ip_address }}"
+              username: "{{ hostvars[current_active_host].username }}"
+              password: "{{ hostvars[current_active_host].password }}"
+            cmd: "request high-availability state suspend"
+          when:
+            - current_active_host is defined
+            - current_active_host | length > 0
+            - current_active_host != original_active
+
+        - name: Wait for original active to resume ownership
+          paloaltonetworks.panos.panos_facts:
+            provider:
+              ip_address: "{{ hostvars[original_active].ip_address }}"
+              username: "{{ hostvars[original_active].username }}"
+              password: "{{ hostvars[original_active].password }}"
+            gather_subset: ["ha"]
+          register: ha_after_failback
+          until: (ha_after_failback.ansible_facts.ansible_net_ha_localstate | lower) == 'active'
+          retries: 40
+          delay: 30
+          when:
+            - current_active_host is defined
+            - current_active_host | length > 0
+            - current_active_host != original_active
+
+        - name: Return suspended peer to functional state after failback
+          paloaltonetworks.panos.panos_op:
+            provider:
+              ip_address: "{{ hostvars[current_active_host].ip_address }}"
+              username: "{{ hostvars[current_active_host].username }}"
+              password: "{{ hostvars[current_active_host].password }}"
+            cmd: "request high-availability state functional"
+          when:
+            - current_active_host is defined
+            - current_active_host | length > 0
+            - current_active_host != original_active
+
+        - name: Confirm original passive returned to passive role
+          paloaltonetworks.panos.panos_facts:
+            provider:
+              ip_address: "{{ hostvars[original_passive].ip_address }}"
+              username: "{{ hostvars[original_passive].username }}"
+              password: "{{ hostvars[original_passive].password }}"
+            gather_subset: ["ha"]
+          register: ha_passive_confirm
+          until: (ha_passive_confirm.ansible_facts.ansible_net_ha_localstate | lower) == 'passive'
+          retries: 40
+          delay: 30
+
+
+
+
+
     - name: Re-enable config sync
       paloaltonetworks.panos.panos_type_cmd:
         provider: "{{ device }}"
@@ -340,93 +422,21 @@
         provider: "{{ device }}"
         description: "Re-enable HA config sync after OS upgrade"
 
-
-    - name: Ensure original active regains active role if needed
-      run_once: true
-      vars:
-        original_active: "{{ hostvars['localhost'].ha_active_host }}"
-        original_passive: "{{ hostvars['localhost'].ha_passive_host }}"
-      block:
-        - name: Check current HA roles after upgrades
-          paloaltonetworks.panos.panos_facts:
-            provider:
-              ip_address: "{{ hostvars[item].ip_address }}"
-              username: "{{ hostvars[item].username }}"
-              password: "{{ hostvars[item].password }}"
-            gather_subset: ["ha"]
-          loop: "{{ [original_active, original_passive] }}"
-          register: final_ha_view
-
-        - name: Derive current active host after upgrades
-          ansible.builtin.set_fact:
-            current_active_host: >-
-              {{ (final_ha_view.results
-                    | selectattr('ansible_facts.ansible_net_ha_localstate', 'defined')
-                    | selectattr('ansible_facts.ansible_net_ha_localstate', 'equalto', 'active')
-                    | map(attribute='item') | list | first | default('')) }}
-
-        - name: Suspend current active to fail back to original active
-          paloaltonetworks.panos.panos_op:
-            provider:
-              ip_address: "{{ hostvars[current_active_host].ip_address }}"
-              username: "{{ hostvars[current_active_host].username }}"
-              password: "{{ hostvars[current_active_host].password }}"
-            cmd: "request high-availability state suspend"
-          when:
-            - current_active_host is defined
-            - current_active_host | length > 0
-            - current_active_host != original_active
-
-        - name: Wait for original active to become active again after failback
-          paloaltonetworks.panos.panos_facts:
-            provider:
-              ip_address: "{{ hostvars[original_active].ip_address }}"
-              username: "{{ hostvars[original_active].username }}"
-              password: "{{ hostvars[original_active].password }}"
-            gather_subset: ["ha"]
-          register: final_active_after_failback
-          until: (final_active_after_failback.ansible_facts.ansible_net_ha_localstate | lower) == 'active'
-          retries: 40
-          delay: 30
-          when:
-            - current_active_host is defined
-            - current_active_host | length > 0
-            - current_active_host != original_active
-
-        - name: Return suspended firewall to functional state after failback
-          paloaltonetworks.panos.panos_op:
-            provider:
-              ip_address: "{{ hostvars[current_active_host].ip_address }}"
-              username: "{{ hostvars[current_active_host].username }}"
-              password: "{{ hostvars[current_active_host].password }}"
-            cmd: "request high-availability state functional"
-          when:
-            - current_active_host is defined
-            - current_active_host | length > 0
-            - current_active_host != original_active
-
-    - name: Wait for original active role to return
-      paloaltonetworks.panos.panos_facts:
-        provider: "{{ device }}"
-        gather_subset: ["ha"]
-      register: final_active_state
-      until: (final_active_state.ansible_facts.ansible_net_ha_localstate | lower) == 'active'
-      retries: 40
-      delay: 30
-      when: is_initial_active
-
-    - name: Wait for original passive role to return
-      paloaltonetworks.panos.panos_facts:
-        provider: "{{ device }}"
-        gather_subset: ["ha"]
-      register: final_passive_state
-      until: (final_passive_state.ansible_facts.ansible_net_ha_localstate | lower) == 'passive'
-      retries: 40
-      delay: 30
-      when: is_initial_passive
-
-
-
+    - name: Wait for configuration synchronization after re-enabling sync
+      paloaltonetworks.panos.panos_op:
+        provider:
+          ip_address: "{{ hostvars[item].ip_address }}"
+          username: "{{ hostvars[item].username }}"
+          password: "{{ hostvars[item].password }}"
+        cmd: "<show><high-availability><state></state></high-availability></show>"
+        cmd_is_xml: true
+      register: ha_sync_check_post
+      until: "ha_sync_check_post.stdout_xml is search('Running Configuration: synchronized')"
+      retries: 5
+      delay: 12
+      loop: "{{ ansible_play_hosts_all }}"
+      loop_control:
+        label: "{{ item }}"
 
     - name: Re-validate HA1 control channel after upgrade
       paloaltonetworks.panos.panos_active_in_ha:
@@ -434,6 +444,7 @@
           ip_address: "{{ hostvars[item].ip_address }}"
           username: "{{ hostvars[item].username }}"
           password: "{{ hostvars[item].password }}"
+        vsys: "{{ ha_health_vsys }}"
       register: ha_upgrade_assurance_post
       loop: "{{ ansible_play_hosts_all }}"
       loop_control:
