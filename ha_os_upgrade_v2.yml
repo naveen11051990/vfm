@@ -165,71 +165,10 @@
       delay: 15
       no_log: true
 
-    # Antivirus update task
-    - name: Refresh antivirus update index
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "request anti-virus upgrade check"
-
-    - name: Download latest antivirus update
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "request anti-virus upgrade download latest"
-      register: antivirus_download
-
-    - name: Extract job ID for antivirus download
-      ansible.builtin.set_fact:
-        antivirus_download_jobid: "{{ antivirus_download.stdout_xml | default('') | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}"
-
-    - name: Wait for antivirus download job to complete
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "<show><jobs><id>{{ antivirus_download_jobid }}</id></jobs></show>"
-        cmd_is_xml: true
-      register: antivirus_download_result
-      until: antivirus_download_result.stdout_xml is search('<status>FIN</status>')
-      retries: 300
-      delay: 10
-      failed_when: antivirus_download_result.stdout_xml is search('<result>FAIL</result>')
-      when: antivirus_download_jobid | length > 0
-      no_log: true
-
-    - name: Install latest antivirus update
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "request anti-virus upgrade install version latest"
-      register: antivirus_install
-
-    - name: Extract job ID for antivirus install
-      ansible.builtin.set_fact:
-        antivirus_install_jobid: "{{ antivirus_install.stdout_xml | default('') | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}"
-
-    - name: Wait for antivirus install job to complete
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "<show><jobs><id>{{ antivirus_install_jobid }}</id></jobs></show>"
-        cmd_is_xml: true
-      register: antivirus_install_result
-      until: >
-        antivirus_install_result.stdout_xml is search('<status>FIN</status>') or
-        antivirus_install_result.stdout_xml is search('<status>FAIL</status>')
-      retries: 300
-      delay: 10
-      failed_when: >
-        (antivirus_install_result.stdout_xml is search('<status>FIN</status>') and
-         antivirus_install_result.stdout_xml is search('<result>FAIL</result>')) or
-        antivirus_install_result.stdout_xml is search('<status>FAIL</status>')
-      when: antivirus_install_jobid | length > 0
-      no_log: true
-
-    - name: Wait for device readiness after antivirus install
-      paloaltonetworks.panos.panos_check:
-        provider: "{{ device }}"
-      register: ready_after_antivirus
-      until: ready_after_antivirus is not failed and ready_after_antivirus.msg == 'Device is ready.'
-      retries: 60
-      delay: 15
-      no_log: true
+    # Note: Antivirus updates are included with content updates via panos_dynamic_updates.
+    # The panos_dynamic_updates module with update_type: content includes antivirus
+    # signatures, applications, threats, and other security content in a single update.
+    # Separate CLI-based antivirus update commands are not used as they vary by PAN-OS version.
 
     - name: Query installed antivirus package information
       paloaltonetworks.panos.panos_op:
