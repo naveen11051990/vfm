@@ -170,27 +170,30 @@
         is_initial_active: "{{ ha_runtime.ha_initial_role == 'active' }}"
         is_initial_passive: "{{ ha_runtime.ha_initial_role == 'passive' }}"
 
-    - name: Include content and antivirus update tasks
-      ansible.builtin.import_tasks: tasks/content_and_antivirus_update.yml
+    # COMMENTED OUT FOR TESTING - Content and antivirus update
+    # - name: Include content and antivirus update tasks
+    #   ansible.builtin.import_tasks: tasks/content_and_antivirus_update.yml
 
-    - name: Backup running configuration
-      paloaltonetworks.panos.panos_export:
-        provider: "{{ device }}"
-        category: configuration
-        filename: "{{ backup_filename }}"
-        create_directory: true
+    # COMMENTED OUT FOR TESTING - Config backup
+    # - name: Backup running configuration
+    #   paloaltonetworks.panos.panos_export:
+    #     provider: "{{ device }}"
+    #     category: configuration
+    #     filename: "{{ backup_filename }}"
+    #     create_directory: true
 
-    - name: Determine tech-support bundle filename
-      ansible.builtin.set_fact:
-        tech_support_bundle_path: >-
-          {{ backup_directory }}/{{ inventory_hostname | default('pa-fw') }}-tech-support-{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.tgz
-
-    - name: Capture tech-support bundle before upgrade
-      paloaltonetworks.panos.panos_export:
-        provider: "{{ device }}"
-        category: tech-support
-        filename: "{{ tech_support_bundle_path }}"
-        create_directory: true
+    # COMMENTED OUT FOR TESTING - Tech-support backup
+    # - name: Determine tech-support bundle filename
+    #   ansible.builtin.set_fact:
+    #     tech_support_bundle_path: >-
+    #       {{ backup_directory }}/{{ inventory_hostname | default('pa-fw') }}-tech-support-{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.tgz
+    #
+    # - name: Capture tech-support bundle before upgrade
+    #   paloaltonetworks.panos.panos_export:
+    #     provider: "{{ device }}"
+    #     category: tech-support
+    #     filename: "{{ tech_support_bundle_path }}"
+    #     create_directory: true
 
     - name: Verify HA readiness (includes config-sync) before upgrade
       paloaltonetworks.panos.panos_readiness_checks:
@@ -225,17 +228,18 @@
           - ha_post_disable.ansible_facts.ansible_net_ha_localstate | lower in ['active', 'passive']
         fail_msg: "Unexpected HA state after disabling config sync; check HA configuration on device."
 
-    - name: Verify antivirus versions match across HA peers
-      run_once: true
-      vars:
-        antivirus_versions: "{{ ansible_play_hosts_all | map('extract', hostvars, 'ha_antivirus_version') | list }}"
-      ansible.builtin.assert:
-        that:
-          - antivirus_versions | reject('equalto', 'unknown') | list | length == antivirus_versions | length
-          - (antivirus_versions | unique | length) == 1
-        fail_msg: >-
-          Antivirus update mismatch detected across HA peers: {{ antivirus_versions }}. Ensure both devices downloaded and
-          installed the latest antivirus package before proceeding.
+    # COMMENTED OUT FOR TESTING - Antivirus version verification
+    # - name: Verify antivirus versions match across HA peers
+    #   run_once: true
+    #   vars:
+    #     antivirus_versions: "{{ ansible_play_hosts_all | map('extract', hostvars, 'ha_antivirus_version') | list }}"
+    #   ansible.builtin.assert:
+    #     that:
+    #       - antivirus_versions | reject('equalto', 'unknown') | list | length == antivirus_versions | length
+    #       - (antivirus_versions | unique | length) == 1
+    #     fail_msg: >-
+    #       Antivirus update mismatch detected across HA peers: {{ antivirus_versions }}. Ensure both devices downloaded and
+    #       installed the latest antivirus package before proceeding.
 
     - name: Orchestrate passive-first upgrade sequence (controller-driven)
       run_once: true
@@ -254,17 +258,18 @@
           retries: 60
           delay: 10
 
-        - name: Upgrade passive firewall first
-          ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
-          loop: "{{ upgrade_path }}"
-          loop_control:
-            label: "{{ item }}"
-          vars:
-            version_item: "{{ item }}"
-            device:
-              ip_address: "{{ hostvars[passive_host].ip_address }}"
-              username: "{{ hostvars[passive_host].username }}"
-              password: "{{ hostvars[passive_host].password }}"
+        # COMMENTED OUT FOR TESTING - OS download + install + reboot
+        # - name: Upgrade passive firewall first
+        #   ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
+        #   loop: "{{ upgrade_path }}"
+        #   loop_control:
+        #     label: "{{ item }}"
+        #   vars:
+        #     version_item: "{{ item }}"
+        #     device:
+        #       ip_address: "{{ hostvars[passive_host].ip_address }}"
+        #       username: "{{ hostvars[passive_host].username }}"
+        #       password: "{{ hostvars[passive_host].password }}"
 
         - name: Suspend original active to trigger failover
           paloaltonetworks.panos.panos_op:
@@ -310,17 +315,18 @@
           retries: 60
           delay: 10
 
-        - name: Upgrade originally active firewall
-          ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
-          loop: "{{ upgrade_path }}"
-          loop_control:
-            label: "{{ item }}"
-          vars:
-            version_item: "{{ item }}"
-            device:
-              ip_address: "{{ hostvars[active_host].ip_address }}"
-              username: "{{ hostvars[active_host].username }}"
-              password: "{{ hostvars[active_host].password }}"
+        # COMMENTED OUT FOR TESTING - OS download + install + reboot
+        # - name: Upgrade originally active firewall
+        #   ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
+        #   loop: "{{ upgrade_path }}"
+        #   loop_control:
+        #     label: "{{ item }}"
+        #   vars:
+        #     version_item: "{{ item }}"
+        #     device:
+        #       ip_address: "{{ hostvars[active_host].ip_address }}"
+        #       username: "{{ hostvars[active_host].username }}"
+        #       password: "{{ hostvars[active_host].password }}"
 
         - name: Return suspended firewall to functional state
           paloaltonetworks.panos.panos_op:
@@ -426,7 +432,29 @@
       paloaltonetworks.panos.panos_op:
         provider: "{{ device }}"
         cmd: "request high-availability sync-to-remote running-config"
+      register: ha_sync_job
       when: inventory_hostname == hostvars['localhost'].ha_active_host
+
+    - name: Extract running-config sync job ID
+      ansible.builtin.set_fact:
+        ha_sync_jobid: >-
+          {{ (ha_sync_job.stdout_xml | default(''))
+              | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}
+      when: inventory_hostname == hostvars['localhost'].ha_active_host
+
+    - name: Wait for running-config sync job to finish
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "<show><jobs><id>{{ ha_sync_jobid }}</id></jobs></show>"
+        cmd_is_xml: true
+      register: ha_sync_job_status
+      until: ha_sync_job_status.stdout_xml is search('<status>FIN</status>')
+      retries: 60
+      delay: 10
+      failed_when: ha_sync_job_status.stdout_xml is search('<result>FAIL</result>')
+      when:
+        - inventory_hostname == hostvars['localhost'].ha_active_host
+        - ha_sync_jobid | length > 0
 
     - name: Re-validate HA1 control channel after upgrade
       paloaltonetworks.panos.panos_active_in_ha:
