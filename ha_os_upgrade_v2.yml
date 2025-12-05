@@ -416,6 +416,27 @@
         provider: "{{ device }}"
         description: "Re-enable HA config sync after upgrade"
 
+    - name: Force running-config sync from original active back to peer
+      paloaltonetworks.panos.panos_op:
+        provider: "{{ device }}"
+        cmd: "request high-availability sync-to-remote running-config"
+      register: ha_sync_job
+      when: inventory_hostname == hostvars['localhost'].ha_active_host
+
+    - name: Wait for HA sync job to complete on peer
+      paloaltonetworks.panos.panos_op:
+        provider:
+          ip_address: "{{ hostvars[hostvars['localhost'].ha_passive_host].ip_address }}"
+          username: "{{ hostvars[hostvars['localhost'].ha_passive_host].username }}"
+          password: "{{ hostvars[hostvars['localhost'].ha_passive_host].password }}"
+        cmd: "<show><jobs><all></all></jobs></show>"
+        cmd_is_xml: true
+      register: peer_jobs
+      retries: 60
+      delay: 5
+      until: peer_jobs.stdout_xml | regex_findall('<description>HA Sync Config[^<]*</description>') | length == 0
+      when: inventory_hostname == hostvars['localhost'].ha_active_host
+
     # ========================================================================
     # Confirm Correct Active-Passive Peers
     # ========================================================================
