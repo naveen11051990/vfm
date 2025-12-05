@@ -170,30 +170,27 @@
         is_initial_active: "{{ ha_runtime.ha_initial_role == 'active' }}"
         is_initial_passive: "{{ ha_runtime.ha_initial_role == 'passive' }}"
 
-    # COMMENTED OUT FOR TESTING - Content and antivirus update
-    # - name: Include content and antivirus update tasks
-    #   ansible.builtin.import_tasks: tasks/content_and_antivirus_update.yml
+    - name: Include content and antivirus update tasks
+      ansible.builtin.import_tasks: tasks/content_and_antivirus_update.yml
 
-    # COMMENTED OUT FOR TESTING - Config backup
-    # - name: Backup running configuration
-    #   paloaltonetworks.panos.panos_export:
-    #     provider: "{{ device }}"
-    #     category: configuration
-    #     filename: "{{ backup_filename }}"
-    #     create_directory: true
+    - name: Backup running configuration
+      paloaltonetworks.panos.panos_export:
+        provider: "{{ device }}"
+        category: configuration
+        filename: "{{ backup_filename }}"
+        create_directory: true
 
-    # COMMENTED OUT FOR TESTING - Tech-support backup
-    # - name: Determine tech-support bundle filename
-    #   ansible.builtin.set_fact:
-    #     tech_support_bundle_path: >-
-    #       {{ backup_directory }}/{{ inventory_hostname | default('pa-fw') }}-tech-support-{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.tgz
-    #
-    # - name: Capture tech-support bundle before upgrade
-    #   paloaltonetworks.panos.panos_export:
-    #     provider: "{{ device }}"
-    #     category: tech-support
-    #     filename: "{{ tech_support_bundle_path }}"
-    #     create_directory: true
+    - name: Determine tech-support bundle filename
+      ansible.builtin.set_fact:
+        tech_support_bundle_path: >-
+          {{ backup_directory }}/{{ inventory_hostname | default('pa-fw') }}-tech-support-{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.tgz
+
+    - name: Capture tech-support bundle before upgrade
+      paloaltonetworks.panos.panos_export:
+        provider: "{{ device }}"
+        category: tech-support
+        filename: "{{ tech_support_bundle_path }}"
+        create_directory: true
 
     - name: Verify HA readiness (includes config-sync) before upgrade
       paloaltonetworks.panos.panos_readiness_checks:
@@ -228,18 +225,17 @@
           - ha_post_disable.ansible_facts.ansible_net_ha_localstate | lower in ['active', 'passive']
         fail_msg: "Unexpected HA state after disabling config sync; check HA configuration on device."
 
-    # COMMENTED OUT FOR TESTING - Antivirus version verification
-    # - name: Verify antivirus versions match across HA peers
-    #   run_once: true
-    #   vars:
-    #     antivirus_versions: "{{ ansible_play_hosts_all | map('extract', hostvars, 'ha_antivirus_version') | list }}"
-    #   ansible.builtin.assert:
-    #     that:
-    #       - antivirus_versions | reject('equalto', 'unknown') | list | length == antivirus_versions | length
-    #       - (antivirus_versions | unique | length) == 1
-    #     fail_msg: >-
-    #       Antivirus update mismatch detected across HA peers: {{ antivirus_versions }}. Ensure both devices downloaded and
-    #       installed the latest antivirus package before proceeding.
+    - name: Verify antivirus versions match across HA peers
+      run_once: true
+      vars:
+        antivirus_versions: "{{ ansible_play_hosts_all | map('extract', hostvars, 'ha_antivirus_version') | list }}"
+      ansible.builtin.assert:
+        that:
+          - antivirus_versions | reject('equalto', 'unknown') | list | length == antivirus_versions | length
+          - (antivirus_versions | unique | length) == 1
+        fail_msg: >-
+          Antivirus update mismatch detected across HA peers: {{ antivirus_versions }}. Ensure both devices downloaded and
+          installed the latest antivirus package before proceeding.
 
     - name: Orchestrate passive-first upgrade sequence (controller-driven)
       run_once: true
@@ -258,18 +254,17 @@
           retries: 60
           delay: 10
 
-        # COMMENTED OUT FOR TESTING - OS download + install + reboot
-        # - name: Upgrade passive firewall first
-        #   ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
-        #   loop: "{{ upgrade_path }}"
-        #   loop_control:
-        #     label: "{{ item }}"
-        #   vars:
-        #     version_item: "{{ item }}"
-        #     device:
-        #       ip_address: "{{ hostvars[passive_host].ip_address }}"
-        #       username: "{{ hostvars[passive_host].username }}"
-        #       password: "{{ hostvars[passive_host].password }}"
+        - name: Upgrade passive firewall first
+          ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
+          loop: "{{ upgrade_path }}"
+          loop_control:
+            label: "{{ item }}"
+          vars:
+            version_item: "{{ item }}"
+            device:
+              ip_address: "{{ hostvars[passive_host].ip_address }}"
+              username: "{{ hostvars[passive_host].username }}"
+              password: "{{ hostvars[passive_host].password }}"
 
         - name: Suspend original active to trigger failover
           paloaltonetworks.panos.panos_op:
@@ -315,18 +310,17 @@
           retries: 60
           delay: 10
 
-        # COMMENTED OUT FOR TESTING - OS download + install + reboot
-        # - name: Upgrade originally active firewall
-        #   ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
-        #   loop: "{{ upgrade_path }}"
-        #   loop_control:
-        #     label: "{{ item }}"
-        #   vars:
-        #     version_item: "{{ item }}"
-        #     device:
-        #       ip_address: "{{ hostvars[active_host].ip_address }}"
-        #       username: "{{ hostvars[active_host].username }}"
-        #       password: "{{ hostvars[active_host].password }}"
+        - name: Upgrade originally active firewall
+          ansible.builtin.include_tasks: tasks/upgrade_step_v2.yml
+          loop: "{{ upgrade_path }}"
+          loop_control:
+            label: "{{ item }}"
+          vars:
+            version_item: "{{ item }}"
+            device:
+              ip_address: "{{ hostvars[active_host].ip_address }}"
+              username: "{{ hostvars[active_host].username }}"
+              password: "{{ hostvars[active_host].password }}"
 
         - name: Return suspended firewall to functional state
           paloaltonetworks.panos.panos_op:
@@ -546,40 +540,39 @@
       loop_control:
         label: "{{ item }}"
 
-    # COMMENTED OUT FOR TESTING - Antivirus version verification
-    # - name: Query antivirus package after upgrade
-    #   paloaltonetworks.panos.panos_op:
-    #     provider:
-    #       ip_address: "{{ hostvars[item].ip_address }}"
-    #       username: "{{ hostvars[item].username }}"
-    #       password: "{{ hostvars[item].password }}"
-    #     cmd: "<request><anti-virus><upgrade><info></info></upgrade></anti-virus></request>"
-    #     cmd_is_xml: true
-    #   register: antivirus_info_post
-    #   loop: "{{ ansible_play_hosts_all }}"
-    #   loop_control:
-    #     label: "{{ item }}"
-    #
-    # - name: Cache post-upgrade antivirus version
-    #   ansible.builtin.set_fact:
-    #     ha_antivirus_version_post: >-
-    #       {{ (antivirus_info_post.results[loop.index0].stdout_xml | default(''))
-    #           | regex_findall('(?s)<entry>.*?<version>([^<]+)</version>.*?<current>yes</current>.*?</entry>')
-    #           | first | default('unknown') }}
-    #   loop: "{{ ansible_play_hosts_all }}"
-    #   loop_control:
-    #     label: "{{ item }}"
-    #
-    # - name: Verify antivirus versions match across HA peers after upgrade
-    #   run_once: true
-    #   delegate_to: localhost
-    #   vars:
-    #     antivirus_versions_post: "{{ ansible_play_hosts_all | map('extract', hostvars, 'ha_antivirus_version_post') | list }}"
-    #   ansible.builtin.assert:
-    #     that:
-    #       - antivirus_versions_post | reject('equalto', 'unknown') | list | length == antivirus_versions_post | length
-    #       - (antivirus_versions_post | unique | length) == 1
-    #     fail_msg: "Post-upgrade antivirus mismatch detected across HA peers: {{ antivirus_versions_post }}."
+    - name: Query antivirus package after upgrade
+      paloaltonetworks.panos.panos_op:
+        provider:
+          ip_address: "{{ hostvars[item].ip_address }}"
+          username: "{{ hostvars[item].username }}"
+          password: "{{ hostvars[item].password }}"
+        cmd: "<request><anti-virus><upgrade><info></info></upgrade></anti-virus></request>"
+        cmd_is_xml: true
+      register: antivirus_info_post
+      loop: "{{ ansible_play_hosts_all }}"
+      loop_control:
+        label: "{{ item }}"
+
+    - name: Cache post-upgrade antivirus version
+      ansible.builtin.set_fact:
+        ha_antivirus_version_post: >-
+          {{ (antivirus_info_post.results[loop.index0].stdout_xml | default(''))
+              | regex_findall('(?s)<entry>.*?<version>([^<]+)</version>.*?<current>yes</current>.*?</entry>')
+              | first | default('unknown') }}
+      loop: "{{ ansible_play_hosts_all }}"
+      loop_control:
+        label: "{{ item }}"
+
+    - name: Verify antivirus versions match across HA peers after upgrade
+      run_once: true
+      delegate_to: localhost
+      vars:
+        antivirus_versions_post: "{{ ansible_play_hosts_all | map('extract', hostvars, 'ha_antivirus_version_post') | list }}"
+      ansible.builtin.assert:
+        that:
+          - antivirus_versions_post | reject('equalto', 'unknown') | list | length == antivirus_versions_post | length
+          - (antivirus_versions_post | unique | length) == 1
+        fail_msg: "Post-upgrade antivirus mismatch detected across HA peers: {{ antivirus_versions_post }}."
 
     - name: Report HA upgrade result
       run_once: true
