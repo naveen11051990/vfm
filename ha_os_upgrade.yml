@@ -422,21 +422,11 @@
         provider: "{{ device }}"
         description: "Re-enable HA config sync after OS upgrade"
 
-    - name: Wait for configuration synchronization after re-enabling sync
+    - name: Force running-config sync from original active back to peer
       paloaltonetworks.panos.panos_op:
-        provider:
-          ip_address: "{{ hostvars[item].ip_address }}"
-          username: "{{ hostvars[item].username }}"
-          password: "{{ hostvars[item].password }}"
-        cmd: "<show><high-availability><state></state></high-availability></show>"
-        cmd_is_xml: true
-      register: ha_sync_check_post
-      until: "ha_sync_check_post.stdout_xml is search('Running Configuration: synchronized')"
-      retries: 5
-      delay: 12
-      loop: "{{ ansible_play_hosts_all }}"
-      loop_control:
-        label: "{{ item }}"
+        provider: "{{ device }}"
+        cmd: "request high-availability sync-to-remote running-config"
+      when: inventory_hostname == hostvars['localhost'].ha_active_host
 
     - name: Re-validate HA1 control channel after upgrade
       paloaltonetworks.panos.panos_active_in_ha:
