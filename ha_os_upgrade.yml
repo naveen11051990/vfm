@@ -435,31 +435,26 @@
       register: ha_sync_job
       when: inventory_hostname == hostvars['localhost'].ha_active_host
 
-    - name: DEBUG - Print full sync job response
-      ansible.builtin.debug:
-        var: ha_sync_job
-      when: inventory_hostname == hostvars['localhost'].ha_active_host
+    - name: Wait for HA sync job to complete on peer
+      block:
+        - name: Query peer job queue for HA sync completion
+          paloaltonetworks.panos.panos_op:
+            provider:
+              ip_address: "{{ hostvars[hostvars['localhost'].ha_passive_host].ip_address }}"
+              username: "{{ hostvars[hostvars['localhost'].ha_passive_host].username }}"
+              password: "{{ hostvars[hostvars['localhost'].ha_passive_host].password }}"
+            cmd: "<show><jobs><all></all></jobs></show>"
+            cmd_is_xml: true
+          register: peer_jobs
 
-    - name: Extract running-config sync job ID
-      ansible.builtin.set_fact:
-        ha_sync_jobid: >-
-          {{ (ha_sync_job.stdout_xml | default(''))
-              | regex_search('<job>(\\d+)</job>', '\\1') | first | default('') }}
-      when: inventory_hostname == hostvars['localhost'].ha_active_host
+        - name: Check if HA Sync Config job is still running
+          ansible.builtin.set_fact:
+            ha_sync_still_running: "{{ peer_jobs.stdout_xml | regex_findall('<description>HA Sync Config[^<]*</description>') | length > 0 }}"
 
-    - name: Wait for running-config sync job to finish
-      paloaltonetworks.panos.panos_op:
-        provider: "{{ device }}"
-        cmd: "<show><jobs><id>{{ ha_sync_jobid }}</id></jobs></show>"
-        cmd_is_xml: true
-      register: ha_sync_job_status
-      until: ha_sync_job_status.stdout_xml is search('<status>FIN</status>')
       retries: 60
-      delay: 10
-      failed_when: ha_sync_job_status.stdout_xml is search('<result>FAIL</result>')
-      when:
-        - inventory_hostname == hostvars['localhost'].ha_active_host
-        - ha_sync_jobid | length > 0
+      delay: 5
+      until: not ha_sync_still_running
+      when: inventory_hostname == hostvars['localhost'].ha_active_host
 
     - name: Re-validate HA1 control channel after upgrade
       paloaltonetworks.panos.panos_active_in_ha:
@@ -541,6 +536,8 @@
           loop: "{{ hosts }}"
           loop_control:
             label: "{{ item }}"
+          # Only validate devices that captured post-upgrade data (those that were active when config was collected)
+          when: hostvars[item].ha1_ip_address_post | default('') | length > 0
 
     - name: Run post-upgrade HA readiness checks
       paloaltonetworks.panos.panos_readiness_checks:
