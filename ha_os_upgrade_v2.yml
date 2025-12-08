@@ -1,5 +1,5 @@
 ---
-- name: PAN-OS HA Upgrade Playbook v2
+- name: PAN-OS HA Upgrade Playbook V2
   hosts: "{{ hosts | default('HA_v2') }}"
   connection: local
   gather_facts: false
