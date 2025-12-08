@@ -441,20 +441,14 @@
 
     - name: Wait for configuration synchronization on both HA peers
       paloaltonetworks.panos.panos_op:
-        provider:
-          ip_address: "{{ hostvars[item].ip_address }}"
-          username: "{{ hostvars[item].username }}"
-          password: "{{ hostvars[item].password }}"
+        provider: "{{ device }}"
         cmd: "<show><high-availability><state></state></high-availability></show>"
         cmd_is_xml: true
       register: ha_sync_status
       until: >-
-        ha_sync_status.stdout_xml is search('Running Configuration: synchronized')
+        ha_sync_status.stdout_xml is search('<running-sync>synchronized</running-sync>')
       retries: 40
       delay: 15
-      loop: "{{ ansible_play_hosts_all }}"
-      loop_control:
-        label: "{{ item }}"
 
     - name: Re-validate HA1 control channel after upgrade
       paloaltonetworks.panos.panos_active_in_ha:
