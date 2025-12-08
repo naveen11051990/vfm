@@ -422,6 +422,9 @@
         provider: "{{ device }}"
         description: "Re-enable HA config sync after OS upgrade"
 
+    # NOTE: panos_readiness_checks validates multiple HA conditions and may fail on transient states
+    # during sync propagation. panos_facts does not expose config sync status (only ha_enabled/mode/role).
+    # Direct HA state query via panos_op is the official method for validating config synchronization.
     - name: Force running-config sync from original active back to peer
       run_once: true
       paloaltonetworks.panos.panos_op:
@@ -429,22 +432,29 @@
           ip_address: "{{ hostvars[hostvars['localhost'].ha_active_host].ip_address }}"
           username: "{{ hostvars[hostvars['localhost'].ha_active_host].username }}"
           password: "{{ hostvars[hostvars['localhost'].ha_active_host].password }}"
-        cmd: "request high-availability sync-to-remote running-config"
+        cmd: "<request><high-availability><sync-to-remote><running-config /></sync-to-remote></high-availability></request>"
+        cmd_is_xml: true
       register: ha_sync_job
+      retries: 3
+      delay: 10
+      until: ha_sync_job is not failed
 
-    - name: Wait for HA sync job to complete on peer
-      run_once: true
+    - name: Wait for configuration synchronization on both HA peers
       paloaltonetworks.panos.panos_op:
         provider:
-          ip_address: "{{ hostvars[hostvars['localhost'].ha_passive_host].ip_address }}"
-          username: "{{ hostvars[hostvars['localhost'].ha_passive_host].username }}"
-          password: "{{ hostvars[hostvars['localhost'].ha_passive_host].password }}"
-        cmd: "<show><jobs><all></all></jobs></show>"
+          ip_address: "{{ hostvars[item].ip_address }}"
+          username: "{{ hostvars[item].username }}"
+          password: "{{ hostvars[item].password }}"
+        cmd: "<show><high-availability><state></state></high-availability></show>"
         cmd_is_xml: true
-      register: peer_jobs
-      retries: 60
-      delay: 5
-      until: peer_jobs.stdout_xml | regex_findall('<description>HA Sync Config[^<]*</description>') | length == 0
+      register: ha_sync_status
+      until: >-
+        ha_sync_status.stdout_xml is search('Running Configuration: synchronized')
+      retries: 40
+      delay: 15
+      loop: "{{ ansible_play_hosts_all }}"
+      loop_control:
+        label: "{{ item }}"
 
     - name: Re-validate HA1 control channel after upgrade
       paloaltonetworks.panos.panos_active_in_ha:
