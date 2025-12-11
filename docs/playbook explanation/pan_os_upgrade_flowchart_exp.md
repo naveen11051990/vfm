@@ -1,8 +1,5 @@
 # PAN-OS Upgrade Playbook Flowchart
 
-<div style="display: flex; gap: 2rem;">
-<div style="flex: 2;">
-
 ```mermaid
 flowchart TD
     Start([Start Playbook]) --> ValidatePath{Validate upgrade_path<br/>provided?}
@@ -49,8 +46,7 @@ flowchart TD
 
     %% Staged OS Upgrade Loop
     LoopStart -->|No| FinalVerify
-    LoopStart -->|Yes| GetNextVersion[Get Next upgrade_path
-    Version]
+    LoopStart -->|Yes| GetNextVersion[Get Next upgrade_path Version]
 
     GetNextVersion --> UpgradeTaskEntry[/"Task: upgrade_step_v2.yml<br/>Target Version"/]
 
@@ -90,8 +86,7 @@ flowchart TD
         Task6Details --> Task6Check{Device<br/>ready?}
         Task6Check -->|No, retry < 100| Task6
         Task6Check -->|Failed after retries| End10([End - Failed])
-        Task6Check -->|Success| Task7["Task 7: Verify installed
-        version is Target Version"]
+        Task6Check -->|Success| Task7["Task 7: Verify installed version is Target Version"]
 
         Task7 --> Task7Details["panos_facts module<br/>gather_subset: system"]
 
@@ -129,187 +124,3 @@ flowchart TD
     class GetNextVersion loopNode
     class UpgradeTaskEntry,UpgradeTaskExit entryExit
 ```
-
-</div>
-<div style="flex: 1; padding: 1rem; background-color: #f8f9fa; border-left: 3px solid #4682B4; font-size: 0.9em;">
-
-## Step-by-Step Execution Flow
-
-### 🚀 Start
-
-**1. Start Playbook** - Execution begins
-
-**2. Validate upgrade_path provided?** (Decision)
-
-- ❌ **No** → Fail: upgrade_path required → **End - Failed**
-- ✅ **Yes** → Continue to Step 3
-
-### 📋 Initial Readiness Check
-
-**3. Check Device Ready** - Verify device is operational
-
-**4. Device Ready?** (Decision)
-
-- ❌ **No, retry < 10** → Loop back to Step 3
-- ❌ **Failed after retries** → **End - Failed**
-- ✅ **Yes** → Continue to Step 5
-
-### 📦 Content Update Phase
-
-**5. Refresh Content Update Idx** - Refresh content index
-
-**6. Download Latest Content** - Initiate content download
-
-**7. Extract Download Job ID** - Get job tracking ID
-
-**8. Job ID exists?** (Decision)
-
-- ❌ **No** → Skip to Step 13 (Install Content)
-- ✅ **Yes** → Continue to Step 9
-
-**9. Poll Download Job Status** - Monitor download progress
-
-**10. Status FIN?** (Decision)
-
-- 🔄 **No, retry < 300** → Loop back to Step 9
-- ❌ **FAIL result** → **End - Failed**
-- ✅ **Success** → Continue to Step 11
-
-**11. Install Latest Content** - Install downloaded content
-
-**12. Extract Install Job ID** - Get install job tracking ID
-
-**13. Job ID exists?** (Decision)
-
-- ❌ **No** → Skip to Step 16 (Wait for Device Ready)
-- ✅ **Yes** → Continue to Step 14
-
-**14. Poll Install Job Status** - Monitor install progress
-
-**15. Status FIN or FAIL?** (Decision)
-
-- 🔄 **No, retry < 300** → Loop back to Step 14
-- ❌ **FIN + FAIL result** → **End - Failed**
-- ❌ **FAIL status** → **End - Failed**
-- ✅ **FIN + Success** → Continue to Step 16
-
-**16. Wait for Device Ready after Content Install**
-
-**17. Device Ready?** (Decision)
-
-- 🔄 **No, retry < 60** → Loop back to Step 16
-- ❌ **Failed** → **End - Failed**
-- ✅ **Yes** → Continue to Step 18
-
-### 🔄 Staged OS Upgrade Loop
-
-**18. More versions in upgrade_path?** (Decision)
-
-- ❌ **No** → Skip to Step 37 (Final Verify)
-- ✅ **Yes** → Continue to Step 19
-
-**19. Get Next upgrade_path Version** - Retrieve next target version
-
-**20. Task: upgrade_step_v2.yml** - Enter upgrade task for target version
-
----
-
-### 📋 upgrade_step_v2.yml Task (Steps 21-36)
-
-**21. Task 1: Download PAN-OS Target Version** - Download OS image
-
-**22. Download successful?** (Decision)
-
-- 🔄 **No, retry < 3 (wait 60s)** → Loop back to Step 21
-- ❌ **Failed after 3 retries** → **End - Failed**
-- ✅ **Yes** → Continue to Step 23
-
-**23. Task 2: Install PAN-OS Target Version (no restart)**
-
-- Uses: `panos_software` module
-- Parameters: `download: false`, `install: true`, `restart: false`
-
-**24. Task 3: Restart device to apply Target Version**
-
-- Uses: `panos_op` module
-- Command: `request restart system`
-- Parameters: `async: 45`, `poll: 0`
-
-**25. Task 4: Wait for port 443 to stop responding**
-
-- Uses: `wait_for` module
-- Port: `443`, State: `stopped`, Timeout: `300s`
-
-**26. Port 443 stopped?** (Decision)
-
-- ❌ **Timeout 300s** → **End - Failed**
-- ✅ **Success** → Continue to Step 27
-
-**27. Task 5: Wait for port 443 to start responding**
-
-- Uses: `wait_for` module
-- Port: `443`, State: `started`, Timeout: `900s` (15 min)
-
-**28. Port 443 started?** (Decision)
-
-- ❌ **Timeout 900s** → **End - Failed**
-- ✅ **Success** → Continue to Step 29
-
-**29. Task 6: Wait for device readiness after upgrade**
-
-- Uses: `panos_check` module
-- Parameters: `retries: 100`, `delay: 15s`
-
-**30. Device ready?** (Decision)
-
-- 🔄 **No, retry < 100** → Loop back to Step 29
-- ❌ **Failed after retries** → **End - Failed**
-- ✅ **Success** → Continue to Step 31
-
-**31. Task 7: Verify installed version is Target Version**
-
-- Uses: `panos_facts` module
-- Parameter: `gather_subset: system`
-
-**32. Task 8: Assert Target Version installed successfully**
-
-- Assert: `ansible_net_version == Target Version`
-
-**33. Version matches?** (Decision)
-
-- ❌ **No** → **End - Failed: Version mismatch**
-- ✅ **Yes** → Continue to Step 34
-
-**34. Return to main playbook** - Exit upgrade_step_v2.yml task
-
----
-
-**35. Loop back to Step 18** - Check for more versions to upgrade
-
-### ✅ Final Verification
-
-**36. Gather Final System Facts** - Collect final device information
-
-**37. Display Final Version** - Show successfully installed version
-
-**38. End - Success** 🎉 - Playbook completed successfully
-
----
-
-### 🛡️ Failure Points Summary
-
-The playbook can fail and halt at:
-
-- Missing upgrade_path parameter
-- Initial device readiness check (10 retries)
-- Content download job failure (300 retries)
-- Content install job failure (300 retries)
-- Device not ready after content install (60 retries)
-- OS download failure (3 retries per version)
-- Port 443 not stopping (300s timeout)
-- Port 443 not starting (900s timeout)
-- Device not ready after upgrade (100 retries)
-- Version mismatch after upgrade
-
-</div>
-</div>
