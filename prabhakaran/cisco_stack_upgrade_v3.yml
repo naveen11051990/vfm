@@ -4,6 +4,7 @@
   gather_facts: yes
   vars:
       ios_image_bin: "{{ ios_image_filename }}"
+      tftp_server: "{{ tftp_server_ip }}"
   tasks:
       - name: Generate timestamp for tech-support file
         set_fact:
@@ -27,7 +28,7 @@
       - name: Ping TFTP server via Mgmt-vrf
         cisco.ios.ios_command:
             commands:
-                - ping vrf Mgmt-vrf 192.168.29.208
+                - ping vrf Mgmt-vrf {{ tftp_server }}
       - name: Generate tech-support log
         cisco.ios.ios_command:
             commands:
@@ -50,7 +51,7 @@
       - name: Copy tech-support log to TFTP
         cisco.ios.ios_command:
             commands:
-                - command: "copy flash:techsupport_{{ timestamp }}.txt tftp://192.168.29.208/techsupport_{{ timestamp }}.txt vrf Mgmt-vrf"
+                - command: "copy flash:techsupport_{{ timestamp }}.txt tftp://{{ tftp_server }}/techsupport_{{ timestamp }}.txt vrf Mgmt-vrf"
                   prompt: "Destination filename"
                   answer: "techsupport_{{ timestamp }}.txt"
         vars:
@@ -79,7 +80,7 @@
       - name: Copy image from TFTP to flash using Mgmt-vrf
         cisco.ios.ios_command:
             commands:
-                - command: "copy tftp://192.168.29.208/{{ ios_image_bin }} flash:{{ ios_image_bin }} vrf Mgmt-vrf"
+                - command: "copy tftp://{{ tftp_server }}/{{ ios_image_bin }} flash:{{ ios_image_bin }} vrf Mgmt-vrf"
                   prompt: Destination filename
                   answer: "{{ ios_image_bin }}"
         register: copy_output
