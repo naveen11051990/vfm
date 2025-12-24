@@ -1,6 +1,6 @@
 ---
-- name: Upgrade FortiGate HA firewall firmware
-  hosts: 192.168.29.146
+- name: Upgrade FortiGate HA firmware (safe process)
+  hosts: localhost
   connection: local
   gather_facts: no
 
@@ -8,15 +8,47 @@
     # Target FortiGate HA IP (management / cluster VIP)
     fortigate_host: "192.168.29.146"
     fortigate_username: "admin"
-    fortigate_password: "YOURPASSWORD"
+    fortigate_password: "YOURPASSWORD"   # <--- REPLACE - prefer use of vault or Ansible vars file
     vdom: "root"
-    ssl_verify: false
-    # Path to local firmware image
+    ssl_verify: false                    # boolean, not string
+    # Path to local firmware image on control machine (must exist)
     firmware_file: "/path/to/FGT-XXXXXX-buildXXXX-FORTINET.out"
-    # Whether to format boot partition (use with caution)
-    format_partition: no
+    # Whether to format boot partition (use with caution — boolean)
+    format_partition: false
+    # Ports and timeouts — tune to your environment
+    mgmt_port: 443
+    preflight_timeout: 30
+    reboot_wait_closed_timeout: 900     # seconds to wait for port to close (device reboot)
+    reboot_wait_open_timeout: 1800      # seconds to wait for port to come back
+    post_reboot_pause: 60               # extra seconds to wait after port open so services settle
 
   tasks:
+    - name: Preflight - quick user notice (do not proceed if you haven't backed up)
+      ansible.builtin.debug:
+        msg: |
+          IMPORTANT: Ensure you have a full config backup and tested recovery plan.
+          This playbook will upload and install firmware to the device at {{ fortigate_host }}.
+          Test in lab first.
+
+    - name: Ensure firmware file exists on the control host
+      ansible.builtin.stat:
+        path: "{{ firmware_file }}"
+      register: firmware_file_stat
+      failed_when: not firmware_file_stat.stat.exists
+      tags: preflight
+
+    - name: Check management port (reachability) before upload
+      ansible.builtin.wait_for:
+        host: "{{ fortigate_host }}"
+        port: "{{ mgmt_port }}"
+        state: started
+        timeout: "{{ preflight_timeout }}"
+
+    - name: (Optional) Pause to let operator cancel within window
+      ansible.builtin.pause:
+        prompt: "Press ENTER to continue with firmware upload, or Ctrl-C to abort (you have backed up config?)"
+      when: firmware_file_stat.stat.exists
+
     - name: Upload and install firmware on FortiGate HA
       fortinet.fortios.fortios_system_firmware_upgrade:
         host: "{{ fortigate_host }}"
@@ -29,12 +61,61 @@
           format_partition: "{{ format_partition }}"
           source: "upload"
       register: upgrade_result
+      # If module signals failure, stop and show useful info
+      failed_when:
+        - upgrade_result is failed
+        - (upgrade_result is defined) and (upgrade_result.meta is defined) and (upgrade_result.meta.results is defined) and (upgrade_result.meta.results.status is defined) and (upgrade_result.meta.results.status == 'error')
+      tags: upgrade
 
-    - name: Show firmware upgrade result
-      debug:
-        msg: "Firmware upgrade status: {{ upgrade_result.meta.results.status }}"
+    - name: Show raw upgrade_result for debugging
+      ansible.builtin.debug:
+        var: upgrade_result
 
-    - name: Optional — Notify if upgrade succeeded
-      when: upgrade_result.meta.results.status == "success"
-      debug:
-        msg: "Firmware upload succeeded. FortiGate will reboot. Ensure HA sync completes."
+    - name: Interpret upgrade result and announce
+      ansible.builtin.debug:
+        msg: >-
+          Upgrade module finished. changed={{ upgrade_result.changed | default(false) }}
+          status={{ (upgrade_result.meta.results.status if (upgrade_result.meta is defined and upgrade_result.meta.results is defined and upgrade_result.meta.results.status is defined) else 'unknown') }}
+      ignore_errors: yes
+
+    - name: Wait for management port to close (reboot begins) -- up to {{ reboot_wait_closed_timeout }}s
+      ansible.builtin.wait_for:
+        host: "{{ fortigate_host }}"
+        port: "{{ mgmt_port }}"
+        state: stopped
+        timeout: "{{ reboot_wait_closed_timeout }}"
+      when: upgrade_result is defined and (upgrade_result.changed | default(false))
+      tags: reboot-wait
+
+    - name: Wait for management port to come back up (device finished reboot) -- up to {{ reboot_wait_open_timeout }}s
+      ansible.builtin.wait_for:
+        host: "{{ fortigate_host }}"
+        port: "{{ mgmt_port }}"
+        state: started
+        timeout: "{{ reboot_wait_open_timeout }}"
+      when: upgrade_result is defined and (upgrade_result.changed | default(false))
+      tags: reboot-wait
+
+    - name: Post-reboot - pause an additional {{ post_reboot_pause }}s to allow services and HA to settle
+      ansible.builtin.pause:
+        seconds: "{{ post_reboot_pause }}"
+      when: upgrade_result is defined and (upgrade_result.changed | default(false))
+
+    - name: Verify management port reachable after upgrade
+      ansible.builtin.wait_for:
+        host: "{{ fortigate_host }}"
+        port: "{{ mgmt_port }}"
+        state: started
+        timeout: 30
+
+    - name: Post-upgrade - show firmware version (example)
+      ansible.builtin.debug:
+        msg: "Please verify the firmware & HA status manually: login to {{ fortigate_host }} and check 'get system status' and 'get system ha status'."
+      # If you have a collection/module which can return firmware/HA programmatically you can replace this debug with that module.
+      tags: verify
+
+    - name: Optional — notify success to operator
+      ansible.builtin.debug:
+        msg: "Firmware upgrade task completed. Check HA sync and that all cluster members are running expected version."
+
+# End playbook
