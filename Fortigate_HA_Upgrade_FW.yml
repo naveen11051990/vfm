@@ -12,7 +12,7 @@
     vdom: "root"
     ssl_verify: false                    # boolean, not string
     # Path to local firmware image on control machine (must exist)
-    firmware_file: "/path/to/FGT-XXXXXX-buildXXXX-FORTINET.out"
+    firmware_file: "/var/lib/awx/panos_backups/fortinet"
     # Whether to format boot partition (use with caution — boolean)
     format_partition: false
     # Ports and timeouts — tune to your environment
