@@ -1,6 +1,6 @@
 ---
 - name: Upgrade FortiGate HA firmware (safe process)
-  hosts: localhost
+  hosts: fg-ha
   connection: local
   gather_facts: no
 
@@ -8,7 +8,7 @@
     # Target FortiGate HA IP (management / cluster VIP)
     fortigate_host: "192.168.29.146"
     fortigate_username: "admin"
-    fortigate_password: "YOURPASSWORD"   # <--- REPLACE - prefer use of vault or Ansible vars file
+    fortigate_password: "P@ssw0rd"   # <--- REPLACE - prefer use of vault or Ansible vars file
     vdom: "root"
     ssl_verify: false                    # boolean, not string
     # Path to local firmware image on control machine (must exist)
