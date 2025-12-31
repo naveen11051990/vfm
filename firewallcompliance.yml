@@ -9,6 +9,10 @@
       ip_address: "{{ ip_address }}"
       username: "{{ username }}"
       password: "{{ password }}"
+
+    # Mandatory security profile group to check
+    required_profile_group: "VFMGROUP"
+
     expected_dns_primary: "{{ dns_primary | default('8.8.8.8') }}"
     expected_dns_secondary: "{{ dns_secondary | default('192.168.29.5') }}"
     expected_ntp_primary: "{{ ntp_primary | default('1.1.1.1') }}"
@@ -92,7 +96,6 @@
         rules_missing_profiles: >-
           {{
             (sec_rules.gathered | default([]))
-            | selectattr('group_profile', 'equalto', None)
             | selectattr('antivirus', 'equalto', None)
             | selectattr('vulnerability', 'equalto', None)
             | selectattr('spyware', 'equalto', None)
@@ -108,6 +111,17 @@
             (sec_rules.gathered | default([]))
             | selectattr('log_start', 'equalto', False)
             | selectattr('log_end', 'equalto', False)
+            | list
+          }}
+
+    # ❗ New: filter rules that do NOT have the required profile group
+    - name: Filter security rules missing required profile group
+      set_fact:
+        rules_missing_required_group: >-
+          {{
+            (sec_rules.gathered | default([]))
+            | selectattr('group_profile', 'defined')
+            | rejectattr('group_profile', 'equalto', required_profile_group)
             | list
           }}
 
@@ -133,7 +147,6 @@
             NTP sync        : {{ readiness.response.ntp_sync.state | default(false) | ternary('PASS','FAIL') }} ({{ readiness.response.ntp_sync.reason | default('') }})
             HA / config sync: {{ readiness.response.ha.state | default(false) | ternary('PASS','FAIL') }} ({{ readiness.response.ha.reason | default('') }})
             Content version : {{ readiness.response.content_version.state | default(false) | ternary('PASS','FAIL') }} ({{ readiness.response.content_version.reason | default('') }})
-
 
     - name: Rules without description
       ansible.builtin.debug:
@@ -190,6 +203,16 @@
           (All rules have at least one of the required profiles or a profile group.)
           {% endfor %}
 
+    - name: Security rules missing the required profile group
+      ansible.builtin.debug:
+        msg: |
+          Security rules that do NOT have profile group "{{ required_profile_group }}":
+          {% for rule in rules_missing_required_group %}
+          - {{ rule.rule_name | default(rule.name) }} → group_profile={{ rule.group_profile | default('None') }}
+          {% else %}
+          (All security rules have the required profile group.)
+          {% endfor %}
+
     - name: Security rules missing logging
       ansible.builtin.debug:
         msg: |
@@ -203,5 +226,3 @@
     - name: NTP HA and Content updates validation
       debug:
         msg: "{{ compliance_status }}"
-
-  
