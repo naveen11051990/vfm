@@ -1,6 +1,6 @@
 ---
 - name: Audit Palo Alto Security Rules for Missing Profiles / Description / Decryption
-  hosts: "PRODUCTIONFIREWALL"
+  hosts: "PA_FW"
   connection: local
   gather_facts: no
 
