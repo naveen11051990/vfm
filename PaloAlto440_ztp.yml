@@ -84,8 +84,25 @@
             commit: true    # commit immediately after creating rule
       register: rule_create
 
+
+	- name: add a nat rule
+    paloaltonetworks.panos.panos_nat_rule2:
+    provider: '{{ device }}'
+    name: 'myRulefromxsoar'
+    description: 'Made by Ansible'
+    nat_type: 'ipv4'
+    from_zones: ['Trust-L3']
+    to_zones: ['Untrusted-L3']
+    to_interface: 'ethernet1/1'
+    service: 'any'
+    source_addresses: ['any']
+    destination_addresses: ['any']
+    source_translation_type: 'dynamic-ip-and-port'
+    source_translation_address_type: 'interface-address'
+    source_translation_interface: 'ethernet1/1'
+
     - name: Configure DNS & NTP servers
-      paloaltonetworks.panos.panos_mgtconfig:
+        paloaltonetworks.panos.panos_mgtconfig:
             provider: "{{ device }}"
             dns_server_primary: "8.8.8.8"
             dns_server_secondary: "192.168.29.3"
@@ -157,22 +174,7 @@
     commit: false
 	
 -------------------------------------------------------------------------------------
-	
-- name: add a nat rule
-  paloaltonetworks.panos.panos_nat_rule2:
-    provider: '{{ device }}'
-    name: 'myRulefromxsoar'
-    description: 'Made by Ansible'
-    nat_type: 'ipv4'
-    from_zones: ['Trust-L3']
-    to_zones: ['Untrusted-L3']
-    to_interface: 'ethernet1/1'
-    service: 'any'
-    source_addresses: ['any']
-    destination_addresses: ['any']
-    source_translation_type: 'dynamic-ip-and-port'
-    source_translation_address_type: 'interface-address'
-    source_translation_interface: 'ethernet1/1'
+
 	
 	
 - name: Update content to latest version
