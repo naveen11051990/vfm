@@ -91,6 +91,94 @@
             dns_server_secondary: "192.168.29.3"
             ntp_server_primary: "1.1.1.1"
             ntp_server_secondary: "2.2.2.2"
+
+    - name: configure foo administrator
+      paloaltonetworks.panos.panos_administrator:
+        provider: '{{ provider }}'
+        admin_username: 'foo'
+        admin_password: 'secret'
+        superuser: true
+        role_profile: 
+
+
+   - name: enable bgp local
+  paloaltonetworks.panos.panos_bgp:
+   provider: '{{ device }}'
+   router_id: '1.1.1.1'
+   local_as: '64512'
+   reject_default_route: true
+   install_route: true
+  
+- name: enable bgp peer  
+  paloaltonetworks.panos.panos_bgp_peer:
+    provider: '{{ device }}'
+    peer_group: 'vfm_peer'
+    name: 'peer-1'
+    enable: true
+    local_interface: 'ethernet1/1'
+    local_interface_ip: '192.168.1.1'
+    peer_address_ip: '10.1.1.1'
+    peer_as: '64512'
+    
+----------------------------------------------------------------------------------
+	
+- name: Add IKE crypto config to the firewall
+  paloaltonetworks.panos.panos_ike_crypto_profile:
+    provider: '{{ device }}'
+    state: 'present'
+    name: 'vfm_crypto_profile'
+    dh_group: ['group2']
+    authentication: ['sha1']
+    encryption: ['aes-128-cbc']
+    lifetime_seconds: '28800'
+	
+- name: Add IPSec crypto config to the firewall
+  paloaltonetworks.panos.panos_ipsec_profile:
+    provider: '{{ device }}'
+    state: 'present'
+    name: 'vfm_ipsec_profile'
+    esp_authentication: ['sha1']
+    esp_encryption: ['aes-128-cbc']
+    lifetime_seconds: '3600'
+	
+- name: Add IKE gateway config to the firewall
+  paloaltonetworks.panos.panos_ike_gateway:
+    provider: '{{ device }}'
+    state: 'present'
+    name: 'VFM_IKEGW'
+    version: 'ikev2'
+    interface: 'ethernet1/1'
+    enable_passive_mode: true
+    enable_liveness_check: true
+    liveness_check_interval: '5'
+    peer_ip_value: '1.2.3.4'
+    pre_shared_key: 'CHANGEME'
+    ikev2_crypto_profile: 'IKE-Ansible'
+    commit: false
+	
+-------------------------------------------------------------------------------------
+	
+- name: add a nat rule
+  paloaltonetworks.panos.panos_nat_rule2:
+    provider: '{{ device }}'
+    name: 'myRulefromxsoar'
+    description: 'Made by Ansible'
+    nat_type: 'ipv4'
+    from_zones: ['Trust-L3']
+    to_zones: ['Untrusted-L3']
+    to_interface: 'ethernet1/1'
+    service: 'any'
+    source_addresses: ['any']
+    destination_addresses: ['any']
+    source_translation_type: 'dynamic-ip-and-port'
+    source_translation_address_type: 'interface-address'
+    source_translation_interface: 'ethernet1/1'
+	
+	
+- name: Update content to latest version
+  paloaltonetworks.panos.panos_dynamic_updates:
+    provider: '{{ device }}'
+	update_type: content
       
     - name: Debug result
       ansible.builtin.debug:
