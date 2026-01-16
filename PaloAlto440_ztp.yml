@@ -31,13 +31,6 @@
           description: "Address object 2 from Ansible"
 
 
-    - name: Create new Virtual Router
-      paloaltonetworks.panos.panos_virtual_router:
-            provider: "{{ device }}"
-            vsys: "vsys1"
-            name: "vfm-vrouter"
-            state: present
-
     - name: Create zone for Internet
       paloaltonetworks.panos.panos_zone:
             provider: "{{ device }}"
@@ -100,6 +93,16 @@
     source_translation_type: 'dynamic-ip-and-port'
     source_translation_address_type: 'interface-address'
     source_translation_interface: 'ethernet1/1'
+
+
+
+	- name: Create new Virtual Router
+      paloaltonetworks.panos.panos_virtual_router:
+            provider: "{{ device }}"
+            vsys: "vsys1"
+            name: "vfm-vrouter"
+            state: present
+			
 
     - name: Configure DNS & NTP servers
         paloaltonetworks.panos.panos_mgtconfig:
